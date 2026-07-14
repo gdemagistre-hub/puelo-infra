@@ -1,197 +1,196 @@
-import '/flutter_flow/flutter_flow_theme.dart';
-import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
-import 'dart:ui';
-import '/index.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
-
-import 'home_page_model.dart';
-export 'home_page_model.dart';
 
 class HomePageWidget extends StatefulWidget {
   const HomePageWidget({super.key});
 
-  static String routeName = 'HomePage';
-  static String routePath = '/homePage';
+  static const String routeName = 'HomePage';
+  static const String routePath = '/homePage';
 
   @override
   State<HomePageWidget> createState() => _HomePageWidgetState();
 }
 
 class _HomePageWidgetState extends State<HomePageWidget> {
-  late HomePageModel _model;
-
   final scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
-  void initState() {
-    super.initState();
-    _model = createModel(context, () => HomePageModel());
-  }
-
-  @override
-  void dispose() {
-    _model.dispose();
-
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    // Definimos una paleta de colores moderna y limpia para el MVP de Puelo
+    final primaryColor = const Color(0xFF0F52BA); // Azul institucional elegante
+    final accentColor = const Color(0xFFE8F0FE);  // Azul suave para contrastes
+    final textColor = const Color(0xFF1E293B);    // Gris pizarra oscuro para legibilidad
+    final subtitleColor = const Color(0xFF64748B); // Gris medio para descripciones
+
     return GestureDetector(
-      onTap: () {
-        FocusScope.of(context).unfocus();
-        FocusManager.instance.primaryFocus?.unfocus();
-      },
+      onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
         key: scaffoldKey,
-        backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
-        appBar: AppBar(
-          backgroundColor: FlutterFlowTheme.of(context).primary,
-          automaticallyImplyLeading: false,
-          title: Text(
-            'Life Wallet by Puelo',
-            style: FlutterFlowTheme.of(context).headlineMedium.override(
-                  font: GoogleFonts.interTight(
-                    fontWeight:
-                        FlutterFlowTheme.of(context).headlineMedium.fontWeight,
-                    fontStyle:
-                        FlutterFlowTheme.of(context).headlineMedium.fontStyle,
-                  ),
-                  color: Colors.white,
-                  fontSize: 22,
-                  letterSpacing: 0.0,
-                  fontWeight:
-                      FlutterFlowTheme.of(context).headlineMedium.fontWeight,
-                  fontStyle:
-                      FlutterFlowTheme.of(context).headlineMedium.fontStyle,
-                ),
-          ),
-          actions: [],
-          centerTitle: false,
-          elevation: 2,
-        ),
+        backgroundColor: const Color(0xFFF8FAFC), // Fondo sutilmente gris/celeste muy limpio
         body: SafeArea(
           top: true,
-          child: Row(
-            mainAxisSize: MainAxisSize.max,
-            children: [
-              Column(
-                mainAxisSize: MainAxisSize.max,
-                children: [
-                  Align(
-                    alignment: AlignmentDirectional(0, 0),
-                    child: Padding(
-                      padding: EdgeInsets.all(75),
-                      child: FFButtonWidget(
-                        onPressed: () async {
-                          context.pushNamed(
-                            RegistroTrabajadorWidget.routeName,
-                            extra: <String, dynamic>{
-                              '__transition_info__': TransitionInfo(
-                                hasTransition: true,
-                                transitionType: PageTransitionType.leftToRight,
-                              ),
-                            },
-                          );
-                        },
-                        text: 'Registrarme como Trabajador',
-                        options: FFButtonOptions(
-                          height: 40,
-                          padding: EdgeInsets.all(10),
-                          iconPadding:
-                              EdgeInsetsDirectional.fromSTEB(0, 0, 0, 0),
-                          color: FlutterFlowTheme.of(context).primary,
-                          textStyle:
-                              FlutterFlowTheme.of(context).titleSmall.override(
-                                    font: GoogleFonts.interTight(
-                                      fontWeight: FlutterFlowTheme.of(context)
-                                          .titleSmall
-                                          .fontWeight,
-                                      fontStyle: FlutterFlowTheme.of(context)
-                                          .titleSmall
-                                          .fontStyle,
-                                    ),
-                                    color: Colors.white,
-                                    letterSpacing: 0.0,
-                                    fontWeight: FlutterFlowTheme.of(context)
-                                        .titleSmall
-                                        .fontWeight,
-                                    fontStyle: FlutterFlowTheme.of(context)
-                                        .titleSmall
-                                        .fontStyle,
-                                  ),
-                          elevation: 0,
-                          borderSide: BorderSide(
-                            color: FlutterFlowTheme.of(context).primaryText,
-                            width: 2,
-                          ),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
+          child: Center(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Cabecera de Marca (Branding)
+                    Icon(
+                      Icons.wallet_giftcard_rounded,
+                      size: 72,
+                      color: primaryColor,
+                    ),
+                    const SizedBox(height: 16.0),
+                    Text(
+                      'Puelo',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w800,
+                        color: primaryColor,
+                        letterSpacing: -0.5,
                       ),
                     ),
-                  ),
-                  Align(
-                    alignment: AlignmentDirectional(0, 0),
-                    child: Padding(
-                      padding: EdgeInsets.all(25),
-                      child: FFButtonWidget(
-                        onPressed: () async {
-                          context
-                              .pushNamed(BuscadorPrestadoresWidget.routeName);
-                        },
-                        text: 'Buscar Servicios',
-                        options: FFButtonOptions(
-                          height: 31.35,
-                          padding: EdgeInsetsDirectional.fromSTEB(16, 0, 16, 0),
-                          iconPadding: EdgeInsets.all(8),
-                          color: FlutterFlowTheme.of(context).primary,
-                          textStyle:
-                              FlutterFlowTheme.of(context).titleSmall.override(
-                            font: GoogleFonts.interTight(
-                              fontWeight: FlutterFlowTheme.of(context)
-                                  .titleSmall
-                                  .fontWeight,
-                              fontStyle: FlutterFlowTheme.of(context)
-                                  .titleSmall
-                                  .fontStyle,
-                            ),
-                            color: Colors.white,
-                            letterSpacing: 0.0,
-                            fontWeight: FlutterFlowTheme.of(context)
-                                .titleSmall
-                                .fontWeight,
-                            fontStyle: FlutterFlowTheme.of(context)
-                                .titleSmall
-                                .fontStyle,
-                            shadows: [
-                              Shadow(
-                                color:
-                                    FlutterFlowTheme.of(context).secondaryText,
-                                offset: Offset(2.0, 2.0),
-                                blurRadius: 2.0,
-                              )
-                            ],
-                          ),
-                          elevation: 0,
-                          borderSide: BorderSide(
-                            color: FlutterFlowTheme.of(context).primaryText,
-                            width: 2,
-                          ),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
+                    Text(
+                      'Life Wallet',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                        color: subtitleColor,
+                        letterSpacing: 1.5,
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 48.0),
+
+                    // Tarjeta/Botón 1: Registrarme como Trabajador
+                    _buildFeatureCard(
+                      context,
+                      title: 'Registrarme como Trabajador',
+                      description: 'Formá parte de nuestra red de prestadores confiables y gestioná tus servicios.',
+                      icon: Icons.badge_outlined,
+                      color: primaryColor,
+                      textColor: Colors.white,
+                      backgroundColor: primaryColor,
+                      onPressed: () {
+                        // TODO: Navegación a RegistroTrabajadorWidget
+                        // Navigator.pushNamed(context, '/registroTrabajador');
+                      },
+                    ),
+
+                    const SizedBox(height: 20.0),
+
+                    // Tarjeta/Botón 2: Buscar Servicios
+                    _buildFeatureCard(
+                      context,
+                      title: 'Buscar Servicios',
+                      description: 'Encontrá prestadores validados en tu comunidad de manera rápida y segura.',
+                      icon: Icons.search_rounded,
+                      color: primaryColor,
+                      textColor: textColor,
+                      backgroundColor: Colors.white,
+                      onPressed: () {
+                        // TODO: Navegación a BuscadorPrestadoresWidget
+                        // Navigator.pushNamed(context, '/buscadorPrestadores');
+                      },
+                      hasBorder: true,
+                    ),
+                  ],
+                ),
               ),
-            ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Componente visual personalizado para las tarjetas de acción principal
+  Widget _buildFeatureCard(
+    BuildContext context, {
+    required String title,
+    required String description,
+    required IconData icon,
+    required Color color,
+    required Color textColor,
+    required Color backgroundColor,
+    required VoidCallback onPressed,
+    bool hasBorder = false,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(16.0),
+        border: hasBorder ? Border.all(color: const Color(0xFFE2E8F0), width: 1.5) : null,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(16.0),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
+            child: Row(
+              children: [
+                // Icono destacado con fondo circular adaptativo
+                Container(
+                  padding: const EdgeInsets.all(12.0),
+                  decoration: BoxDecoration(
+                    color: backgroundColor == Colors.white 
+                        ? color.withOpacity(0.1) 
+                        : Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 28,
+                    color: backgroundColor == Colors.white ? color : Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 20.0),
+                // Textos descriptivos
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: textColor,
+                        ),
+                      ),
+                      const SizedBox(height: 4.0),
+                      Text(
+                        description,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.normal,
+                          color: backgroundColor == Colors.white 
+                              ? const Color(0xFF64748B) 
+                              : Colors.white.withOpacity(0.85),
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 }
-
