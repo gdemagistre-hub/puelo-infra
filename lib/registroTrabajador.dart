@@ -33,24 +33,12 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
   List<String> _profesionesSeleccionadas = [];
   List<String> _zonasSeleccionadas = [];
 
-  // Listas de ejemplo
-  final List<String> _opcionesProfesiones = [
-    'Electricista',
-    'Plomero',
-    'Gasista',
-    'Carpintero',
-    'Pintor',
-    'Soporte Técnico',
-  ];
+  // Listas dinámicas que se llenarán desde Firestore
+  List<String> _opcionesProfesiones = [];
+  List<String> _opcionesZonas = [];
+  bool _cargandoCatalogos = true;
 
-  final List<String> _opcionesZonas = [
-    'Zona Norte',
-    'Zona Sur',
-    'Zona Oeste',
-    'CABA',
-  ];
-
-  // Paleta de colores consistente con la Homepage
+  // Paleta de colores unificada para Puelo
   final primaryColor = const Color(0xFF0F52BA); 
   final accentColor = const Color(0xFFE8F0FE);  
   final textColor = const Color(0xFF1E293B);    
@@ -64,6 +52,9 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
     _documentoController = TextEditingController();
     _nombreComercialController = TextEditingController();
     _telefonoController = TextEditingController();
+
+    // Disparamos la carga de catálogos al iniciar la pantalla
+    _cargarCatalogosDesdeFirestore();
   }
 
   @override
@@ -80,6 +71,52 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
     _nombreComercialFocusNode.dispose();
     _telefonoFocusNode.dispose();
     super.dispose();
+  }
+
+  // Método para leer los catálogos en tiempo real
+  Future<void> _cargarCatalogosDesdeFirestore() async {
+    try {
+      // 1. Cargar Catálogo de Oficios
+      // Buscamos el primer documento de la colección 'cat_oficios'
+      final oficiosSnapshot = await FirebaseFirestore.instance.collection('cat_oficios').limit(1).get();
+      List<String> oficiosCargados = [];
+      if (oficiosSnapshot.docs.isNotEmpty) {
+        final data = oficiosSnapshot.docs.first.data();
+        final List<dynamic>? maestro = data['maestro'] as List<dynamic>?;
+        if (maestro != null) {
+          oficiosCargados = maestro.map((e) => e.toString()).toList();
+        }
+      }
+
+      // 2. Cargar Catálogo de Zonas
+      // Buscamos el primer documento de la colección 'cat_zonas'
+      final zonasSnapshot = await FirebaseFirestore.instance.collection('cat_zonas').limit(1).get();
+      List<String> zonasCargadas = [];
+      if (zonasSnapshot.docs.isNotEmpty) {
+        final data = zonasSnapshot.docs.first.data();
+        final List<dynamic>? maestro = data['maestro'] as List<dynamic>?;
+        if (maestro != null) {
+          zonasCargadas = maestro.map((e) => e.toString()).toList();
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _opcionesProfesiones = oficiosCargados;
+          _opcionesZonas = zonasCargadas;
+          _cargandoCatalogos = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _cargandoCatalogos = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al cargar catálogos: $e')),
+        );
+      }
+    }
   }
 
   // Helper para mostrar un diálogo de selección múltiple premium
@@ -104,35 +141,40 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
               contentPadding: const EdgeInsets.only(top: 12.0, bottom: 4.0),
               content: SizedBox(
                 width: double.maxFinite,
-                child: SingleChildScrollView(
-                  child: ListBody(
-                    children: opciones.map((opcion) {
-                      final isChecked = tempSeleccionadas.contains(opcion);
-                      return CheckboxListTile(
-                        title: Text(
-                          opcion,
-                          style: TextStyle(
-                            color: textColor,
-                            fontWeight: isChecked ? FontWeight.w600 : FontWeight.normal,
-                          ),
+                child: opciones.isEmpty 
+                    ? const Padding(
+                        padding: EdgeInsets.all(24.0),
+                        child: Text('No hay opciones disponibles en este catálogo.', textAlign: TextAlign.center),
+                      )
+                    : SingleChildScrollView(
+                        child: ListBody(
+                          children: opciones.map((opcion) {
+                            final isChecked = tempSeleccionadas.contains(opcion);
+                            return CheckboxListTile(
+                              title: Text(
+                                opcion,
+                                style: TextStyle(
+                                  color: textColor,
+                                  fontWeight: isChecked ? FontWeight.w600 : FontWeight.normal,
+                                ),
+                              ),
+                              value: isChecked,
+                              activeColor: primaryColor,
+                              checkboxShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4.0)),
+                              controlAffinity: ListTileControlAffinity.trailing,
+                              onChanged: (bool? checked) {
+                                setDialogState(() {
+                                  if (checked == true) {
+                                    tempSeleccionadas.add(opcion);
+                                  } else {
+                                    tempSeleccionadas.remove(opcion);
+                                  }
+                                });
+                              },
+                            );
+                          }).toList(),
                         ),
-                        value: isChecked,
-                        activeColor: primaryColor,
-                        checkboxShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4.0)),
-                        controlAffinity: ListTileControlAffinity.trailing,
-                        onChanged: (bool? checked) {
-                          setDialogState(() {
-                            if (checked == true) {
-                              tempSeleccionadas.add(opcion);
-                            } else {
-                              tempSeleccionadas.remove(opcion);
-                            }
-                          });
-                        },
-                      );
-                    }).toList(),
-                  ),
-                ),
+                      ),
               ),
               actions: [
                 TextButton(
@@ -288,7 +330,9 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
                             _buildSelectorTile(
                               titulo: 'Profesión u Oficio',
                               valores: _profesionesSeleccionadas,
+                              cargando: _cargandoCatalogos,
                               onTap: () {
+                                if (_cargandoCatalogos) return;
                                 _mostrarSeleccionMultiple(
                                   titulo: 'Seleccioná tus Especialidades',
                                   opciones: _opcionesProfesiones,
@@ -306,7 +350,9 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
                             _buildSelectorTile(
                               titulo: 'Zonas de Cobertura',
                               valores: _zonasSeleccionadas,
+                              cargando: _cargandoCatalogos,
                               onTap: () {
+                                if (_cargandoCatalogos) return;
                                 _mostrarSeleccionMultiple(
                                   titulo: 'Seleccioná tus Zonas de Trabajo',
                                   opciones: _opcionesZonas,
@@ -441,112 +487,5 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
     );
   }
 
-  // Constructor elegante para los selectores de tipo input
-  Widget _buildSelectorTile({
-    required String titulo,
-    required List<String> valores,
-    required VoidCallback onTap,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 20.0),
-          decoration: BoxDecoration(
-            color: inputBgColor,
-            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      titulo,
-                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 15),
-                    ),
-                    if (valores.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: valores
-                            .map((val) => Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: accentColor,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    val, 
-                                    style: TextStyle(
-                                      fontSize: 12, 
-                                      color: primaryColor,
-                                      fontWeight: FontWeight.w600,
-                                    )
-                                  ),
-                                ))
-                            .toList(),
-                      )
-                    ]
-                  ],
-                ),
-              ),
-              const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF94A3B8), size: 28),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Callback de Guardado e Integración con Firestore
-  void _crearTarjetaProfesional() async {
-    // Validación básica de completitud
-    if (_nombreController.text.trim().isEmpty || _apellidoController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor completa Nombre y Apellido')),
-      );
-      return;
-    }
-
-    try {
-      final nuevoUsuarioRef = FirebaseFirestore.instance.collection('usuarios').doc();
-      
-      await nuevoUsuarioRef.set({
-        'nombre': _nombreController.text.trim(),
-        'apellido': _apellidoController.text.trim(),
-        'documento': _documentoController.text.trim(),
-        'nombre_comercial': _nombreComercialController.text.trim(),
-        'telefono': _telefonoController.text.trim(),
-        'profesiones': _profesionesSeleccionadas,
-        'zonas': _zonasSeleccionadas,
-        'creado_en': FieldValue.serverTimestamp(),
-      });
-
-      if (mounted) {
-        // Al culminar con éxito, informamos y preparamos para ruteo
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Perfil creado correctamente')),
-        );
-        // Descomentar al tener lista la pantalla de tarjetaDigital.dart:
-        // Navigator.pushNamed(
-        //   context, 
-        //   '/tarjetaDigital', 
-        //   arguments: nuevoUsuarioRef.id
-        // );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al guardar en base de datos: $e')),
-        );
-      }
-    }
-  }
-}
+  // Constructor elegante para los selectores de tipo input (adaptado para carga asíncrona)
+  Widget
