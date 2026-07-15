@@ -6,6 +6,7 @@ import 'Homepage.dart';
 import 'registroTrabajador.dart';
 import 'buscadorPrestadores.dart';
 import 'tarjetaDigital.dart';
+import 'seleccionRol.dart'; // <-- 1. IMPORTANTE IMPORTARLA ACÁ
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,25 +44,21 @@ class MyApp extends StatelessWidget {
         HomePageWidget.routePath: (context) => const HomePageWidget(),
         RegistroTrabajadorWidget.routePath: (context) => const RegistroTrabajadorWidget(),
         BuscadorPrestadoresWidget.routePath: (context) => const BuscadorPrestadoresWidget(),
+        // Usamos Navigator.push directo para las pantallas de carga, 
+        // pero registramos esta por si querés usar rutas nombradas más adelante.
+        '/seleccionRol': (context) => const SeleccionRolWidget(), 
       },
-      // Manejo inteligente para recuperar el ID desde el enlace web compartido o recargas
       onGenerateRoute: (settings) {
         final settingsName = settings.name ?? '';
         final uri = Uri.parse(settingsName);
 
-        // Detecta si la ruta coincide con tarjetaDigital (incluso si trae parámetros web)
         if (uri.path == TarjetaDigitalWidget.routePath || uri.path.startsWith('/tarjetaDigital')) {
           DocumentReference? userRef;
-
-          // 1. Intentamos buscar el ID directamente en los parámetros de la URL web (?id=...)
           final String? idParam = uri.queryParameters['id'] ?? uri.queryParameters['usuarioRef'];
 
           if (idParam != null && idParam.isNotEmpty) {
-            // Reconstruye la referencia de Firestore usando el ID del enlace compartido
             userRef = FirebaseFirestore.instance.doc('usuarios/$idParam');
-          } 
-          // 2. Si no viene por URL (navegación interna de la app), lo extrae de los argumentos habituales
-          else if (settings.arguments is Map<String, dynamic>) {
+          } else if (settings.arguments is Map<String, dynamic>) {
             final args = settings.arguments as Map<String, dynamic>;
             userRef = args['usuarioRef'] as DocumentReference?;
           } else if (settings.arguments is DocumentReference) {
