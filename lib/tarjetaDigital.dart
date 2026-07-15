@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
+// Importación especial de Dart para poder leer la URL real del navegador en Web
+import 'dart:html' as html;
 
 class TarjetaDigitalWidget extends StatefulWidget {
   const TarjetaDigitalWidget({
@@ -21,7 +23,7 @@ class TarjetaDigitalWidget extends StatefulWidget {
 class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
   final scaffoldKey = GlobalKey<ScaffoldState>();
   DocumentReference? _resolvedRef;
-  bool _loadingRouteArgs = true;
+  bool _loading = true;
 
   // Paleta de diseño premium Puelo
   final primaryColor = const Color(0xFF0F52BA);
@@ -32,26 +34,48 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
   @override
   void initState() {
     super.initState();
-    _resolvedRef = widget.usuarioRef;
     _resolveReference();
   }
 
-  // Resuelve la referencia ya sea por parámetro o leyendo argumentos de ruteo web
+  // Método de resolución avanzado e infalible para Web
   void _resolveReference() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_resolvedRef == null) {
-        final args = ModalRoute.of(context)?.settings.arguments;
-        if (args is DocumentReference) {
-          _resolvedRef = args;
-        } else if (args is Map<String, dynamic> && args['usuarioRef'] is DocumentReference) {
-          _resolvedRef = args['usuarioRef'];
-        } else if (args is String) {
-          _resolvedRef = FirebaseFirestore.instance.collection('usuarios').doc(args);
+    // Escenario 1: El parámetro fue enviado por navegación local en memoria
+    if (widget.usuarioRef != null) {
+      _resolvedRef = widget.usuarioRef;
+      _loading = false;
+      return;
+    }
+
+    try {
+      // Escenario 2: Extracción directa desde la URL real de la barra del navegador (Solución para links externos)
+      final currentUrl = html.window.location.href;
+      final uri = Uri.parse(currentUrl);
+      
+      // Intentamos buscar el id tanto en la ruta tradicional como detrás del '#' de Flutter
+      String? id;
+      if (uri.queryParameters.containsKey('id')) {
+        id = uri.queryParameters['id'];
+      } else {
+        // En Flutter Web con hash (#), el link se ve como: /#/tarjetaDigital?id=X
+        // Buscamos el ID analizando el fragmento interno después del '#'
+        final fragment = uri.fragment; // Ej: "/tarjetaDigital?id=YEfc5hYMK..."
+        if (fragment.contains('?')) {
+          final fragmentUri = Uri.parse(fragment);
+          if (fragmentUri.queryParameters.containsKey('id')) {
+            id = fragmentUri.queryParameters['id'];
+          }
         }
       }
-      setState(() {
-        _loadingRouteArgs = false;
-      });
+
+      if (id != null && id.isNotEmpty) {
+        _resolvedRef = FirebaseFirestore.instance.collection('usuarios').doc(id);
+      }
+    } catch (e) {
+      debugPrint('Error al intentar leer la URL nativa de la web: $e');
+    }
+
+    setState(() {
+      _loading = false;
     });
   }
 
@@ -113,7 +137,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loadingRouteArgs) {
+    if (_loading) {
       return Scaffold(
         backgroundColor: const Color(0xFFF8FAFC),
         body: Center(
