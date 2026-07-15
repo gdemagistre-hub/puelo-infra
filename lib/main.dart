@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'Homepage.dart'; 
 import 'registroTrabajador.dart';
 import 'buscadorPrestadores.dart';
@@ -35,21 +36,37 @@ class MyApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFFF8FAFC),
         useMaterial3: true,
       ),
-      // Definimos la pantalla de inicio
       initialRoute: HomePageWidget.routePath,
-      // Registramos las rutas de navegación nativa
       routes: {
         HomePageWidget.routePath: (context) => const HomePageWidget(),
         RegistroTrabajadorWidget.routePath: (context) => const RegistroTrabajadorWidget(),
         BuscadorPrestadoresWidget.routePath: (context) => const BuscadorPrestadoresWidget(),
       },
-      // Manejador dinámico para la Tarjeta Digital (ya que necesita recibir la referencia del usuario de Firestore)
+      // Motor de ruteo avanzado para capturar parámetros de URLs de WhatsApp (?id=...)
       onGenerateRoute: (settings) {
-        if (settings.name == TarjetaDigitalWidget.routePath) {
-          final args = settings.arguments as Map<String, dynamic>?;
-          final ref = args?['usuarioRef'];
+        final settingsName = settings.name ?? '';
+        final uri = Uri.parse(settingsName);
+
+        // Si la URL que ingresa el usuario apunta a la Tarjeta Digital
+        if (uri.path == TarjetaDigitalWidget.routePath) {
+          DocumentReference? userRef;
+
+          // Escenario A: Viene de una URL externa (ej: ?id=YEfc5hYMKf02eOvNJNbh)
+          if (uri.queryParameters.containsKey('id')) {
+            final String id = uri.queryParameters['id']!;
+            userRef = FirebaseFirestore.instance.collection('usuarios').doc(id);
+          } 
+          // Escenario B: Navegación interna con argumentos de memoria
+          else if (settings.arguments is Map<String, dynamic>) {
+            final args = settings.arguments as Map<String, dynamic>;
+            userRef = args['usuarioRef'] as DocumentReference?;
+          } else if (settings.arguments is DocumentReference) {
+            userRef = settings.arguments as DocumentReference?;
+          }
+
           return MaterialPageRoute(
-            builder: (context) => TarjetaDigitalWidget(usuarioRef: ref),
+            settings: settings,
+            builder: (context) => TarjetaDigitalWidget(usuarioRef: userRef),
           );
         }
         return null;
