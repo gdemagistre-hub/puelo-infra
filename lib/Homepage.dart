@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'registroTrabajador.dart';
+import 'buscadorPrestadores.dart';
 
 class HomePageWidget extends StatefulWidget {
   const HomePageWidget({super.key});
@@ -15,17 +17,15 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // Definimos una paleta de colores moderna y limpia para el MVP de Puelo
-    final primaryColor = const Color(0xFF0F52BA); // Azul institucional elegante
-    final accentColor = const Color(0xFFE8F0FE);  // Azul suave para contrastes
-    final textColor = const Color(0xFF1E293B);    // Gris pizarra oscuro para legibilidad
-    final subtitleColor = const Color(0xFF64748B); // Gris medio para descripciones
+    final primaryColor = const Color(0xFF0F52BA); 
+    final textColor = const Color(0xFF1E293B);    
+    final subtitleColor = const Color(0xFF64748B); 
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
         key: scaffoldKey,
-        backgroundColor: const Color(0xFFF8FAFC), // Fondo sutilmente gris/celeste muy limpio
+        backgroundColor: const Color(0xFFF8FAFC), 
         body: SafeArea(
           top: true,
           child: Center(
@@ -76,8 +76,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                       textColor: Colors.white,
                       backgroundColor: primaryColor,
                       onPressed: () {
-                        // TODO: Navegación a RegistroTrabajadorWidget
-                        // Navigator.pushNamed(context, '/registroTrabajador');
+                        // Navegación activa al Registro
+                        Navigator.pushNamed(context, RegistroTrabajadorWidget.routePath);
                       },
                     ),
 
@@ -93,8 +93,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                       textColor: textColor,
                       backgroundColor: Colors.white,
                       onPressed: () {
-                        // TODO: Navegación a BuscadorPrestadoresWidget
-                        // Navigator.pushNamed(context, '/buscadorPrestadores');
+                        // Navegación activa al Buscador
+                        Navigator.pushNamed(context, BuscadorPrestadoresWidget.routePath);
                       },
                       hasBorder: true,
                     ),
@@ -108,7 +108,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     );
   }
 
-  // Componente visual personalizado para las tarjetas de acción principal
   Widget _buildFeatureCard(
     BuildContext context, {
     required String title,
@@ -142,7 +141,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
             child: Row(
               children: [
-                // Icono destacado con fondo circular adaptativo
                 Container(
                   padding: const EdgeInsets.all(12.0),
                   decoration: BoxDecoration(
@@ -158,7 +156,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                   ),
                 ),
                 const SizedBox(width: 20.0),
-                // Textos descriptivos
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
