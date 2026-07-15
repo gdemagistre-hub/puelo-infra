@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'Homepage.dart'; 
+import 'registroTrabajador.dart';
+import 'buscadorPrestadores.dart';
+import 'tarjetaDigital.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Inicialización explícita con tus credenciales de Firebase Web
   await Firebase.initializeApp(
     options: const FirebaseOptions(
       apiKey: "AIzaSyAr6iPh8NaDBD4qwo3LvfpE4j9k7RfKTwQ",
@@ -33,7 +35,25 @@ class MyApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFFF8FAFC),
         useMaterial3: true,
       ),
-      home: const HomePageWidget(),
+      // Definimos la pantalla de inicio
+      initialRoute: HomePageWidget.routePath,
+      // Registramos las rutas de navegación nativa
+      routes: {
+        HomePageWidget.routePath: (context) => const HomePageWidget(),
+        RegistroTrabajadorWidget.routePath: (context) => const RegistroTrabajadorWidget(),
+        BuscadorPrestadoresWidget.routePath: (context) => const BuscadorPrestadoresWidget(),
+      },
+      // Manejador dinámico para la Tarjeta Digital (ya que necesita recibir la referencia del usuario de Firestore)
+      onGenerateRoute: (settings) {
+        if (settings.name == TarjetaDigitalWidget.routePath) {
+          final args = settings.arguments as Map<String, dynamic>?;
+          final ref = args?['usuarioRef'];
+          return MaterialPageRoute(
+            builder: (context) => TarjetaDigitalWidget(usuarioRef: ref),
+          );
+        }
+        return null;
+      },
     );
   }
 }
