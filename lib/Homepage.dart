@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'registroTrabajador.dart';
 import 'buscadorPrestadores.dart';
+import 'seleccionRol.dart'; // Importamos la nueva pantalla intermedia
 
 class HomePageWidget extends StatefulWidget {
   const HomePageWidget({super.key});
@@ -76,7 +77,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                       textColor: Colors.white,
                       backgroundColor: primaryColor,
                       onPressed: () {
-                        // Navegación activa al Registro
                         Navigator.pushNamed(context, RegistroTrabajadorWidget.routePath);
                       },
                     ),
@@ -93,8 +93,27 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                       textColor: textColor,
                       backgroundColor: Colors.white,
                       onPressed: () {
-                        // Navegación activa al Buscador
                         Navigator.pushNamed(context, BuscadorPrestadoresWidget.routePath);
+                      },
+                      hasBorder: true,
+                    ),
+
+                    const SizedBox(height: 20.0),
+
+                    // Tarjeta/Botón 3: Cargar Trabajos (Nueva Arista)
+                    _buildFeatureCard(
+                      context,
+                      title: 'Cargar trabajos',
+                      description: 'Documentá tus obras o servicios completados asociando fotos a un prestador.',
+                      icon: Icons.work_history_outlined,
+                      color: primaryColor,
+                      textColor: textColor,
+                      backgroundColor: Colors.white,
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const SeleccionRolWidget()),
+                        );
                       },
                       hasBorder: true,
                     ),
