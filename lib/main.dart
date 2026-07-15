@@ -42,22 +42,15 @@ class MyApp extends StatelessWidget {
         RegistroTrabajadorWidget.routePath: (context) => const RegistroTrabajadorWidget(),
         BuscadorPrestadoresWidget.routePath: (context) => const BuscadorPrestadoresWidget(),
       },
-      // Motor de ruteo avanzado para capturar parámetros de URLs de WhatsApp (?id=...)
+      // Manejador dinámico simplificado que permite pasar la URL sin trabar el enrutador
       onGenerateRoute: (settings) {
         final settingsName = settings.name ?? '';
         final uri = Uri.parse(settingsName);
 
-        // Si la URL que ingresa el usuario apunta a la Tarjeta Digital
         if (uri.path == TarjetaDigitalWidget.routePath) {
           DocumentReference? userRef;
 
-          // Escenario A: Viene de una URL externa (ej: ?id=YEfc5hYMKf02eOvNJNbh)
-          if (uri.queryParameters.containsKey('id')) {
-            final String id = uri.queryParameters['id']!;
-            userRef = FirebaseFirestore.instance.collection('usuarios').doc(id);
-          } 
-          // Escenario B: Navegación interna con argumentos de memoria
-          else if (settings.arguments is Map<String, dynamic>) {
+          if (settings.arguments is Map<String, dynamic>) {
             final args = settings.arguments as Map<String, dynamic>;
             userRef = args['usuarioRef'] as DocumentReference?;
           } else if (settings.arguments is DocumentReference) {
