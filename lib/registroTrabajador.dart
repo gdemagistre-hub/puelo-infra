@@ -77,7 +77,6 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
   Future<void> _cargarCatalogosDesdeFirestore() async {
     try {
       // 1. Cargar Catálogo de Oficios
-      // Buscamos el primer documento de la colección 'cat_oficios'
       final oficiosSnapshot = await FirebaseFirestore.instance.collection('cat_oficios').limit(1).get();
       List<String> oficiosCargados = [];
       if (oficiosSnapshot.docs.isNotEmpty) {
@@ -89,7 +88,6 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
       }
 
       // 2. Cargar Catálogo de Zonas
-      // Buscamos el primer documento de la colección 'cat_zonas'
       final zonasSnapshot = await FirebaseFirestore.instance.collection('cat_zonas').limit(1).get();
       List<String> zonasCargadas = [];
       if (zonasSnapshot.docs.isNotEmpty) {
@@ -488,4 +486,117 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
   }
 
   // Constructor elegante para los selectores de tipo input (adaptado para carga asíncrona)
-  Widget
+  Widget _buildSelectorTile({
+    required String titulo,
+    required List<String> valores,
+    required bool cargando,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: InkWell(
+        onTap: cargando ? null : onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 20.0),
+          decoration: BoxDecoration(
+            color: inputBgColor,
+            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      cargando ? 'Cargando catálogo...' : titulo,
+                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 15),
+                    ),
+                    if (valores.isNotEmpty && !cargando) ...[
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: valores
+                            .map((val) => Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: accentColor,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    val, 
+                                    style: TextStyle(
+                                      fontSize: 12, 
+                                      color: primaryColor,
+                                      fontWeight: FontWeight.w600,
+                                    )
+                                  ),
+                                ))
+                            .toList(),
+                      )
+                    ]
+                  ],
+                ),
+              ),
+              cargando 
+                ? SizedBox(
+                    width: 20, 
+                    height: 20, 
+                    child: CircularProgressIndicator(strokeWidth: 2, color: primaryColor)
+                  )
+                : const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF94A3B8), size: 28),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Callback de Guardado e Integración con Firestore
+  void _crearTarjetaProfesional() async {
+    if (_nombreController.text.trim().isEmpty || _apellidoController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Por favor completa Nombre y Apellido')),
+      );
+      return;
+    }
+
+    try {
+      final nuevoUsuarioRef = FirebaseFirestore.instance.collection('usuarios').doc();
+      
+      await nuevoUsuarioRef.set({
+        'nombre': _nombreController.text.trim(),
+        'apellido': _apellidoController.text.trim(),
+        'documento': _documentoController.text.trim(),
+        'nombre_comercial': _nombreComercialController.text.trim(),
+        'telefono': _telefonoController.text.trim(),
+        'profesiones': _profesionesSeleccionadas,
+        'zonas': _zonasSeleccionadas,
+        'rol': 'trabajador',
+        'creado_en': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Perfil creado correctamente')),
+        );
+        
+        Navigator.pushNamed(
+          context, 
+          '/tarjetaDigital', 
+          arguments: {'usuarioRef': nuevoUsuarioRef}
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al guardar en base de datos: $e')),
+        );
+      }
+    }
+  }
+}
