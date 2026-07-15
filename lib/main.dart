@@ -5,15 +5,15 @@ import 'Homepage.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Inicialización explícita para Web para evitar que se cuelgue la carga
+  // Inicialización explícita con tus credenciales de Firebase Web
   await Firebase.initializeApp(
     options: const FirebaseOptions(
-      apiKey: "TU_API_KEY_AQUÍ",
+      apiKey: "AIzaSyAr6iPh8NaDBD4qwo3LvfpE4j9k7RfKTwQ",
       authDomain: "lifewalletpuelo.firebaseapp.com",
       projectId: "lifewalletpuelo",
-      storageBucket: "lifewalletpuelo.appspot.com",
-      messagingSenderId: "TU_SENDER_ID_AQUÍ",
-      appId: "TU_APP_ID_AQUÍ",
+      storageBucket: "lifewalletpuelo.firebasestorage.app",
+      messagingSenderId: "74624927314",
+      appId: "1:74624927314:web:3fadcc533dd1f3a985818b",
     ),
   );
   
