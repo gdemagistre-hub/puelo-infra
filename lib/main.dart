@@ -37,7 +37,6 @@ class MyApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFFF8FAFC),
         useMaterial3: true,
       ),
-      // La pantalla inicial ahora será el SplashScreen
       initialRoute: SplashScreenWidget.routePath,
       routes: {
         SplashScreenWidget.routePath: (context) => const SplashScreenWidget(),
@@ -45,15 +44,24 @@ class MyApp extends StatelessWidget {
         RegistroTrabajadorWidget.routePath: (context) => const RegistroTrabajadorWidget(),
         BuscadorPrestadoresWidget.routePath: (context) => const BuscadorPrestadoresWidget(),
       },
-      // Manejo dinámico para la carga y lectura de la Tarjeta Digital
+      // Manejo inteligente para recuperar el ID desde el enlace web compartido o recargas
       onGenerateRoute: (settings) {
         final settingsName = settings.name ?? '';
         final uri = Uri.parse(settingsName);
 
-        if (uri.path == TarjetaDigitalWidget.routePath) {
+        // Detecta si la ruta coincide con tarjetaDigital (incluso si trae parámetros web)
+        if (uri.path == TarjetaDigitalWidget.routePath || uri.path.startsWith('/tarjetaDigital')) {
           DocumentReference? userRef;
 
-          if (settings.arguments is Map<String, dynamic>) {
+          // 1. Intentamos buscar el ID directamente en los parámetros de la URL web (?id=...)
+          final String? idParam = uri.queryParameters['id'] ?? uri.queryParameters['usuarioRef'];
+
+          if (idParam != null && idParam.isNotEmpty) {
+            // Reconstruye la referencia de Firestore usando el ID del enlace compartido
+            userRef = FirebaseFirestore.instance.doc('usuarios/$idParam');
+          } 
+          // 2. Si no viene por URL (navegación interna de la app), lo extrae de los argumentos habituales
+          else if (settings.arguments is Map<String, dynamic>) {
             final args = settings.arguments as Map<String, dynamic>;
             userRef = args['usuarioRef'] as DocumentReference?;
           } else if (settings.arguments is DocumentReference) {
