@@ -178,7 +178,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
       stream: _resolvedRef!.snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return Scaffold(
+          return const Scaffold(
             body: Center(child: Text('Ocurrió un error al cargar la información')),
           );
         }
@@ -193,7 +193,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
         }
 
         if (!snapshot.hasData || !snapshot.data!.exists) {
-          return Scaffold(
+          return const Scaffold(
             body: Center(child: Text('La tarjeta seleccionada no existe.')),
           );
         }
@@ -449,69 +449,111 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                       ),
                       const SizedBox(height: 28),
 
-                      // Portafolio de Trabajos (Próxima Versión)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Trabajos realizados',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: textColor,
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text(
-                              'PRÓXIMAMENTE',
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFF475569),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
+                      // Consulta en tiempo real de Trabajos
+                      FutureBuilder<QuerySnapshot>(
+                        future: FirebaseFirestore.instance
+                            .collection('trabajos')
+                            .where('trabajadorRef', isEqualTo: _resolvedRef)
+                            .get(),
+                        builder: (context, trabajosSnapshot) {
+                          if (trabajosSnapshot.connectionState == ConnectionState.waiting) {
+                            return const Center(child: CircularProgressIndicator());
+                          }
 
-                      // Grid de imágenes simuladas con efecto elegante
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                          childAspectRatio: 1.1,
-                        ),
-                        itemCount: 4,
-                        itemBuilder: (context, index) {
-                          final List<String> placeholderImages = [
-                            'https://images.unsplash.com/photo-1581094288338-2314dddb7ece?auto=format&fit=crop&w=400&q=80',
-                            'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=400&q=80',
-                            'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&w=400&q=80',
-                            'https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122?auto=format&fit=crop&w=400&q=80',
-                          ];
-                          return ClipRRect(
-                            borderRadius: BorderRadius.circular(16),
-                            child: Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                Image.network(
-                                  placeholderImages[index],
-                                  fit: BoxFit.cover,
-                                ),
+                          // Consolidamos todas las URLs de imágenes de los distintos trabajos del usuario
+                          List<String> todasLasImagenes = [];
+                          if (trabajosSnapshot.hasData) {
+                            for (var doc in trabajosSnapshot.data!.docs) {
+                              var data = doc.data() as Map<String, dynamic>;
+                              if (data['imagenes'] != null) {
+                                List<dynamic> imgs = data['imagenes'];
+                                todasLasImagenes.addAll(imgs.map((e) => e.toString()));
+                              }
+                            }
+                          }
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Trabajos realizados',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: textColor,
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: accentColor,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      '${todasLasImagenes.length} FOTOS',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w800,
+                                        color: primaryColor,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              
+                              if (todasLasImagenes.isEmpty)
                                 Container(
-                                  color: Colors.black.withOpacity(0.15),
+                                  padding: const EdgeInsets.all(32),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[100],
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: const Text(
+                                    'Este proveedor todavía no cargó imágenes de sus trabajos.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(color: Colors.grey),
+                                  ),
+                                )
+                              else
+                                GridView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    crossAxisSpacing: 12,
+                                    mainAxisSpacing: 12,
+                                    childAspectRatio: 1.1,
+                                  ),
+                                  itemCount: todasLasImagenes.length,
+                                  itemBuilder: (context, index) {
+                                    return ClipRRect(
+                                      borderRadius: BorderRadius.circular(16),
+                                      child: Stack(
+                                        fit: StackFit.expand,
+                                        children: [
+                                          Image.network(
+                                            todasLasImagenes[index],
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) {
+                                              return Container(
+                                                color: Colors.grey[300],
+                                                child: const Icon(Icons.broken_image, color: Colors.grey),
+                                              );
+                                            },
+                                          ),
+                                          Container(
+                                            color: Colors.black.withOpacity(0.05),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
                                 ),
-                              ],
-                            ),
+                            ],
                           );
                         },
                       ),
@@ -521,8 +563,8 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
               ),
             ),
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
 }
