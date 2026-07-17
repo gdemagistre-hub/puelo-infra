@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
+import 'calificarTrabajo.dart';
+import 'Homepage.dart';
 
 class CargaTrabajoClienteWidget extends StatefulWidget {
   const CargaTrabajoClienteWidget({super.key});
@@ -18,11 +20,11 @@ class _CargaTrabajoClienteWidgetState extends State<CargaTrabajoClienteWidget> {
   final ImagePicker _picker = ImagePicker();
   bool _isUploading = false;
 
-Future<void> _pickImages() async {
+  Future<void> _pickImages() async {
     final List<XFile> images = await _picker.pickMultiImage(
-      maxWidth: 1920,      // Limita el ancho a Full HD
-      maxHeight: 1080,     // Limita el alto a Full HD
-      imageQuality: 80,    // Comprime el peso del archivo sin perder calidad visual
+      maxWidth: 1920,
+      maxHeight: 1080,
+      imageQuality: 80,
     );
     
     if (images.isNotEmpty) {
@@ -68,19 +70,34 @@ Future<void> _pickImages() async {
         imageUrls.add(downloadUrl);
       }
 
-      await FirebaseFirestore.instance.collection('trabajos').add({
+      // Creamos el documento del trabajo
+      final nuevoTrabajoRef = await FirebaseFirestore.instance.collection('trabajos').add({
         'trabajadorRef': _selectedTrabajador,
         'clienteRef': _selectedCliente,
         'imagenes': imageUrls,
         'fechaCarga': FieldValue.serverTimestamp(),
         'cargadoPor': 'Cliente',
+        'calificado': false,
+        'comentarioCliente': '',
+        'estrellas': 0,
       });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('¡Trabajo cargado e informado con éxito!')),
+          const SnackBar(content: Text('¡Trabajo cargado con éxito! Ahora podés calificar.')),
         );
-        Navigator.popUntil(context, (route) => route.isFirst);
+        
+        // Redirección inmediata a la pantalla de estrellas
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CalificarTrabajoWidget(
+              trabajoId: nuevoTrabajoRef.id,
+              trabajadorId: _selectedTrabajador!.id,
+              clienteId: _selectedCliente!.id,
+            ),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -104,6 +121,18 @@ Future<void> _pickImages() async {
         title: const Text('Ingreso Cliente'),
         backgroundColor: const Color(0xFF0F52BA),
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.home_rounded),
+            onPressed: () {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const HomePageWidget()),
+                (route) => false,
+              );
+            },
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -217,7 +246,13 @@ Future<void> _pickImages() async {
                       style: OutlinedButton.styleFrom(foregroundColor: Colors.red, side: const BorderSide(color: Colors.red), padding: const EdgeInsets.symmetric(vertical: 14)),
                       icon: const Icon(Icons.cancel),
                       label: const Text('Cancelar'),
-                      onPressed: () => Navigator.popUntil(context, (route) => route.isFirst),
+                      onPressed: () {
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(builder: (context) => const HomePageWidget()),
+                          (route) => false,
+                        );
+                      },
                     ),
                   ),
                   const SizedBox(width: 15),
