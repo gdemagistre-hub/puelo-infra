@@ -25,7 +25,7 @@ class SeleccionRolWidget extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 40), 
               
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
