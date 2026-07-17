@@ -438,11 +438,10 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                       ),
                       const SizedBox(height: 28),
 
-                      // Consulta de Trabajos Dinámicos
+                      // Consulta de Trabajos Flexible (Acepta Referencias y Texto)
                       FutureBuilder<QuerySnapshot>(
                         future: FirebaseFirestore.instance
                             .collection('trabajos')
-                            .where('trabajadorRef', isEqualTo: _resolvedRef)
                             .get(),
                         builder: (context, trabajosSnapshot) {
                           if (trabajosSnapshot.connectionState == ConnectionState.waiting) {
@@ -450,10 +449,23 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                           }
 
                           List<String> todasLasImagenes = [];
+                          
                           if (trabajosSnapshot.hasData) {
+                            final currentId = _resolvedRef!.id;
+                            final currentPath = _resolvedRef!.path; // Ej: "usuarios/ID"
+
                             for (var doc in trabajosSnapshot.data!.docs) {
                               var data = doc.data() as Map<String, dynamic>;
-                              if (data['imagenes'] != null) {
+                              var rawRef = data['trabajadorRef'];
+                              bool coincide = false;
+
+                              if (rawRef is DocumentReference) {
+                                coincide = (rawRef.id == currentId);
+                              } else if (rawRef is String) {
+                                coincide = (rawRef == currentId || rawRef == currentPath);
+                              }
+
+                              if (coincide && data['imagenes'] != null) {
                                 List<dynamic> imgs = data['imagenes'];
                                 todasLasImagenes.addAll(imgs.map((e) => e.toString()));
                               }
