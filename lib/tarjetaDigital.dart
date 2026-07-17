@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
-// Importación especial de Dart para poder leer la URL real del navegador en Web
 import 'dart:html' as html;
+import 'Homepage.dart';
 
 class TarjetaDigitalWidget extends StatefulWidget {
   const TarjetaDigitalWidget({
@@ -25,7 +25,6 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
   DocumentReference? _resolvedRef;
   bool _loading = true;
 
-  // Paleta de diseño premium Puelo
   final primaryColor = const Color(0xFF0F52BA);
   final accentColor = const Color(0xFFE8F0FE);
   final textColor = const Color(0xFF1E293B);
@@ -37,7 +36,6 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
     _resolveReference();
   }
 
-  // Método de resolución avanzado e infalible para Web
   void _resolveReference() {
     if (widget.usuarioRef != null) {
       _resolvedRef = widget.usuarioRef;
@@ -198,15 +196,34 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
         final List<dynamic> zonas = datos['zonas'] ?? [];
         final String docId = snapshot.data!.id;
 
+        // Nuevos campos calculados
+        final double promedio = (datos['promedioEstrellas'] ?? 0.0).toDouble();
+        final int cantidadEvaluadores = datos['cantidadEvaluadores'] ?? 0;
+
         return Scaffold(
           key: scaffoldKey,
           backgroundColor: const Color(0xFFF8FAFC),
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded),
+              color: textColor,
+              onPressed: () {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => const HomePageWidget()),
+                  (route) => false,
+                );
+              },
+            ),
+          ),
           body: SafeArea(
             child: SingleChildScrollView(
               child: Center(
                 child: Container(
                   constraints: const BoxConstraints(maxWidth: 550),
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -331,6 +348,24 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                                           ),
                                         ),
                                       ],
+                                      const SizedBox(height: 6),
+                                      // Renderizado estético de valoración en el Perfil
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.star_rounded, color: Color(0xFFFFB000), size: 20),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            cantidadEvaluadores > 0 
+                                                ? '${promedio.toStringAsFixed(1)} ($cantidadEvaluadores evaluaciones)' 
+                                                : 'Nuevo prestador',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              color: textColor,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ],
                                   ),
                                 ),
