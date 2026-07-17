@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'splashScreen.dart';
+import 'loginScreen.dart'; // <-- Importamos la nueva pantalla de Login profesional
 import 'Homepage.dart'; 
 import 'registroTrabajador.dart';
 import 'buscadorPrestadores.dart';
 import 'tarjetaDigital.dart';
-import 'seleccionRol.dart'; // <-- 1. IMPORTANTE IMPORTARLA ACÁ
+import 'seleccionRol.dart'; 
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,11 +42,10 @@ class MyApp extends StatelessWidget {
       initialRoute: SplashScreenWidget.routePath,
       routes: {
         SplashScreenWidget.routePath: (context) => const SplashScreenWidget(),
+        LoginScreenWidget.routePath: (context) => const LoginScreenWidget(), // <-- Registramos la ruta del Login intermedio
         HomePageWidget.routePath: (context) => const HomePageWidget(),
         RegistroTrabajadorWidget.routePath: (context) => const RegistroTrabajadorWidget(),
         BuscadorPrestadoresWidget.routePath: (context) => const BuscadorPrestadoresWidget(),
-        // Usamos Navigator.push directo para las pantallas de carga, 
-        // pero registramos esta por si querés usar rutas nombradas más adelante.
         '/seleccionRol': (context) => const SeleccionRolWidget(), 
       },
       onGenerateRoute: (settings) {
