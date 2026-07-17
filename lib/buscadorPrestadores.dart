@@ -179,7 +179,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                               ],
                             ),
                             trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-                            onChanged: null,
                             onTap: () {
                               // Al presionar, viaja a la Tarjeta Digital pasando la referencia real de Firestore
                               Navigator.push(
