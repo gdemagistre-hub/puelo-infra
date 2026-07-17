@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'Homepage.dart';
 
 class CalificarTrabajoWidget extends StatefulWidget {
   const CalificarTrabajoWidget({
@@ -13,6 +14,9 @@ class CalificarTrabajoWidget extends StatefulWidget {
   final String trabajadorId;
   final String clienteId;
 
+  static const String routeName = 'CalificarTrabajo';
+  static const String routePath = '/calificar';
+
   @override
   State<CalificarTrabajoWidget> createState() => _CalificarTrabajoWidgetState();
 }
@@ -25,9 +29,19 @@ class _CalificarTrabajoWidgetState extends State<CalificarTrabajoWidget> {
   final primaryColor = const Color(0xFF0F52BA);
   final textColor = const Color(0xFF1E293B);
 
+  void _volverAPrincipal() {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const HomePageWidget()),
+      (route) => false,
+    );
+  }
+
   Future<void> _guardarCalificacion() async {
     if (_estrellasSeleccionadas == 0) {
-      _mostrarAlerta('Por favor, seleccioná al menos 1 estrella.');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Por favor, seleccioná al menos 1 estrella.'), behavior: SnackBarBehavior.floating),
+      );
       return;
     }
 
@@ -37,7 +51,6 @@ class _CalificarTrabajoWidgetState extends State<CalificarTrabajoWidget> {
     final trabajadorRef = FirebaseFirestore.instance.collection('usuarios').doc(widget.trabajadorId);
 
     try {
-      // Usamos una transacción para asegurar que el cálculo del promedio sea exacto y libre de fraude
       await FirebaseFirestore.instance.runTransaction((transaction) async {
         final trabajadorSnapshot = await transaction.get(trabajadorRef);
         
@@ -45,7 +58,6 @@ class _CalificarTrabajoWidgetState extends State<CalificarTrabajoWidget> {
 
         Map<String, dynamic> trabajadorData = trabajadorSnapshot.data() as Map<String, dynamic>;
         
-        // Estructura anti-fraude: Validamos si este cliente ya evaluó antes a este trabajador
         Map<String, dynamic> historialVotos = trabajadorData['historialVotos'] != null 
             ? Map<String, dynamic>.from(trabajadorData['historialVotos']) 
             : {};
@@ -57,16 +69,13 @@ class _CalificarTrabajoWidgetState extends State<CalificarTrabajoWidget> {
         int nuevosVotos = votosAnteriores;
 
         if (historialVotos.containsKey(widget.clienteId)) {
-          // Si ya había votado antes, restamos su voto viejo y sumamos el nuevo (mantiene 1 voto por cliente)
           int votoViejo = historialVotos[widget.clienteId];
           nuevaSuma = (sumaAnterior - votoViejo) + _estrellasSeleccionadas;
         } else {
-          // Si es un evaluador nuevo, sumamos un nuevo cliente al conteo
           nuevosVotos = votosAnteriores + 1;
           nuevaSuma = sumaAnterior + _estrellasSeleccionadas;
         }
 
-        // Actualizamos el registro interno anti-fraude
         historialVotos[widget.clienteId] = _estrellasSeleccionadas;
 
         double nuevoPromedio = nuevosVotos > 0 ? (nuevaSuma / nuevosVotos) : 0.0;
@@ -92,19 +101,15 @@ class _CalificarTrabajoWidgetState extends State<CalificarTrabajoWidget> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('¡Muchas gracias por tu calificación!')),
         );
-        Navigator.pop(context);
+        _volverAPrincipal();
       }
     } catch (e) {
-      _mostrarAlerta('Error al guardar la calificación: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al guardar la calificación: $e')),
+      );
     } finally {
       if (mounted) setState(() => _enviando = false);
     }
-  }
-
-  void _mostrarAlerta(String mensaje) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(mensaje), behavior: SnackBarBehavior.floating),
-    );
   }
 
   @override
@@ -115,6 +120,10 @@ class _CalificarTrabajoWidgetState extends State<CalificarTrabajoWidget> {
         foregroundColor: textColor,
         backgroundColor: Colors.white,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.close_rounded),
+          onPressed: _volverAPrincipal,
+        ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -133,7 +142,7 @@ class _CalificarTrabajoWidgetState extends State<CalificarTrabajoWidget> {
               ),
               const SizedBox(height: 28),
 
-              // Selector interactivo de 5 estrellas
+              // Selector de 5 estrellas
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(5, (index) {
@@ -156,7 +165,7 @@ class _CalificarTrabajoWidgetState extends State<CalificarTrabajoWidget> {
               ),
               const SizedBox(height: 28),
 
-              // Campo de texto para comentarios opcionales (máx 200 caracteres)
+              // Campo para comentario privado (máx 200 caracteres)
               Text(
                 'Comentario para el trabajador (Opcional)',
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textColor),
@@ -178,7 +187,6 @@ class _CalificarTrabajoWidgetState extends State<CalificarTrabajoWidget> {
               ),
               const SizedBox(height: 36),
 
-              // Botón de Envío
               ElevatedButton(
                 onPressed: _enviando ? null : _guardarCalificacion,
                 style: ElevatedButton.styleFrom(
