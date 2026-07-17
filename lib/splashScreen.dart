@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'Homepage.dart';
+import 'loginScreen.dart'; // Importamos la nueva pantalla de login intermedio
 
 class SplashScreenWidget extends StatefulWidget {
   const SplashScreenWidget({super.key});
@@ -17,10 +17,10 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget> {
   void initState() {
     super.initState();
     
-    // Temporizador de 3 segundos para redirigir a la Home
+    // Temporizador de 3 segundos para redirigir al Login profesional
     Timer(const Duration(seconds: 3), () {
       if (mounted) {
-        Navigator.pushReplacementNamed(context, HomePageWidget.routePath);
+        Navigator.pushReplacementNamed(context, LoginScreenWidget.routePath);
       }
     });
   }
@@ -28,7 +28,6 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget> {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      // Un fondo blanco limpio o el color primario que prefieras
       backgroundColor: Colors.white, 
       body: SafeArea(
         child: Center(
@@ -37,14 +36,14 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Contenedor para limitar y suavizar el renderizado de la imagen de alta resolución
+                // Contenedor para limitar y suavizar el renderizado de la imagen
                 SizedBox(
                   width: 250,
                   height: 300,
                   child: Image(
                     image: AssetImage('assets/images/lifewallet.png'),
                     fit: BoxFit.contain,
-                    filterQuality: FilterQuality.high, // Evita pixelado al escalar 300ppp
+                    filterQuality: FilterQuality.high, // Evita pixelado en pantallas de alta densidad
                   ),
                 ),
               ],
