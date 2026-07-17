@@ -18,11 +18,16 @@ class _CargaTrabajoClienteWidgetState extends State<CargaTrabajoClienteWidget> {
   final ImagePicker _picker = ImagePicker();
   bool _isUploading = false;
 
-  Future<void> _pickImages() async {
-    final List<XFile> images = await _picker.pickMultiImage();
+Future<void> _pickImages() async {
+    final List<XFile> images = await _picker.pickMultiImage(
+      maxWidth: 1920,      // Limita el ancho a Full HD
+      maxHeight: 1080,     // Limita el alto a Full HD
+      imageQuality: 80,    // Comprime el peso del archivo sin perder calidad visual
+    );
+    
     if (images.isNotEmpty) {
       setState(() {
-        _selectedImages.addAll(images); 
+        _selectedImages.addAll(images);
       });
     }
   }
