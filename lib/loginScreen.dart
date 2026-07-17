@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'homePage.dart'; // Asegurate de que el import coincida con el nombre real de tu archivo de Home
+import 'Homepage.dart'; // Corregido el nombre del archivo con la 'p' exacta
 
 class LoginScreenWidget extends StatelessWidget {
   const LoginScreenWidget({super.key});
@@ -10,16 +9,15 @@ class LoginScreenWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Colores de la paleta premium Puelo
+    // Paleta de diseño premium Puelo
     final primaryColor = const Color(0xFF0F52BA);
     final textColor = const Color(0xFF1E293B);
     final subTextColor = const Color(0xFF64748B);
 
-    // Función rápida para saltar a la Home
     void irAHome() {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const HomePageWidget()), // Ajustar si tu clase se llama distinto
+        MaterialPageRoute(builder: (context) => const HomePageWidget()),
       );
     }
 
@@ -86,7 +84,18 @@ class LoginScreenWidget extends StatelessWidget {
                   // Botón: Continuar con Google
                   _buildLoginButton(
                     onPressed: irAHome,
-                    icon: const FaIcon(FontAwesomeIcons.google, color: Color(0xFFDB4437), size: 18),
+                    icon: _buildIconCircle(
+                      backgroundColor: const Color(0xFFF1F5F9),
+                      child: const Text(
+                        'G',
+                        style: TextStyle(
+                          color: Color(0xFFDB4437),
+                          fontWeight: FontWeight.black,
+                          fontSize: 16,
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
                     label: 'Continuar con Google',
                     backgroundColor: Colors.white,
                     textColor: textColor,
@@ -97,7 +106,10 @@ class LoginScreenWidget extends StatelessWidget {
                   // Botón: Continuar con Apple
                   _buildLoginButton(
                     onPressed: irAHome,
-                    icon: const FaIcon(FontAwesomeIcons.apple, color: Colors.black, size: 20),
+                    icon: _buildIconCircle(
+                      backgroundColor: Colors.white.withOpacity(0.15),
+                      child: const Icon(Icons.apple, color: Colors.white, size: 18),
+                    ),
                     label: 'Continuar con Apple',
                     backgroundColor: Colors.black,
                     textColor: Colors.white,
@@ -107,14 +119,24 @@ class LoginScreenWidget extends StatelessWidget {
                   // Botón: Continuar con Facebook
                   _buildLoginButton(
                     onPressed: irAHome,
-                    icon: const FaIcon(FontAwesomeIcons.facebook, color: Colors.white, size: 20),
+                    icon: _buildIconCircle(
+                      backgroundColor: Colors.white.withOpacity(0.2),
+                      child: const Text(
+                        'f',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ),
                     label: 'Continuar con Facebook',
                     backgroundColor: const Color(0xFF1877F2),
                     textColor: Colors.white,
                   ),
                   const SizedBox(height: 20),
 
-                  // Divisor estético para separar las redes del correo tradicional
+                  // Divisor estético
                   Row(
                     children: [
                       Expanded(child: Divider(color: Colors.grey[300], thickness: 1)),
@@ -130,7 +152,10 @@ class LoginScreenWidget extends StatelessWidget {
                   // Botón: Ingresar con Email
                   _buildLoginButton(
                     onPressed: irAHome,
-                    icon: Icon(Icons.mail_outline_rounded, color: primaryColor, size: 20),
+                    icon: _buildIconCircle(
+                      backgroundColor: primaryColor.withOpacity(0.1),
+                      child: Icon(Icons.mail_outline_rounded, color: primaryColor, size: 16),
+                    ),
                     label: 'Ingresar con Email',
                     backgroundColor: Colors.white,
                     textColor: primaryColor,
@@ -170,7 +195,20 @@ class LoginScreenWidget extends StatelessWidget {
     );
   }
 
-  // Helper para construir botones estilizados de manera idéntica y limpia
+  // Generador de contenedores circulares impecables para los logotipos estéticos
+  Widget _buildIconCircle({required Color backgroundColor, required Widget child}) {
+    return Container(
+      width: 28,
+      height: 28,
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        shape: BoxShape.circle,
+      ),
+      alignment: Alignment.center,
+      child: child,
+    );
+  }
+
   Widget _buildLoginButton({
     required VoidCallback onPressed,
     required Widget icon,
@@ -199,7 +237,7 @@ class LoginScreenWidget extends StatelessWidget {
           Align(
             alignment: Alignment.centerLeft,
             child: Padding(
-              padding: const EdgeInsets.only(left: 20.0),
+              padding: const EdgeInsets.only(left: 16.0),
               child: icon,
             ),
           ),
