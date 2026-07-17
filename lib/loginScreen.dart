@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'Homepage.dart'; // Corregido el nombre del archivo con la 'p' exacta
+import 'Homepage.dart'; 
 
 class LoginScreenWidget extends StatelessWidget {
   const LoginScreenWidget({super.key});
@@ -88,11 +88,11 @@ class LoginScreenWidget extends StatelessWidget {
                       backgroundColor: const Color(0xFFF1F5F9),
                       child: const Text(
                         'G',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Color(0xFFDB4437),
-                          fontWeight: FontWeight.black,
+                          fontWeight: FontWeight.w900,
                           fontSize: 16,
-                          textAlign: TextAlign.center,
                         ),
                       ),
                     ),
@@ -195,7 +195,6 @@ class LoginScreenWidget extends StatelessWidget {
     );
   }
 
-  // Generador de contenedores circulares impecables para los logotipos estéticos
   Widget _buildIconCircle({required Color backgroundColor, required Widget child}) {
     return Container(
       width: 28,
