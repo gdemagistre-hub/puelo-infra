@@ -438,7 +438,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                       ),
                       const SizedBox(height: 28),
 
-                      // Consulta de Trabajos Flexible (Acepta Referencias y Texto)
+                      // Consulta de Trabajos Flexible
                       FutureBuilder<QuerySnapshot>(
                         future: FirebaseFirestore.instance
                             .collection('trabajos')
@@ -452,7 +452,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                           
                           if (trabajosSnapshot.hasData) {
                             final currentId = _resolvedRef!.id;
-                            final currentPath = _resolvedRef!.path; // Ej: "usuarios/ID"
+                            final currentPath = _resolvedRef!.path;
 
                             for (var doc in trabajosSnapshot.data!.docs) {
                               var data = doc.data() as Map<String, dynamic>;
@@ -538,6 +538,12 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                                           Image.network(
                                             todasLasImagenes[index],
                                             fit: BoxFit.cover,
+                                            loadingBuilder: (context, child, loadingProgress) {
+                                              if (loadingProgress == null) return child;
+                                              return const Center(
+                                                child: CircularProgressIndicator(),
+                                              );
+                                            },
                                             errorBuilder: (context, error, stackTrace) {
                                               return Container(
                                                 color: Colors.grey[300],
