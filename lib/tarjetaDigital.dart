@@ -39,7 +39,6 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
 
   // Método de resolución avanzado e infalible para Web
   void _resolveReference() {
-    // Escenario 1: El parámetro fue enviado por navegación local en memoria
     if (widget.usuarioRef != null) {
       _resolvedRef = widget.usuarioRef;
       _loading = false;
@@ -47,18 +46,14 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
     }
 
     try {
-      // Escenario 2: Extracción directa desde la URL real de la barra del navegador (Solución para links externos)
       final currentUrl = html.window.location.href;
       final uri = Uri.parse(currentUrl);
       
-      // Intentamos buscar el id tanto en la ruta tradicional como detrás del '#' de Flutter
       String? id;
       if (uri.queryParameters.containsKey('id')) {
         id = uri.queryParameters['id'];
       } else {
-        // En Flutter Web con hash (#), el link se ve como: /#/tarjetaDigital?id=X
-        // Buscamos el ID analizando el fragmento interno después del '#'
-        final fragment = uri.fragment; // Ej: "/tarjetaDigital?id=YEfc5hYMK..."
+        final fragment = uri.fragment; 
         if (fragment.contains('?')) {
           final fragmentUri = Uri.parse(fragment);
           if (fragmentUri.queryParameters.containsKey('id')) {
@@ -79,7 +74,6 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
     });
   }
 
-  // Inicia chat directo de WhatsApp con el prestador
   Future<void> _contactarWhatsApp(String telefono, String nombre) async {
     final mensaje = Uri.encodeComponent(
         'Hola $nombre, vi tu Tarjeta Digital en Puelo y me gustaría hacerte una consulta.');
@@ -92,7 +86,6 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
     }
   }
 
-  // Realiza una llamada tradicional
   Future<void> _realizarLlamada(String telefono) async {
     final url = Uri.parse('tel:$telefono');
     if (await canLaunchUrl(url)) {
@@ -102,7 +95,6 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
     }
   }
 
-  // Comparte la tarjeta enviando al usuario a WhatsApp para elegir destinatario
   Future<void> _compartirPorWhatsApp(String nombre, String idDocumento) async {
     final linkTarjeta = 'https://lifewalletpuelo.web.app/#/tarjetaDigital?id=$idDocumento';
     final mensajeShared = Uri.encodeComponent(
@@ -116,7 +108,6 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
     }
   }
 
-  // Copia el enlace único al portapapeles
   void _copiarEnlaceAlPortapapeles(String idDocumento) {
     final linkTarjeta = 'https://lifewalletpuelo.web.app/#/tarjetaDigital?id=$idDocumento';
     Clipboard.setData(ClipboardData(text: linkTarjeta));
@@ -219,7 +210,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Panel de Acciones de Compartido (Herramienta del Trabajador)
+                      // Panel de Acciones de Compartido
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -284,7 +275,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                       ),
                       const SizedBox(height: 24),
 
-                      // Tarjeta de Presentación Premium
+                      // Tarjeta de Presentación
                       Container(
                         decoration: BoxDecoration(
                           color: cardBgColor,
@@ -347,7 +338,6 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                             ),
                             const SizedBox(height: 24),
 
-                            // Especialidades
                             if (profesiones.isNotEmpty) ...[
                               const Text(
                                 'Especialidades',
@@ -383,7 +373,6 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                               const SizedBox(height: 20),
                             ],
 
-                            // Cobertura
                             if (zonas.isNotEmpty) ...[
                               const Text(
                                 'Zonas de cobertura',
@@ -413,7 +402,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Botones de Contacto Rápido para Clientes
+                      // Botones de Contacto
                       Row(
                         children: [
                           Expanded(
@@ -449,7 +438,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                       ),
                       const SizedBox(height: 28),
 
-                      // Consulta en tiempo real de Trabajos
+                      // Consulta de Trabajos Dinámicos
                       FutureBuilder<QuerySnapshot>(
                         future: FirebaseFirestore.instance
                             .collection('trabajos')
@@ -460,7 +449,6 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                             return const Center(child: CircularProgressIndicator());
                           }
 
-                          // Consolidamos todas las URLs de imágenes de los distintos trabajos del usuario
                           List<String> todasLasImagenes = [];
                           if (trabajosSnapshot.hasData) {
                             for (var doc in trabajosSnapshot.data!.docs) {
@@ -563,8 +551,8 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
               ),
             ),
           ),
-        ),
-      );
-    },
-  );
+        );
+      },
+    );
+  }
 }
