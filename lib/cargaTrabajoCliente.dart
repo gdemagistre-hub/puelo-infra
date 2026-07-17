@@ -22,7 +22,7 @@ class _CargaTrabajoClienteWidgetState extends State<CargaTrabajoClienteWidget> {
     final List<XFile> images = await _picker.pickMultiImage();
     if (images.isNotEmpty) {
       setState(() {
-        _selectedImages.addAll(images);
+        _selectedImages.addAll(images); 
       });
     }
   }
