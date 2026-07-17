@@ -153,6 +153,10 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                         final rubro = data['rubro'] ?? 'Especialidad no especificada';
                         final telefono = data['telefono'] ?? 'Sin teléfono';
 
+                        // Recuperamos las variables del promedio pre-computado anti-fraude
+                        final double promedio = (data['promedioEstrellas'] ?? 0.0).toDouble();
+                        final int cantidadEvaluadores = data['cantidadEvaluadores'] ?? 0;
+
                         return Card(
                           margin: const EdgeInsets.only(bottom: 12.0),
                           shape: RoundedRectangleBorder(
@@ -165,9 +169,46 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                               backgroundColor: primaryColor.withOpacity(0.1),
                               child: Icon(Icons.person, color: primaryColor),
                             ),
-                            title: Text(
-                              displayName,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            title: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    displayName,
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                // Componente visual dinámico de estrellas en el listado
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.star_rounded, color: Color(0xFFFFB000), size: 18),
+                                    const SizedBox(width: 2),
+                                    Text(
+                                      cantidadEvaluadores > 0 
+                                          ? promedio.toStringAsFixed(1) 
+                                          : 'Nuevo',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: textColor,
+                                      ),
+                                    ),
+                                    if (cantidadEvaluadores > 0) ...[
+                                      const SizedBox(width: 2),
+                                      Text(
+                                        '($cantidadEvaluadores)',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Color(0xFF64748B),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ],
                             ),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -180,7 +221,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                             ),
                             trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
                             onTap: () {
-                              // Al presionar, viaja a la Tarjeta Digital pasando la referencia real de Firestore
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
