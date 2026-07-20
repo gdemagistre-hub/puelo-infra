@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'registroTrabajador.dart';
 import 'buscadorPrestadores.dart';
-import 'seleccionRol.dart'; // Importamos la nueva pantalla intermedia
+import 'seleccionRol.dart'; 
+import 'completar_perfil.dart'; // Importamos la nueva pantalla de scoring
 
 class HomePageWidget extends StatefulWidget {
   const HomePageWidget({super.key});
@@ -65,7 +66,35 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                         letterSpacing: 1.5,
                       ),
                     ),
-                    const SizedBox(height: 48.0),
+                    const SizedBox(height: 32.0),
+
+                    // Botón Destacado: Enriquecer Perfil (Scoring)
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const CompletarPerfilWidget(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.verified_user_outlined, color: Colors.white),
+                      label: const Text(
+                        'Enriquecer mi perfil (Scoring)',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                        elevation: 4,
+                        shadowColor: primaryColor.withOpacity(0.4),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 32.0),
 
                     // Tarjeta/Botón 1: Registrarme como Trabajador
                     _buildFeatureCard(
