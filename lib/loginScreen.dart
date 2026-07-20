@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'Homepage.dart'; 
+import 'db_migration.dart'; // <-- Agregamos el import de tu nuevo archivo
 
 class LoginScreenWidget extends StatelessWidget {
   const LoginScreenWidget({super.key});
@@ -173,7 +174,31 @@ class LoginScreenWidget extends StatelessWidget {
                         style: TextStyle(color: subTextColor, fontSize: 14),
                       ),
                       GestureDetector(
-                        onTap: irAHome,
+                        // --- ACÁ CONECTAMOS LA MIGRACIÓN ---
+                        onTap: () async {
+                          // 1. Avisamos que el proceso inició
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Procesando base de datos, no cierres la app...'),
+                              duration: Duration(seconds: 4),
+                            ),
+                          );
+                          
+                          // 2. Ejecutamos la migración
+                          await migrarBaseDeDatos();
+                          
+                          // 3. Avisamos que terminó
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('¡Datos cargados exitosamente!'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                            // 4. Vamos al Home
+                            irAHome();
+                          }
+                        },
                         child: Text(
                           'Crear usuario',
                           style: TextStyle(
