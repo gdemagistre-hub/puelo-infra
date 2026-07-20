@@ -26,7 +26,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-        key: scaffoldKey,
+        key: scaffoldKey, 
         backgroundColor: const Color(0xFFF8FAFC), 
         body: SafeArea(
           top: true,
