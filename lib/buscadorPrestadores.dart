@@ -14,14 +14,74 @@ class BuscadorPrestadoresWidget extends StatefulWidget {
 
 class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
   final scaffoldKey = GlobalKey<ScaffoldState>();
+  final db = FirebaseFirestore.instance;
+
   String _searchQuery = '';
   String _selectedRubro = 'Todos';
-
-  // NUEVOS FILTROS GEOGRÁFICOS DE BÚSQUEDA
-  String _filtroProvinciaId = '06'; // Por defecto Buenos Aires para Pilar
-  String _filtroLocalidadId = 'Todos';
-
   final List<String> _rubros = ['Todos', 'Electricista', 'Plomero', 'Gasista', 'Carpintero', 'Pintor', 'Construcción'];
+
+  // NUEVOS FILTROS GEOGRÁFICOS DINÁMICOS
+  String? selectedProvinciaId;
+  String? selectedPartidoId;
+  String? selectedLocalidadId;
+
+  List<Map<String, dynamic>> provincias = [];
+  List<Map<String, dynamic>> partidos = [];
+  List<Map<String, dynamic>> localidades = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProvincias();
+  }
+
+  // --- LÓGICA DE CASCADA DESDE FIRESTORE ---
+  Future<void> _loadProvincias() async {
+    final doc = await db.collection('cat_paises').doc('AR').get();
+    if (doc.exists && doc.data()!.containsKey('provincias')) {
+      setState(() {
+        provincias = List<Map<String, dynamic>>.from(doc.data()!['provincias']);
+      });
+    }
+  }
+
+  Future<void> _onProvinciaSelected(String? provId) async {
+    if (provId == null) return;
+    
+    setState(() {
+      selectedProvinciaId = provId;
+      selectedPartidoId = null;
+      selectedLocalidadId = null;
+      partidos = [];
+      localidades = [];
+    });
+
+    final query = await db.collection('cat_departamentos')
+        .where('provincia_id', isEqualTo: provId)
+        .get();
+
+    setState(() {
+      partidos = query.docs.map((d) => d.data()).toList();
+    });
+  }
+
+  Future<void> _onPartidoSelected(String? partId) async {
+    if (partId == null) return;
+    
+    setState(() {
+      selectedPartidoId = partId;
+      selectedLocalidadId = null;
+      localidades = [];
+    });
+
+    final query = await db.collection('cat_localidades')
+        .where('partido_id', isEqualTo: partId)
+        .get();
+
+    setState(() {
+      localidades = query.docs.map((d) => d.data()).toList();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,45 +119,53 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                     ),
                     const SizedBox(height: 12.0),
                     
-                    // SELECTORES DE FILTRO GEOGRÁFICO EN EL BUSCADOR
+                    // SELECTORES DE FILTRO GEOGRÁFICO DINÁMICOS
+                    DropdownButtonFormField<String>(
+                      value: selectedProvinciaId,
+                      decoration: const InputDecoration(labelText: 'Provincia', border: OutlineInputBorder()),
+                      items: provincias.map((p) {
+                        return DropdownMenuItem<String>(
+                          value: p['id'],
+                          child: Text(p['nombre']),
+                        );
+                      }).toList(),
+                      onChanged: _onProvinciaSelected,
+                    ),
+                    const SizedBox(height: 12.0),
                     Row(
                       children: [
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: _filtroProvinciaId,
-                            decoration: const InputDecoration(labelText: 'Provincia', border: OutlineInputBorder()),
-                            items: const [
-                              DropdownMenuItem(value: '06', child: Text('Buenos Aires')),
-                              DropdownMenuItem(value: '14', child: Text('Córdoba')),
-                              DropdownMenuItem(value: '30', child: Text('Entre Ríos')),
-                            ],
-                            onChanged: (val) => setState(() {
-                              _filtroProvinciaId = val!;
-                              _filtroLocalidadId = 'Todos'; // Reset localidad
-                            }),
+                            value: selectedPartidoId,
+                            decoration: const InputDecoration(labelText: 'Partido', border: OutlineInputBorder()),
+                            items: partidos.map((p) {
+                              return DropdownMenuItem<String>(
+                                value: p['departamento_id'],
+                                child: Text(p['departamento_nombre'], overflow: TextOverflow.ellipsis),
+                              );
+                            }).toList(),
+                            onChanged: _onPartidoSelected,
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: _filtroLocalidadId,
+                            value: selectedLocalidadId,
                             decoration: const InputDecoration(labelText: 'Localidad', border: OutlineInputBorder()),
-                            items: [
-                              const DropdownMenuItem(value: 'Todos', child: Text('Todas')),
-                              if (_filtroProvinciaId == '06') ...[
-                                const DropdownMenuItem(value: '06638040', child: Text('Pilar')),
-                                const DropdownMenuItem(value: '06042010', child: Text('Ayacucho')),
-                              ] else if (_filtroProvinciaId == '14') ...[
-                                const DropdownMenuItem(value: '14042170', child: Text('Villa María')),
-                              ]
-                            ],
-                            onChanged: (val) => setState(() => _filtroLocalidadId = val!),
+                            items: localidades.map((l) {
+                              return DropdownMenuItem<String>(
+                                value: l['localidad_id'],
+                                child: Text(l['localidad_nombre'], overflow: TextOverflow.ellipsis),
+                              );
+                            }).toList(),
+                            onChanged: (val) => setState(() => selectedLocalidadId = val),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12.0),
                     
+                    // CARRUSEL DE RUBROS
                     SizedBox(
                       height: 40,
                       child: ListView.builder(
@@ -123,7 +191,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                 ),
               ),
 
-              // LISTADO FILTRADO CON NESTED MAPS DE COBERTURA
+              // LISTADO FILTRADO DESDE FIRESTORE
               Expanded(
                 child: StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance.collection('usuarios').snapshots(),
@@ -135,7 +203,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                     final filteredDocs = docs.where((doc) {
                       final data = doc.data() as Map<String, dynamic>;
                       
-                      // Validación de rol
+                      // 1. Validación de rol
                       if (data['rol'] != 'trabajador') return false;
 
                       // Descomposición del mapa de cobertura
@@ -143,29 +211,36 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                       if (cobertura == null) return false;
 
                       final String providerProvinciaId = cobertura['provincia_id'] ?? '';
-                      final List<dynamic> localidades = cobertura['localidades'] ?? [];
+                      final List<dynamic> provLocalidades = cobertura['localidades'] ?? [];
 
-                      // 1. Filtrado por Provincia
-                      if (providerProvinciaId != _filtroProvinciaId) return false;
-
-                      // 2. Filtrado por Localidad seleccionada
-                      if (_filtroLocalidadId != 'Todos') {
-                        final tieneLocalidad = localidades.any((l) => l['id'] == _filtroLocalidadId);
-                        if (!tieneLocalidad) return false;
+                      // 2. Filtrado por Provincia (si el usuario eligió una)
+                      if (selectedProvinciaId != null && providerProvinciaId != selectedProvinciaId) {
+                        return false;
                       }
 
-                      // 3. Filtro por Rubro
+                      // 3. Filtrado por Partido y Localidad
+                      if (selectedLocalidadId != null) {
+                        // Si eligió una localidad exacta, el prestador debe tenerla
+                        final tieneLocalidad = provLocalidades.any((l) => l['id'] == selectedLocalidadId);
+                        if (!tieneLocalidad) return false;
+                      } else if (selectedPartidoId != null) {
+                        // Si eligió un partido pero no una localidad, mostramos todos los del partido
+                        final tienePartido = provLocalidades.any((l) => l['partido_id'] == selectedPartidoId);
+                        if (!tienePartido) return false;
+                      }
+
+                      // 4. Filtro por Rubro
                       final rubro = (data['rubro'] ?? '').toString();
                       if (_selectedRubro != 'Todos' && rubro != _selectedRubro) return false;
 
-                      // 4. Filtro por texto
+                      // 5. Filtro por texto
                       final nombre = (data['nombre'] ?? '').toString().toLowerCase();
                       final apellido = (data['apellido'] ?? '').toString().toLowerCase();
-                      return nombre.contains(_searchQuery) || apellido.contains(_searchQuery);
+                      return nombre.contains(_searchQuery) || apellido.contains(_searchQuery) || rubro.toLowerCase().contains(_searchQuery);
                     }).toList();
 
                     if (filteredDocs.isEmpty) {
-                      return const Center(child: Text('No se encontraron prestadores en esta zona.'));
+                      return const Center(child: Text('No se encontraron prestadores con estos filtros.'));
                     }
 
                     return ListView.builder(
