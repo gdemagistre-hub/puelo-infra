@@ -14,6 +14,7 @@ class RegistroTrabajadorWidget extends StatefulWidget {
 
 class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
   final scaffoldKey = GlobalKey<ScaffoldState>();
+  final db = FirebaseFirestore.instance;
 
   late TextEditingController _nombreController;
   late TextEditingController _apellidoController;
@@ -21,24 +22,24 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
   late TextEditingController _nombreComercialController;
   late TextEditingController _telefonoController;
 
-  final FocusNode _nombreFocusNode = FocusNode();
-  final FocusNode _apellidoFocusNode = FocusNode();
-  final FocusNode _documentoFocusNode = FocusNode();
-  final FocusNode _nombreComercialFocusNode = FocusNode();
-  final FocusNode _telefonoFocusNode = FocusNode();
-
   List<String> _profesionesSeleccionadas = [];
   List<String> _opcionesProfesiones = [];
   bool _cargandoCatalogos = true;
 
-  // NUEVO ESTADO GEOGRÁFICO CASCADA
-  String? _paisSeleccionadoId = 'AR'; // Por defecto Argentina
+  // ESTADO GEOGRÁFICO - CASCADA Y MEMORIA LOCAL
+  String? _paisSeleccionadoId = 'AR'; 
   String? _paisSeleccionadoNombre = 'Argentina';
   String? _provinciaSeleccionadaId;
   String? _provinciaSeleccionadaNombre;
   
-  List<Map<String, String>> _partidosSeleccionados = []; // [{id, nombre}]
-  List<Map<String, String>> _localidadesSeleccionadas = []; // [{id, nombre}]
+  List<Map<String, String>> _partidosSeleccionados = []; 
+  List<Map<String, String>> _localidadesSeleccionadas = [];
+
+  // Datos en memoria descargados al elegir la Provincia
+  List<Map<String, dynamic>> _todasLasProvincias = [];
+  List<Map<String, dynamic>> _partidosDeProvincia = [];
+  List<Map<String, dynamic>> _localidadesDeProvincia = [];
+  bool _cargandoZonas = false;
 
   final primaryColor = const Color(0xFF0F52BA); 
   final accentColor = const Color(0xFFE8F0FE);  
@@ -54,6 +55,7 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
     _nombreComercialController = TextEditingController();
     _telefonoController = TextEditingController();
     _cargarCatalogos();
+    _cargarProvincias();
   }
 
   @override
@@ -68,7 +70,7 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
 
   Future<void> _cargarCatalogos() async {
     try {
-      final oficiosSnapshot = await FirebaseFirestore.instance.collection('cat_oficios').limit(1).get();
+      final oficiosSnapshot = await db.collection('cat_oficios').limit(1).get();
       if (oficiosSnapshot.docs.isNotEmpty) {
         final data = oficiosSnapshot.docs.first.data();
         final List<dynamic>? maestro = data['maestro'] as List<dynamic>?;
@@ -82,7 +84,76 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
     }
   }
 
-  // DIÁLOGO SELECCIÓN ÚNICA (País / Provincia)
+  // --- LÓGICA GEOGRÁFICA ---
+
+  Future<void> _cargarProvincias() async {
+    try {
+      final doc = await db.collection('cat_paises').doc('AR').get();
+      if (doc.exists && doc.data()!.containsKey('provincias')) {
+        setState(() {
+          _todasLasProvincias = List<Map<String, dynamic>>.from(doc.data()!['provincias']);
+        });
+      }
+    } catch (e) {
+      print("Error cargando provincias: $e");
+    }
+  }
+
+  Future<void> _seleccionarProvincia(Map<String, String> prov) async {
+    setState(() {
+      _cargandoZonas = true;
+      _provinciaSeleccionadaId = prov['id'];
+      _provinciaSeleccionadaNombre = prov['nombre'];
+      
+      // Limpiamos selecciones y memoria anterior
+      _partidosSeleccionados.clear();
+      _localidadesSeleccionadas.clear();
+      _partidosDeProvincia.clear();
+      _localidadesDeProvincia.clear();
+    });
+
+    try {
+      // Descargamos TODOS los partidos de la provincia
+      final depQuery = await db.collection('cat_departamentos')
+          .where('provincia_id', isEqualTo: prov['id']).get();
+      
+      // Descargamos TODAS las localidades de la provincia
+      final locQuery = await db.collection('cat_localidades')
+          .where('provincia_id', isEqualTo: prov['id']).get();
+
+      setState(() {
+        _partidosDeProvincia = depQuery.docs.map((d) => d.data()).toList();
+        _localidadesDeProvincia = locQuery.docs.map((d) => d.data()).toList();
+        _cargandoZonas = false;
+      });
+    } catch (e) {
+      print("Error cargando zonas: $e");
+      setState(() => _cargandoZonas = false);
+    }
+  }
+
+  void _actualizarLocalidadesSegunPartidos(List<Map<String, String>> nuevosPartidos) {
+    setState(() {
+      _partidosSeleccionados = nuevosPartidos;
+      
+      // Si el usuario desmarcó un partido, removemos las localidades que pertenecían a él
+      final idsPartidosSeleccionados = nuevosPartidos.map((p) => p['id']).toList();
+      
+      _localidadesSeleccionadas.removeWhere((locSeleccionada) {
+        final locDataOriginal = _localidadesDeProvincia.firstWhere(
+          (l) => l['localidad_id'] == locSeleccionada['id'],
+          orElse: () => {},
+        );
+        if (locDataOriginal.isEmpty) return true;
+        
+        return !idsPartidosSeleccionados.contains(locDataOriginal['partido_id']);
+      });
+    });
+  }
+
+
+  // --- DIÁLOGOS DE INTERFAZ ---
+
   void _mostrarSeleccionUnica({
     required String titulo,
     required List<Map<String, String>> opciones,
@@ -115,7 +186,6 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
     );
   }
 
-  // DIÁLOGO SELECCIÓN MÚLTIPLE (Partidos / Localidades)
   void _mostrarSeleccionMultiple({
     required String titulo,
     required List<Map<String, String>> opciones,
@@ -182,6 +252,8 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
     );
   }
 
+  // --- GUARDAR DATOS ---
+
   void _crearTarjetaProfesional() async {
     if (_nombreController.text.trim().isEmpty || _apellidoController.text.trim().isEmpty || _provinciaSeleccionadaId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -191,7 +263,7 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
     }
 
     try {
-      final nuevoUsuarioRef = FirebaseFirestore.instance.collection('usuarios').doc();
+      final nuevoUsuarioRef = db.collection('usuarios').doc();
       
       await nuevoUsuarioRef.set({
         'nombre': _nombreController.text.trim(),
@@ -202,7 +274,6 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
         'profesiones': _profesionesSeleccionadas,
         'creado_en': FieldValue.serverTimestamp(),
         'rol': 'trabajador',
-        // NUEVA ESTRUCTURA GEOGRÁFICA MAPA EN FIRESTORE
         'zonas_cobertura': {
           'pais_id': _paisSeleccionadoId,
           'pais_nombre': _paisSeleccionadoNombre,
@@ -260,7 +331,7 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
 
                     _buildSectionHeader('Zonas de Cobertura (Filtro Geográfico)'),
                     
-                    // Selector País
+                    // Selector País (Por ahora fijo en AR)
                     _buildSelectorWidget(
                       label: 'País',
                       valor: _paisSeleccionadoNombre ?? 'Seleccionar',
@@ -272,98 +343,82 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
                             setState(() {
                               _paisSeleccionadoId = res['id'];
                               _paisSeleccionadoNombre = res['nombre'];
-                              // Reset cascada
-                              _provinciaSeleccionadaId = null;
-                              _provinciaSeleccionadaNombre = null;
-                              _partidosSeleccionados.clear();
-                              _localidadesSeleccionadas.clear();
                             });
                           }
                         );
                       }
                     ),
 
-                    // Selector Provincia
+                    // Selector Provincia (Dinámico desde base)
                     _buildSelectorWidget(
                       label: 'Provincia',
                       valor: _provinciaSeleccionadaNombre ?? 'Seleccionar Provincia',
                       onTap: () {
+                        List<Map<String, String>> opciones = _todasLasProvincias.map((p) {
+                          return {'id': p['id'].toString(), 'nombre': p['nombre'].toString()};
+                        }).toList();
+
                         _mostrarSeleccionUnica(
                           titulo: 'Seleccionar Provincia',
-                          opciones: [
-                            {'id': '06', 'nombre': 'Buenos Aires'},
-                            {'id': '14', 'nombre': 'Córdoba'},
-                            {'id': '30', 'nombre': 'Entre Ríos'},
-                            {'id': '70', 'nombre': 'San Juan'},
-                          ],
-                          onConfirm: (res) {
-                            setState(() {
-                              _provinciaSeleccionadaId = res['id'];
-                              _provinciaSeleccionadaNombre = res['nombre'];
-                              _partidosSeleccionados.clear();
-                              _localidadesSeleccionadas.clear();
-                            });
-                          }
+                          opciones: opciones,
+                          onConfirm: _seleccionarProvincia
                         );
                       }
                     ),
 
-                    // Selector Partido (Múltiple)
+                    // Indicador de carga de zonas
+                    if (_cargandoZonas)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8.0),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+
+                    // Selector Partido (Múltiple, filtrado en memoria)
                     _buildSelectorWidget(
                       label: 'Partidos / Departamentos',
                       valor: _partidosSeleccionados.isEmpty 
                           ? 'Seleccionar (Múltiple)' 
                           : _partidosSeleccionados.map((e) => e['nombre']).join(', '),
-                      onTap: _provinciaSeleccionadaId == null ? null : () {
-                        // Mock de partidos según provincia
-                        List<Map<String, String>> mockPartidos = _provinciaSeleccionadaId == '06' ? [
-                          {'id': '06638', 'nombre': 'Pilar'},
-                          {'id': '06134', 'nombre': 'Cañuelas'},
-                          {'id': '06042', 'nombre': 'Ayacucho'}
-                        ] : [
-                          {'id': '14042', 'nombre': 'General San Martín'},
-                          {'id': '14021', 'nombre': 'Colón'}
-                        ];
+                      onTap: _provinciaSeleccionadaId == null || _cargandoZonas ? null : () {
+                        
+                        List<Map<String, String>> opcionesPartidos = _partidosDeProvincia.map((p) {
+                          return {
+                            'id': p['departamento_id'].toString(), 
+                            'nombre': p['departamento_nombre'].toString()
+                          };
+                        }).toList();
 
                         _mostrarSeleccionMultiple(
                           titulo: 'Seleccionar Partidos',
-                          opciones: mockPartidos,
+                          opciones: opcionesPartidos,
                           seleccionadas: _partidosSeleccionados,
-                          onConfirm: (res) {
-                            setState(() {
-                              _partidosSeleccionados = res;
-                              _localidadesSeleccionadas.clear();
-                            });
-                          }
+                          onConfirm: _actualizarLocalidadesSegunPartidos
                         );
                       }
                     ),
 
-                    // Selector Localidad (Múltiple)
+                    // Selector Localidad (Múltiple, filtrado en memoria por los partidos elegidos)
                     _buildSelectorWidget(
                       label: 'Localidades',
                       valor: _localidadesSeleccionadas.isEmpty 
                           ? 'Seleccionar Localidades (Múltiple)' 
                           : _localidadesSeleccionadas.map((e) => e['nombre']).join(', '),
-                      onTap: _partidosSeleccionados.isEmpty ? null : () {
-                        // Mock de localidades filtradas por partidos seleccionados
-                        List<Map<String, String>> mockLocs = [];
-                        if (_partidosSeleccionados.any((e) => e['id'] == '06638')) {
-                          mockLocs.add({'id': '06638040', 'nombre': 'Pilar'});
-                        }
-                        if (_partidosSeleccionados.any((e) => e['id'] == '06042')) {
-                          mockLocs.addAll([
-                            {'id': '06042010', 'nombre': 'Ayacucho'},
-                            {'id': '06042020', 'nombre': 'La Constancia'}
-                          ]);
-                        }
-                        if (mockLocs.isEmpty) {
-                          mockLocs.add({'id': '1000', 'nombre': 'Localidad Centro'});
-                        }
+                      onTap: _partidosSeleccionados.isEmpty || _cargandoZonas ? null : () {
+                        
+                        // Solo mostramos localidades cuyos partidos fueron seleccionados
+                        final idsPartidos = _partidosSeleccionados.map((p) => p['id']).toList();
+                        final locsFiltradas = _localidadesDeProvincia.where((l) => idsPartidos.contains(l['partido_id']));
+
+                        List<Map<String, String>> opcionesLocalidades = locsFiltradas.map((l) {
+                          return {
+                            'id': l['localidad_id'].toString(), 
+                            'nombre': l['localidad_nombre'].toString()
+                          };
+                        }).toList();
 
                         _mostrarSeleccionMultiple(
                           titulo: 'Seleccionar Localidades',
-                          opciones: mockLocs,
+                          opciones: opcionesLocalidades,
                           seleccionadas: _localidadesSeleccionadas,
                           onConfirm: (res) {
                             setState(() {
