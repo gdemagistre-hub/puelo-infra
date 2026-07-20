@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
-import 'dart:html' as html;
 import 'Homepage.dart';
 
 class TarjetaDigitalWidget extends StatefulWidget {
@@ -44,8 +43,8 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
     }
 
     try {
-      final currentUrl = html.window.location.href;
-      final uri = Uri.parse(currentUrl);
+      // Uso de Uri.base en lugar de dart:html para compatibilidad total con WASM y Móvil
+      final uri = Uri.base;
       
       String? id;
       if (uri.queryParameters.containsKey('id')) {
@@ -64,7 +63,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
         _resolvedRef = FirebaseFirestore.instance.collection('usuarios').doc(id);
       }
     } catch (e) {
-      debugPrint('Error al intentar leer la URL nativa de la web: $e');
+      debugPrint('Error al intentar leer la URL nativa: $e');
     }
 
     setState(() {
