@@ -17,7 +17,10 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
   String _searchQuery = '';
   String _selectedRubro = 'Todos';
 
-  // Lista estática de rubros para el filtro superior rápido
+  // NUEVOS FILTROS GEOGRÁFICOS DE BÚSQUEDA
+  String _filtroProvinciaId = '06'; // Por defecto Buenos Aires para Pilar
+  String _filtroLocalidadId = 'Todos';
+
   final List<String> _rubros = ['Todos', 'Electricista', 'Plomero', 'Gasista', 'Carpintero', 'Pintor', 'Construcción'];
 
   @override
@@ -39,7 +42,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
         body: SafeArea(
           child: Column(
             children: [
-              // Barra de búsqueda y Filtros
+              // Barra de búsqueda y selectores geográficos
               Container(
                 color: Colors.white,
                 padding: const EdgeInsets.all(16.0),
@@ -49,18 +52,52 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                       decoration: InputDecoration(
                         hintText: 'Buscar por nombre o especialidad...',
                         prefixIcon: const Icon(Icons.search),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12.0),
-                        ),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
                         contentPadding: const EdgeInsets.symmetric(vertical: 12.0),
                       ),
-                      onChanged: (value) {
-                        setState(() {
-                          _searchQuery = value.toLowerCase();
-                        });
-                      },
+                      onChanged: (value) => setState(() => _searchQuery = value.toLowerCase()),
                     ),
                     const SizedBox(height: 12.0),
+                    
+                    // SELECTORES DE FILTRO GEOGRÁFICO EN EL BUSCADOR
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: _filtroProvinciaId,
+                            decoration: const InputDecoration(labelText: 'Provincia', border: OutlineInputBorder()),
+                            items: const [
+                              DropdownMenuItem(value: '06', child: Text('Buenos Aires')),
+                              DropdownMenuItem(value: '14', child: Text('Córdoba')),
+                              DropdownMenuItem(value: '30', child: Text('Entre Ríos')),
+                            ],
+                            onChanged: (val) => setState(() {
+                              _filtroProvinciaId = val!;
+                              _filtroLocalidadId = 'Todos'; // Reset localidad
+                            }),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: _filtroLocalidadId,
+                            decoration: const InputDecoration(labelText: 'Localidad', border: OutlineInputBorder()),
+                            items: [
+                              const DropdownMenuItem(value: 'Todos', child: Text('Todas')),
+                              if (_filtroProvinciaId == '06') ...[
+                                const DropdownMenuItem(value: '06638040', child: Text('Pilar')),
+                                const DropdownMenuItem(value: '06042010', child: Text('Ayacucho')),
+                              ] else if (_filtroProvinciaId == '14') ...[
+                                const DropdownMenuItem(value: '14042170', child: Text('Villa María')),
+                              ]
+                            ],
+                            onChanged: (val) => setState(() => _filtroLocalidadId = val!),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12.0),
+                    
                     SizedBox(
                       height: 40,
                       child: ListView.builder(
@@ -76,15 +113,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                               selected: isSelected,
                               selectedColor: primaryColor.withOpacity(0.2),
                               checkmarkColor: primaryColor,
-                              labelStyle: TextStyle(
-                                color: isSelected ? primaryColor : textColor,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                              ),
-                              onSelected: (selected) {
-                                setState(() {
-                                  _selectedRubro = rubro;
-                                });
-                              },
+                              onSelected: (selected) => setState(() => _selectedRubro = rubro),
                             ),
                           );
                         },
@@ -94,50 +123,49 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                 ),
               ),
 
-              // Lista Dinámica desde Firestore
+              // LISTADO FILTRADO CON NESTED MAPS DE COBERTURA
               Expanded(
                 child: StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance.collection('usuarios').snapshots(),
                   builder: (context, snapshot) {
-                    if (snapshot.hasError) {
-                      return const Center(child: Text('Ocurrió un error al cargar los datos.'));
-                    }
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
+                    if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
 
-                    final docs = snapshot.data?.docs ?? [];
+                    final docs = snapshot.data!.docs;
 
-                    // Filtramos los usuarios en el cliente para permitir búsquedas parciales fluidas
                     final filteredDocs = docs.where((doc) {
                       final data = doc.data() as Map<String, dynamic>;
                       
-                      final nombre = (data['nombre'] ?? '').toString().toLowerCase();
-                      final apellido = (data['apellido'] ?? '').toString().toLowerCase();
-                      final nombreComercial = (data['nombre_comercial'] ?? '').toString().toLowerCase();
-                      final rubro = (data['rubro'] ?? '').toString();
+                      // Validación de rol
+                      if (data['rol'] != 'trabajador') return false;
 
-                      // Filtro por Rubro seleccionado en los Chips
-                      if (_selectedRubro != 'Todos' && rubro != _selectedRubro) {
-                        return false;
+                      // Descomposición del mapa de cobertura
+                      final cobertura = data['zonas_cobertura'] as Map<String, dynamic>?;
+                      if (cobertura == null) return false;
+
+                      final String providerProvinciaId = cobertura['provincia_id'] ?? '';
+                      final List<dynamic> localidades = cobertura['localidades'] ?? [];
+
+                      // 1. Filtrado por Provincia
+                      if (providerProvinciaId != _filtroProvinciaId) return false;
+
+                      // 2. Filtrado por Localidad seleccionada
+                      if (_filtroLocalidadId != 'Todos') {
+                        final tieneLocalidad = localidades.any((l) => l['id'] == _filtroLocalidadId);
+                        if (!tieneLocalidad) return false;
                       }
 
-                      // Filtro por texto de búsqueda
-                      final matchesText = nombre.contains(_searchQuery) || 
-                                          apellido.contains(_searchQuery) || 
-                                          nombreComercial.contains(_searchQuery) ||
-                                          rubro.toLowerCase().contains(_searchQuery);
+                      // 3. Filtro por Rubro
+                      final rubro = (data['rubro'] ?? '').toString();
+                      if (_selectedRubro != 'Todos' && rubro != _selectedRubro) return false;
 
-                      return matchesText;
+                      // 4. Filtro por texto
+                      final nombre = (data['nombre'] ?? '').toString().toLowerCase();
+                      final apellido = (data['apellido'] ?? '').toString().toLowerCase();
+                      return nombre.contains(_searchQuery) || apellido.contains(_searchQuery);
                     }).toList();
 
                     if (filteredDocs.isEmpty) {
-                      return const Center(
-                        child: Text(
-                          'No se encontraron prestadores que coincidan.',
-                          style: TextStyle(color: Colors.grey, fontSize: 16),
-                        ),
-                      );
+                      return const Center(child: Text('No se encontraron prestadores en esta zona.'));
                     }
 
                     return ListView.builder(
@@ -146,86 +174,26 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                       itemBuilder: (context, index) {
                         final doc = filteredDocs[index];
                         final data = doc.data() as Map<String, dynamic>;
-
-                        String displayName = data['nombre_comercial'] ?? '${data['nombre'] ?? ''} ${data['apellido'] ?? ''}';
-                        if (displayName.trim().isEmpty) displayName = 'Prestador sin nombre';
-                        
-                        final rubro = data['rubro'] ?? 'Especialidad no especificada';
-                        final telefono = data['telefono'] ?? 'Sin teléfono';
-
-                        // Recuperamos las variables del promedio pre-computado anti-fraude
                         final double promedio = (data['promedioEstrellas'] ?? 0.0).toDouble();
                         final int cantidadEvaluadores = data['cantidadEvaluadores'] ?? 0;
 
                         return Card(
                           margin: const EdgeInsets.only(bottom: 12.0),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16.0),
-                          ),
-                          elevation: 2,
                           child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                            leading: CircleAvatar(
-                              backgroundColor: primaryColor.withOpacity(0.1),
-                              child: Icon(Icons.person, color: primaryColor),
-                            ),
-                            title: Row(
+                            leading: const CircleAvatar(child: Icon(Icons.person)),
+                            title: Text('${data['nombre'] ?? ''} ${data['apellido'] ?? ''}'),
+                            subtitle: Text(data['rubro'] ?? 'Prestador'),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                Expanded(
-                                  child: Text(
-                                    displayName,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                // Componente visual dinámico de estrellas en el listado
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.star_rounded, color: Color(0xFFFFB000), size: 18),
-                                    const SizedBox(width: 2),
-                                    Text(
-                                      cantidadEvaluadores > 0 
-                                          ? promedio.toStringAsFixed(1) 
-                                          : 'Nuevo',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
-                                        color: textColor,
-                                      ),
-                                    ),
-                                    if (cantidadEvaluadores > 0) ...[
-                                      const SizedBox(width: 2),
-                                      Text(
-                                        '($cantidadEvaluadores)',
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          color: Color(0xFF64748B),
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
+                                const Icon(Icons.star_rounded, color: Color(0xFFFFB000), size: 18),
+                                Text(cantidadEvaluadores > 0 ? promedio.toStringAsFixed(1) : 'Nuevo'),
                               ],
                             ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const SizedBox(height: 4),
-                                Text(rubro, style: TextStyle(color: primaryColor, fontWeight: FontWeight.w500)),
-                                const SizedBox(height: 2),
-                                Text(telefono, style: const TextStyle(color: Colors.grey)),
-                              ],
-                            ),
-                            trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
                             onTap: () {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(
-                                  builder: (context) => TarjetaDigitalWidget(usuarioRef: doc.reference),
-                                ),
+                                MaterialPageRoute(builder: (context) => TarjetaDigitalWidget(usuarioRef: doc.reference)),
                               );
                             },
                           ),
