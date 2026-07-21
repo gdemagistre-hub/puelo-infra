@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'user_session.dart';
 import 'loginScreen.dart';
 import 'buscadorPrestadores.dart';
-import 'completar_perfil.dart';
 import 'menuEvaluaciones.dart';
+import 'menuPerfil.dart'; // Importamos el nuevo menú
 
 class HomePageWidget extends StatefulWidget {
   const HomePageWidget({super.key});
@@ -96,14 +96,14 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               ),
               const SizedBox(height: 16),
 
-              // Botón 3: Sobre mí
+              // Botón 3: Sobre mí (Apunta al nuevo menú)
               _buildMainButton(
                 context,
                 texto: 'Sobre mí',
                 icono: Icons.person_outline_rounded,
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const CompletarPerfilWidget()),
+                  MaterialPageRoute(builder: (context) => const MenuPerfilWidget()),
                 ),
               ),
             ],
