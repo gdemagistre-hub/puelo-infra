@@ -192,8 +192,15 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
         final String nombreComercial = datos['nombre_comercial'] ?? '';
         final String telefono = datos['telefono'] ?? '';
         final List<dynamic> profesiones = datos['profesiones'] ?? [];
-        final List<dynamic> zonas = datos['zonas'] ?? [];
         final String docId = snapshot.data!.id;
+
+        // Extraemos las zonas de cobertura del nuevo esquema
+        final Map<String, dynamic>? zonasCoberturaMap = datos['zonas_cobertura'];
+        List<String> zonasLista = [];
+        if (zonasCoberturaMap != null && zonasCoberturaMap['localidades'] != null) {
+          final List<dynamic> locs = zonasCoberturaMap['localidades'];
+          zonasLista = locs.map((e) => e['nombre'].toString()).toList();
+        }
 
         // Nuevos campos calculados
         final double promedio = (datos['promedioEstrellas'] ?? 0.0).toDouble();
@@ -407,7 +414,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                               const SizedBox(height: 20),
                             ],
 
-                            if (zonas.isNotEmpty) ...[
+                            if (zonasLista.isNotEmpty) ...[
                               const Text(
                                 'Zonas de cobertura',
                                 style: TextStyle(
@@ -419,12 +426,13 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                               ),
                               const SizedBox(height: 6),
                               Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Icon(Icons.location_on_outlined, size: 16, color: primaryColor),
                                   const SizedBox(width: 4),
                                   Expanded(
                                     child: Text(
-                                      zonas.join(', '),
+                                      zonasLista.join(', '),
                                       style: TextStyle(fontSize: 14, color: textColor),
                                     ),
                                   ),
