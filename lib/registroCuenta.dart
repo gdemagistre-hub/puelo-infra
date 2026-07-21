@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
+import 'user_session.dart';
 
 class RegistroCuentaWidget extends StatefulWidget {
   const RegistroCuentaWidget({super.key});
@@ -17,9 +18,11 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
   final _apellidoController = TextEditingController();
   final _docNumeroController = TextEditingController();
   final _whatsappController = TextEditingController();
+  final _emailController = TextEditingController();
 
   String? _tipoDocSeleccionado;
   String? _paisSeleccionado;
+  String _metodoValidacion = 'whatsapp'; // whatsapp | email
   
   bool _isLoading = false;
   String? _invitacionLink;
@@ -37,6 +40,7 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
     _apellidoController.dispose();
     _docNumeroController.dispose();
     _whatsappController.dispose();
+    _emailController.dispose();
     super.dispose();
   }
 
@@ -49,36 +53,66 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
       return;
     }
 
+    if (_metodoValidacion == 'whatsapp' && _whatsappController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ingresá un número de WhatsApp válido.')),
+      );
+      return;
+    }
+    if (_metodoValidacion == 'email' && _emailController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ingresá un email válido.')),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
       _tokenValidacion = uuid.v4().substring(0, 8).toUpperCase();
 
-      // Creamos el usuario en la base de datos con estado "pendiente_validacion"
-      await db.collection('usuarios').add({
+      final Map<String, dynamic> dataUsuario = {
         'nombre': _nombreController.text.trim(),
         'apellido': _apellidoController.text.trim(),
         'documento_tipo': _tipoDocSeleccionado,
         'documento_pais': _paisSeleccionado,
         'documento': _docNumeroController.text.trim(),
         'telefono': _whatsappController.text.trim(),
+        'email': _emailController.text.trim(),
         'estado': 'pendiente_validacion',
         'token_validacion': _tokenValidacion,
         'creado_en': FieldValue.serverTimestamp(),
-      });
+      };
 
-      // Limpiamos el número de WhatsApp para la URL
-      final String numero = _whatsappController.text.trim().replaceAll(RegExp(r'[^0-9+]'), '');
+      // Si venimos de una validación de domicilio, la asociamos
+      if (UserSession().pendingValidacionToken != null) {
+        dataUsuario['pending_domicilio_token'] = UserSession().pendingValidacionToken;
+      }
 
-      // Generamos el mensaje prearmado
-      final String mensaje = Uri.encodeComponent(
-        "¡Hola ${_nombreController.text.trim()}! 🚀\n\n"
-        "Este es tu enlace para validar y activar tu cuenta en la plataforma Puelo.\n\n"
-        "Por favor haz click aquí para confirmar tu identidad:\n\n"
-        "https://puelo.xyz/validar?token=$_tokenValidacion"
-      );
+      await db.collection('usuarios').add(dataUsuario);
 
-      _invitacionLink = "https://wa.me/$numero?text=$mensaje";
+      final String linkValidacion = 'https://lifewalletpuelo.web.app/#/validar?token=$_tokenValidacion';
+
+      if (_metodoValidacion == 'whatsapp') {
+        final String numero = _whatsappController.text.trim().replaceAll(RegExp(r'[^0-9+]'), '');
+        final String mensaje = Uri.encodeComponent(
+          "¡Hola ${_nombreController.text.trim()}! 🚀\n\n"
+          "Este es tu enlace para validar y activar tu cuenta en la plataforma Puelo.\n\n"
+          "Por favor haz click aquí para confirmar tu identidad:\n\n"
+          "$linkValidacion"
+        );
+        _invitacionLink = "https://wa.me/$numero?text=$mensaje";
+      } else {
+        // Email: preparamos mailto (el usuario envía desde su cliente de correo)
+        final String asunto = Uri.encodeComponent('Activá tu cuenta en Puelo');
+        final String cuerpo = Uri.encodeComponent(
+          "Hola ${_nombreController.text.trim()},\n\n"
+          "Hacé click en el siguiente enlace para validar y activar tu cuenta en Puelo:\n\n"
+          "$linkValidacion\n\n"
+          "Gracias por sumarte a la comunidad."
+        );
+        _invitacionLink = "mailto:${_emailController.text.trim()}?subject=$asunto&body=$cuerpo";
+      }
 
       if (mounted) {
         _mostrarPopupLink();
@@ -104,10 +138,12 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'Enviate el enlace de activación por WhatsApp para validar tu dispositivo y activar la cuenta.',
+            Text(
+              _metodoValidacion == 'whatsapp'
+                  ? 'Enviate el enlace de activación por WhatsApp para validar tu dispositivo y activar la cuenta.'
+                  : 'Se abrió tu cliente de correo con el enlace de activación. Enviá el email para validar tu cuenta.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14),
+              style: const TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 20),
             Container(
@@ -126,8 +162,8 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.pop(context); // Cierra el dialog
-              Navigator.pop(context); // Vuelve al login
+              Navigator.pop(context);
+              Navigator.pop(context);
             },
             child: const Text('Cerrar', style: TextStyle(color: Colors.grey)),
           ),
@@ -137,15 +173,15 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
               if (await canLaunchUrl(url)) {
                 await launchUrl(url, mode: LaunchMode.externalApplication);
                 if (mounted) {
-                  Navigator.pop(context); // Cierra el dialog
-                  Navigator.pop(context); // Vuelve al login
+                  Navigator.pop(context);
+                  Navigator.pop(context);
                 }
               }
             },
-            icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
-            label: const Text('Validar por WhatsApp'),
+            icon: Icon(_metodoValidacion == 'whatsapp' ? Icons.chat_bubble_outline_rounded : Icons.email_outlined, size: 18),
+            label: Text(_metodoValidacion == 'whatsapp' ? 'Validar por WhatsApp' : 'Abrir Email'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF25D366),
+              backgroundColor: _metodoValidacion == 'whatsapp' ? const Color(0xFF25D366) : primaryColor,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
@@ -229,13 +265,48 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
                   obligatorio: true,
                 ),
 
-                _buildTextField(
-                  controller: _whatsappController,
-                  labelText: 'Número de WhatsApp (ej: +54911...)',
-                  icon: Icons.phone_outlined,
-                  keyboardType: TextInputType.phone,
-                  obligatorio: true,
+                const SizedBox(height: 16),
+                const Text('Método de validación', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ChoiceChip(
+                        label: const Text('WhatsApp'),
+                        selected: _metodoValidacion == 'whatsapp',
+                        selectedColor: primaryColor.withOpacity(0.2),
+                        onSelected: (_) => setState(() => _metodoValidacion = 'whatsapp'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ChoiceChip(
+                        label: const Text('Email'),
+                        selected: _metodoValidacion == 'email',
+                        selectedColor: primaryColor.withOpacity(0.2),
+                        onSelected: (_) => setState(() => _metodoValidacion = 'email'),
+                      ),
+                    ),
+                  ],
                 ),
+                const SizedBox(height: 12),
+
+                if (_metodoValidacion == 'whatsapp')
+                  _buildTextField(
+                    controller: _whatsappController,
+                    labelText: 'Número de WhatsApp (ej: +54911...)',
+                    icon: Icons.phone_outlined,
+                    keyboardType: TextInputType.phone,
+                    obligatorio: true,
+                  )
+                else
+                  _buildTextField(
+                    controller: _emailController,
+                    labelText: 'Email',
+                    icon: Icons.email_outlined,
+                    keyboardType: TextInputType.emailAddress,
+                    obligatorio: true,
+                  ),
 
                 const SizedBox(height: 32),
 
