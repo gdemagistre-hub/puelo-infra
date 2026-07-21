@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'user_session.dart'; // Importamos el Singleton de sesión
 
 class CompletarPerfilWidget extends StatefulWidget {
   const CompletarPerfilWidget({super.key});
@@ -19,9 +20,8 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
 
   bool _isLoading = false;
 
-  // --- VARIABLES DE USUARIO TEMPORAL ---
+  // --- VARIABLE DE USUARIO ACTUAL ---
   String? _selectedUsuarioId;
-  List<Map<String, dynamic>> _usuariosDisponibles = [];
 
   // --- CONTROLADORES DE TEXTO ---
   final _calleController = TextEditingController();
@@ -63,7 +63,12 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
   @override
   void initState() {
     super.initState();
-    _cargarUsuariosTemporales();
+    // Tomamos el usuario de la sesión activa
+    _selectedUsuarioId = UserSession().uid;
+    
+    if (_selectedUsuarioId != null) {
+      _cargarDatosUsuarioActual();
+    }
     _cargarPaises();
   }
 
@@ -82,26 +87,13 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
   // ==========================================
   // LÓGICA DE CARGA INICIAL
   // ==========================================
-  Future<void> _cargarUsuariosTemporales() async {
-    final query = await db.collection('usuarios').get();
-    setState(() {
-      _usuariosDisponibles = query.docs.map((doc) {
-        var data = doc.data();
-        data['doc_id'] = doc.id;
-        return data;
-      }).toList();
-    });
-  }
-
-  Future<void> _seleccionarUsuario(String? userId) async {
-    if (userId == null) return;
-
+  
+  Future<void> _cargarDatosUsuarioActual() async {
     setState(() {
       _isLoading = true;
-      _selectedUsuarioId = userId;
     });
 
-    final doc = await db.collection('usuarios').doc(userId).get();
+    final doc = await db.collection('usuarios').doc(_selectedUsuarioId).get();
     if (doc.exists) {
       final data = doc.data()!;
       setState(() {
@@ -250,7 +242,7 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
   Future<void> _guardarPerfil() async {
     if (_selectedUsuarioId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor seleccioná un usuario primero.')),
+        const SnackBar(content: Text('Error: No se encontró la sesión del usuario.')),
       );
       return;
     }
@@ -326,6 +318,14 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
   // ==========================================
   @override
   Widget build(BuildContext context) {
+    if (_selectedUsuarioId == null) {
+      return const Scaffold(
+        body: Center(
+          child: Text('Error: Iniciá sesión nuevamente para ver tu perfil.'),
+        ),
+      );
+    }
+
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
@@ -345,287 +345,269 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _buildSectionHeader('Simulador de Login (Temporal)'),
-                        DropdownButtonFormField<String>(
-                          value: _selectedUsuarioId,
-                          decoration: _inputDeco('Seleccionar Usuario Actual'),
-                          items: _usuariosDisponibles.map((u) {
-                            return DropdownMenuItem<String>(
-                              value: u['doc_id']?.toString(),
-                              child: Text(
-                                '${u['nombre'] ?? ''} ${u['apellido'] ?? ''} - ${u['rol'] ?? ''}',
+                        // --- FOTO DE PERFIL ---
+                        const SizedBox(height: 12),
+                        Center(
+                          child: Stack(
+                            children: [
+                              CircleAvatar(
+                                radius: 60,
+                                backgroundColor: Colors.grey[300],
+                                backgroundImage: _fotoPerfilBytes != null
+                                    ? MemoryImage(_fotoPerfilBytes!)
+                                    : (_urlFotoPerfilActual != null
+                                        ? NetworkImage(_urlFotoPerfilActual!)
+                                        : null) as ImageProvider?,
+                                child: (_fotoPerfilBytes == null &&
+                                        _urlFotoPerfilActual == null)
+                                    ? const Icon(Icons.person, size: 60, color: Colors.grey)
+                                    : null,
                               ),
-                            );
-                          }).toList(),
-                          onChanged: _seleccionarUsuario,
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: CircleAvatar(
+                                  backgroundColor: primaryColor,
+                                  radius: 20,
+                                  child: IconButton(
+                                    icon: const Icon(Icons.camera_alt,
+                                        color: Colors.white, size: 18),
+                                    onPressed: () =>
+                                        _tomarFoto(true, ImageSource.gallery),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                         const SizedBox(height: 24),
 
-                        // Contenido solo si hay usuario seleccionado
-                        if (_selectedUsuarioId != null) ...[
-                          // --- FOTO DE PERFIL ---
-                          Center(
-                            child: Stack(
+                        // --- DIRECCIÓN ---
+                        _buildSectionHeader('Dirección de Residencia'),
+                        _buildTextField(controller: _calleController, hintText: 'Calle'),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _numeroController,
+                                hintText: 'Número',
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _pisoDeptoController,
+                                hintText: 'Piso / Depto',
+                              ),
+                            ),
+                          ],
+                        ),
+                        _buildTextField(controller: _barrioController, hintText: 'Barrio'),
+
+                        DropdownButtonFormField<String>(
+                          value: _paisDirId,
+                          decoration: _inputDeco('País'),
+                          items: _paises
+                              .map((p) => DropdownMenuItem<String>(
+                                    value: p['id']?.toString(),
+                                    child: Text(p['nombre']?.toString() ?? ''),
+                                  ))
+                              .toList(),
+                          onChanged: _onPaisSelected,
+                        ),
+                        const SizedBox(height: 12),
+
+                        DropdownButtonFormField<String>(
+                          value: _provinciaDirId,
+                          decoration: _inputDeco('Provincia'),
+                          items: _provincias
+                              .map((p) => DropdownMenuItem<String>(
+                                    value: p['id']?.toString(),
+                                    child: Text(p['nombre']?.toString() ?? ''),
+                                  ))
+                              .toList(),
+                          onChanged: _onProvinciaSelected,
+                        ),
+                        const SizedBox(height: 12),
+
+                        DropdownButtonFormField<String>(
+                          value: _partidoDirId,
+                          decoration: _inputDeco('Partido / Departamento'),
+                          items: _partidos
+                              .map((p) => DropdownMenuItem<String>(
+                                    value: p['departamento_id']?.toString(),
+                                    child: Text(
+                                        p['departamento_nombre']?.toString() ?? ''),
+                                  ))
+                              .toList(),
+                          onChanged: _onPartidoSelected,
+                        ),
+                        const SizedBox(height: 12),
+
+                        DropdownButtonFormField<String>(
+                          value: _localidadDirId,
+                          decoration: _inputDeco('Localidad'),
+                          items: _localidades
+                              .map((l) => DropdownMenuItem<String>(
+                                    value: l['localidad_id']?.toString(),
+                                    child: Text(
+                                        l['localidad_nombre']?.toString() ?? ''),
+                                  ))
+                              .toList(),
+                          onChanged: (val) => setState(() => _localidadDirId = val),
+                        ),
+                        const SizedBox(height: 12),
+
+                        _buildTextField(
+                          controller: _cpController,
+                          hintText: 'Código Postal',
+                          keyboardType: TextInputType.number,
+                        ),
+
+                        // --- IDENTIDAD ---
+                        _buildSectionHeader('Datos de Identidad'),
+                        InkWell(
+                          onTap: _seleccionarFechaNacimiento,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 18),
+                            decoration: BoxDecoration(
+                              color: inputBgColor,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                CircleAvatar(
-                                  radius: 60,
-                                  backgroundColor: Colors.grey[300],
-                                  backgroundImage: _fotoPerfilBytes != null
-                                      ? MemoryImage(_fotoPerfilBytes!)
-                                      : (_urlFotoPerfilActual != null
-                                          ? NetworkImage(_urlFotoPerfilActual!)
-                                          : null) as ImageProvider?,
-                                  child: (_fotoPerfilBytes == null &&
-                                          _urlFotoPerfilActual == null)
-                                      ? const Icon(Icons.person, size: 60, color: Colors.grey)
-                                      : null,
-                                ),
-                                Positioned(
-                                  bottom: 0,
-                                  right: 0,
-                                  child: CircleAvatar(
-                                    backgroundColor: primaryColor,
-                                    radius: 20,
-                                    child: IconButton(
-                                      icon: const Icon(Icons.camera_alt,
-                                          color: Colors.white, size: 18),
-                                      onPressed: () =>
-                                          _tomarFoto(true, ImageSource.gallery),
-                                    ),
+                                Text(
+                                  _fechaNacimiento == null
+                                      ? 'Fecha de Nacimiento'
+                                      : DateFormat('dd/MM/yyyy')
+                                          .format(_fechaNacimiento!),
+                                  style: TextStyle(
+                                    color: _fechaNacimiento == null
+                                        ? Colors.grey
+                                        : textColor,
+                                    fontSize: 16,
                                   ),
                                 ),
+                                const Icon(Icons.calendar_today, color: Colors.grey),
                               ],
                             ),
                           ),
-                          const SizedBox(height: 24),
+                        ),
+                        const SizedBox(height: 12),
 
-                          // --- DIRECCIÓN ---
-                          _buildSectionHeader('Dirección de Residencia'),
-                          _buildTextField(controller: _calleController, hintText: 'Calle'),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _buildTextField(
-                                  controller: _numeroController,
-                                  hintText: 'Número',
-                                ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                value: _tipoDocSeleccionado,
+                                decoration: _inputDeco('Tipo'),
+                                items: ['DNI', 'Pasaporte', 'Cédula']
+                                    .map((t) => DropdownMenuItem(
+                                          value: t,
+                                          child: Text(t),
+                                        ))
+                                    .toList(),
+                                onChanged: (val) =>
+                                    setState(() => _tipoDocSeleccionado = val),
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: _buildTextField(
-                                  controller: _pisoDeptoController,
-                                  hintText: 'Piso / Depto',
-                                ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                value: _paisDocSeleccionado,
+                                decoration: _inputDeco('País Emisor'),
+                                items: ['Argentina', 'Uruguay', 'Chile', 'Otro']
+                                    .map((p) => DropdownMenuItem(
+                                          value: p,
+                                          child: Text(p),
+                                        ))
+                                    .toList(),
+                                onChanged: (val) =>
+                                    setState(() => _paisDocSeleccionado = val),
                               ),
-                            ],
-                          ),
-                          _buildTextField(controller: _barrioController, hintText: 'Barrio'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
 
-                          DropdownButtonFormField<String>(
-                            value: _paisDirId,
-                            decoration: _inputDeco('País'),
-                            items: _paises
-                                .map((p) => DropdownMenuItem<String>(
-                                      value: p['id']?.toString(),
-                                      child: Text(p['nombre']?.toString() ?? ''),
-                                    ))
-                                .toList(),
-                            onChanged: _onPaisSelected,
-                          ),
-                          const SizedBox(height: 12),
+                        _buildTextField(
+                          controller: _docNumeroController,
+                          hintText: 'Número de Documento',
+                          keyboardType: TextInputType.number,
+                        ),
 
-                          DropdownButtonFormField<String>(
-                            value: _provinciaDirId,
-                            decoration: _inputDeco('Provincia'),
-                            items: _provincias
-                                .map((p) => DropdownMenuItem<String>(
-                                      value: p['id']?.toString(),
-                                      child: Text(p['nombre']?.toString() ?? ''),
-                                    ))
-                                .toList(),
-                            onChanged: _onProvinciaSelected,
-                          ),
-                          const SizedBox(height: 12),
-
-                          DropdownButtonFormField<String>(
-                            value: _partidoDirId,
-                            decoration: _inputDeco('Partido / Departamento'),
-                            items: _partidos
-                                .map((p) => DropdownMenuItem<String>(
-                                      value: p['departamento_id']?.toString(),
-                                      child: Text(
-                                          p['departamento_nombre']?.toString() ?? ''),
-                                    ))
-                                .toList(),
-                            onChanged: _onPartidoSelected,
-                          ),
-                          const SizedBox(height: 12),
-
-                          DropdownButtonFormField<String>(
-                            value: _localidadDirId,
-                            decoration: _inputDeco('Localidad'),
-                            items: _localidades
-                                .map((l) => DropdownMenuItem<String>(
-                                      value: l['localidad_id']?.toString(),
-                                      child: Text(
-                                          l['localidad_nombre']?.toString() ?? ''),
-                                    ))
-                                .toList(),
-                            onChanged: (val) => setState(() => _localidadDirId = val),
-                          ),
-                          const SizedBox(height: 12),
-
-                          _buildTextField(
-                            controller: _cpController,
-                            hintText: 'Código Postal',
-                            keyboardType: TextInputType.number,
-                          ),
-
-                          // --- IDENTIDAD ---
-                          _buildSectionHeader('Datos de Identidad'),
-                          InkWell(
-                            onTap: _seleccionarFechaNacimiento,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 18),
-                              decoration: BoxDecoration(
-                                color: inputBgColor,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    _fechaNacimiento == null
-                                        ? 'Fecha de Nacimiento'
-                                        : DateFormat('dd/MM/yyyy')
-                                            .format(_fechaNacimiento!),
-                                    style: TextStyle(
-                                      color: _fechaNacimiento == null
-                                          ? Colors.grey
-                                          : textColor,
-                                      fontSize: 16,
+                        // --- FOTO DEL DNI ---
+                        const SizedBox(height: 8),
+                        InkWell(
+                          onTap: () => _tomarFoto(false, ImageSource.camera),
+                          child: Container(
+                            height: 120,
+                            decoration: BoxDecoration(
+                              color: inputBgColor,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.grey.shade300),
+                            ),
+                            child: _fotoDocBytes != null
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Image.memory(
+                                      _fotoDocBytes!,
+                                      fit: BoxFit.cover,
                                     ),
-                                  ),
-                                  const Icon(Icons.calendar_today, color: Colors.grey),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-
-                          Row(
-                            children: [
-                              Expanded(
-                                child: DropdownButtonFormField<String>(
-                                  value: _tipoDocSeleccionado,
-                                  decoration: _inputDeco('Tipo'),
-                                  items: ['DNI', 'Pasaporte', 'Cédula']
-                                      .map((t) => DropdownMenuItem(
-                                            value: t,
-                                            child: Text(t),
-                                          ))
-                                      .toList(),
-                                  onChanged: (val) =>
-                                      setState(() => _tipoDocSeleccionado = val),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: DropdownButtonFormField<String>(
-                                  value: _paisDocSeleccionado,
-                                  decoration: _inputDeco('País Emisor'),
-                                  items: ['Argentina', 'Uruguay', 'Chile', 'Otro']
-                                      .map((p) => DropdownMenuItem(
-                                            value: p,
-                                            child: Text(p),
-                                          ))
-                                      .toList(),
-                                  onChanged: (val) =>
-                                      setState(() => _paisDocSeleccionado = val),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-
-                          _buildTextField(
-                            controller: _docNumeroController,
-                            hintText: 'Número de Documento',
-                            keyboardType: TextInputType.number,
-                          ),
-
-                          // --- FOTO DEL DNI ---
-                          const SizedBox(height: 8),
-                          InkWell(
-                            onTap: () => _tomarFoto(false, ImageSource.camera),
-                            child: Container(
-                              height: 120,
-                              decoration: BoxDecoration(
-                                color: inputBgColor,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.grey.shade300),
-                              ),
-                              child: _fotoDocBytes != null
-                                  ? ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: Image.memory(
-                                        _fotoDocBytes!,
-                                        fit: BoxFit.cover,
-                                      ),
-                                    )
-                                  : _urlFotoDocumentoActual != null
-                                      ? ClipRRect(
-                                          borderRadius: BorderRadius.circular(12),
-                                          child: Image.network(
-                                            _urlFotoDocumentoActual!,
-                                            fit: BoxFit.cover,
-                                          ),
-                                        )
-                                      : Column(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Icon(Icons.camera_front,
-                                                color: primaryColor, size: 40),
-                                            const SizedBox(height: 8),
-                                            const Text(
-                                              'Tomar foto del documento frontal',
-                                              style: TextStyle(color: Colors.grey),
-                                            ),
-                                          ],
+                                  )
+                                : _urlFotoDocumentoActual != null
+                                    ? ClipRRect(
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Image.network(
+                                          _urlFotoDocumentoActual!,
+                                          fit: BoxFit.cover,
                                         ),
-                            ),
+                                      )
+                                    : Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(Icons.camera_front,
+                                              color: primaryColor, size: 40),
+                                          const SizedBox(height: 8),
+                                          const Text(
+                                            'Tomar foto del documento frontal',
+                                            style: TextStyle(color: Colors.grey),
+                                          ),
+                                        ],
+                                      ),
                           ),
+                        ),
 
-                          // --- SOCIAL ---
-                          _buildSectionHeader('Redes Sociales'),
-                          _buildTextField(
-                            controller: _instagramController,
-                            hintText: 'Usuario de Instagram (ej: @puelo)',
-                            icon: Icons.camera_alt_outlined,
-                          ),
-                          const SizedBox(height: 32),
+                        // --- SOCIAL ---
+                        _buildSectionHeader('Redes Sociales'),
+                        _buildTextField(
+                          controller: _instagramController,
+                          hintText: 'Usuario de Instagram (ej: @puelo)',
+                          icon: Icons.camera_alt_outlined,
+                        ),
+                        const SizedBox(height: 32),
 
-                          ElevatedButton(
-                            onPressed: _guardarPerfil,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: primaryColor,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Text(
-                              'Actualizar tu perfil',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
+                        ElevatedButton(
+                          onPressed: _guardarPerfil,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryColor,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          const SizedBox(height: 40),
-                        ],
+                          child: const Text(
+                            'Actualizar tu perfil',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 40),
                       ],
                     ),
                   ),
