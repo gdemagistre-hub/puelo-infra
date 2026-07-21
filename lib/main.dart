@@ -1,3 +1,4 @@
+import 'pantallaValidacion.dart'; // Agregá este import
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -48,10 +49,20 @@ class MyApp extends StatelessWidget {
         BuscadorPrestadoresWidget.routePath: (context) => const BuscadorPrestadoresWidget(),
         '/seleccionRol': (context) => const SeleccionRolWidget(), 
       },
-      onGenerateRoute: (settings) {
+onGenerateRoute: (settings) {
         final settingsName = settings.name ?? '';
         final uri = Uri.parse(settingsName);
 
+        // 1. Interceptor para la validación de cuenta
+        if (uri.path == '/validar') {
+          final String? token = uri.queryParameters['token'];
+          return MaterialPageRoute(
+            settings: settings,
+            builder: (context) => PantallaValidacionWidget(token: token),
+          );
+        }
+
+        // 2. Interceptor para la tarjeta digital (tu código existente)
         if (uri.path == TarjetaDigitalWidget.routePath || uri.path.startsWith('/tarjetaDigital')) {
           DocumentReference? userRef;
           final String? idParam = uri.queryParameters['id'] ?? uri.queryParameters['usuarioRef'];
@@ -64,6 +75,16 @@ class MyApp extends StatelessWidget {
           } else if (settings.arguments is DocumentReference) {
             userRef = settings.arguments as DocumentReference?;
           }
+
+          return MaterialPageRoute(
+            settings: settings,
+            builder: (context) => TarjetaDigitalWidget(usuarioRef: userRef),
+          );
+        }
+        
+        return null;
+      },
+      
 
           return MaterialPageRoute(
             settings: settings,
