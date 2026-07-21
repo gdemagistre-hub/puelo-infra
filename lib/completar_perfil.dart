@@ -45,7 +45,7 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
   String? _urlFotoDocumentoActual;
 
   // --- VARIABLES GEOGRÁFICAS (CASCADA) ---
-  String? _paisDirId = 'AR'; // Valor por defecto
+  String? _paisDirId = 'AR'; 
   String? _provinciaDirId;
   String? _partidoDirId;
   String? _localidadDirId;
@@ -254,7 +254,6 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
       String? urlPerfil = _urlFotoPerfilActual;
       String? urlDoc = _urlFotoDocumentoActual;
 
-      // Usamos putData en lugar de putFile para compatibilidad Web
       if (_fotoPerfilBytes != null) {
         final ref = storage.ref().child('usuarios_fotos/perfil_$_selectedUsuarioId.jpg');
         await ref.putData(_fotoPerfilBytes!);
@@ -343,8 +342,8 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
                           decoration: _inputDeco('Seleccionar Usuario Actual'),
                           items: _usuariosDisponibles.map((u) {
                             return DropdownMenuItem<String>(
-                              value: u['doc_id'],
-                              child: Text('${u['nombre']} ${u['apellido']} - ${u['rol']}'),
+                              value: u['doc_id']?.toString(),
+                              child: Text('${u['nombre'] ?? ''} ${u['apellido'] ?? ''} - ${u['rol'] ?? ''}'),
                             );
                           }).toList(),
                           onChanged: _seleccionarUsuario,
@@ -399,28 +398,28 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
                           DropdownButtonFormField<String>(
                             value: _paisDirId,
                             decoration: _inputDeco('País'),
-                            items: _paises.map((p) => DropdownMenuItem<String>(value: p['id'].toString(), child: Text(p['nombre'].toString()))).toList(),
+                            items: _paises.map((p) => DropdownMenuItem<String>(value: p['id']?.toString(), child: Text(p['nombre']?.toString() ?? ''))).toList(),
                             onChanged: _onPaisSelected,
                           ),
                           const SizedBox(height: 12),
                           DropdownButtonFormField<String>(
                             value: _provinciaDirId,
                             decoration: _inputDeco('Provincia'),
-                            items: _provincias.map((p) => DropdownMenuItem<String>(value: p['id'].toString(), child: Text(p['nombre'].toString()))).toList(),
+                            items: _provincias.map((p) => DropdownMenuItem<String>(value: p['id']?.toString(), child: Text(p['nombre']?.toString() ?? ''))).toList(),
                             onChanged: _onProvinciaSelected,
                           ),
                           const SizedBox(height: 12),
                           DropdownButtonFormField<String>(
                             value: _partidoDirId,
                             decoration: _inputDeco('Partido / Departamento'),
-                            items: _partidos.map((p) => DropdownMenuItem<String>(value: p['departamento_id'].toString(), child: Text(p['departamento_nombre'].toString()))).toList(),
+                            items: _partidos.map((p) => DropdownMenuItem<String>(value: p['departamento_id']?.toString(), child: Text(p['departamento_nombre']?.toString() ?? ''))).toList(),
                             onChanged: _onPartidoSelected,
                           ),
                           const SizedBox(height: 12),
                           DropdownButtonFormField<String>(
                             value: _localidadDirId,
                             decoration: _inputDeco('Localidad'),
-                            items: _localidades.map((l) => DropdownMenuItem<String>(value: l['localidad_id'].toString(), child: Text(l['localidad_nombre'].toString()))).toList(),
+                            items: _localidades.map((l) => DropdownMenuItem<String>(value: l['localidad_id']?.toString(), child: Text(l['localidad_nombre']?.toString() ?? ''))).toList(),
                             onChanged: (val) => setState(() => _localidadDirId = val),
                           ),
                           const SizedBox(height: 12),
