@@ -37,7 +37,7 @@ class MenuPerfilWidget extends StatelessWidget {
               _buildActionCard(
                 context,
                 titulo: 'Crear perfil profesional',
-                subtitulo: 'Comenzá a ofrecer tus servicios y sumá zonas de cobertura.',
+                subtitulo: 'Activá tu tarjeta digital para ofrecer servicios y definir tus zonas de cobertura.',
                 icono: Icons.work_outline_rounded,
                 onTap: () => Navigator.push(
                   context,
@@ -49,7 +49,7 @@ class MenuPerfilWidget extends StatelessWidget {
               _buildActionCard(
                 context,
                 titulo: 'Mis datos personales',
-                subtitulo: 'Actualizá tu dirección, documento y foto de perfil.',
+                subtitulo: 'Actualizá tu dirección, documento y foto para validar tu identidad.',
                 icono: Icons.person_outline_rounded,
                 onTap: () => Navigator.push(
                   context,
