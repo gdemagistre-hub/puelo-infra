@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'loginScreen.dart';
+import 'user_session.dart';
 
 class PantallaValidacionWidget extends StatefulWidget {
   final String? token;
@@ -37,7 +38,6 @@ class _PantallaValidacionWidgetState extends State<PantallaValidacionWidget> {
     }
 
     try {
-      // Buscamos el usuario que tenga este token y esté pendiente
       final query = await db
           .collection('usuarios')
           .where('token_validacion', isEqualTo: widget.token)
@@ -54,13 +54,21 @@ class _PantallaValidacionWidgetState extends State<PantallaValidacionWidget> {
         return;
       }
 
-      // Si existe, actualizamos su estado a activo y borramos el token
-      final docId = query.docs.first.id;
+      final doc = query.docs.first;
+      final docId = doc.id;
+      final data = doc.data();
+
       await db.collection('usuarios').doc(docId).update({
         'estado': 'activo',
-        'token_validacion': FieldValue.delete(), // Borramos el token por seguridad
+        'token_validacion': FieldValue.delete(),
         'validado_en': FieldValue.serverTimestamp(),
       });
+
+      // Si este usuario venía de una validación de domicilio pendiente → impactamos
+      final String? pendingDomicilio = data['pending_domicilio_token'];
+      if (pendingDomicilio != null && pendingDomicilio.isNotEmpty) {
+        await _impactarValidacionDomicilio(pendingDomicilio, docId);
+      }
 
       setState(() {
         _validando = false;
@@ -73,6 +81,44 @@ class _PantallaValidacionWidgetState extends State<PantallaValidacionWidget> {
         _exito = false;
         _mensaje = 'Ocurrió un error al intentar validar la cuenta: $e';
       });
+    }
+  }
+
+  Future<void> _impactarValidacionDomicilio(String token, String validadorId) async {
+    try {
+      final pendRef = db.collection('validaciones_pendientes').doc(token);
+      final pendSnap = await pendRef.get();
+      if (!pendSnap.exists) return;
+
+      final pend = pendSnap.data()!;
+      if (pend['estado'] != 'pendiente') return;
+
+      final String targetUserId = pend['targetUserId'] ?? '';
+      if (targetUserId.isEmpty) return;
+
+      await pendRef.update({
+        'validadorId': validadorId,
+        'estado': 'completado',
+        'procesado_en': FieldValue.serverTimestamp(),
+      });
+
+      final Map<String, dynamic> registro = {
+        'validadorId': validadorId,
+        'conoce': pend['conoce'] ?? false,
+        'domicilioSeleccionado': pend['domicilioSeleccionado'] ?? '',
+        'esCorrecto': pend['esCorrecto'] ?? false,
+        'tiempoViviendo': pend['tiempoViviendo'] ?? '',
+        'fecha': FieldValue.serverTimestamp(),
+      };
+
+      await db.collection('usuarios').doc(targetUserId).update({
+        'validaciones_recibidas': FieldValue.arrayUnion([registro]),
+      });
+
+      // Limpiamos el pending del session por si acaso
+      UserSession().clearPendingValidacion();
+    } catch (e) {
+      debugPrint('Error impactando validación de domicilio: $e');
     }
   }
 
