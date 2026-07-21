@@ -102,7 +102,9 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
         _pisoDeptoController.text = data['piso_depto'] ?? '';
         _barrioController.text = data['barrio'] ?? '';
         _cpController.text = data['codigo_postal'] ?? '';
-        _docNumeroController.text = data['documento_numero'] ?? '';
+        
+        // Apuntamos a la clave exacta de tu DB
+        _docNumeroController.text = data['documento'] ?? ''; 
         _instagramController.text = data['instagram'] ?? '';
 
         _tipoDocSeleccionado = data['documento_tipo'];
@@ -114,8 +116,9 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
           _fechaNacimiento = null;
         }
 
-        _urlFotoPerfilActual = data['url_foto_perfil'];
-        _urlFotoDocumentoActual = data['url_foto_documento'];
+        // Mapeamos a las claves de fotos correctas
+        _urlFotoPerfilActual = data['url_foto_perfil'] ?? data['foto_perfil'];
+        _urlFotoDocumentoActual = data['url_foto_documento'] ?? data['foto_documento'];
       });
     }
 
@@ -273,7 +276,8 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
         'codigo_postal': _cpController.text.trim(),
         'documento_tipo': _tipoDocSeleccionado,
         'documento_pais': _paisDocSeleccionado,
-        'documento_numero': _docNumeroController.text.trim(),
+        // Guardamos con la clave 'documento' para respetar el modelo
+        'documento': _docNumeroController.text.trim(),
         'instagram': _instagramController.text.trim(),
         'url_foto_perfil': urlPerfil,
         'url_foto_documento': urlDoc,
