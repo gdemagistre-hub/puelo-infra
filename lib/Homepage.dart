@@ -73,118 +73,126 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                   color: Color(0xFF64748B),
                 ),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 32),
               
-              // Botón 1: Buscar servicios
-              _buildMainButton(
-                context,
-                texto: 'Buscar servicios',
-                icono: Icons.search_rounded,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const BuscadorPrestadoresWidget()),
-                ),
-              ),
-              const SizedBox(height: 16),
+              // Grilla de botones estilo "Tarjeta"
+              GridView.count(
+                crossAxisCount: 2,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                childAspectRatio: 0.85, // Ajusta la proporción vertical de las tarjetas
+                children: [
+                  // Tarjeta 1: Buscar servicios
+                  _buildGridCard(
+                    context,
+                    titulo: 'Buscar\nservicios',
+                    subtitulo: 'Encontrá profesionales',
+                    icono: Icons.search_rounded,
+                    colorIcono: const Color(0xFFF59E0B), // Naranja
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const BuscadorPrestadoresWidget()),
+                    ),
+                  ),
 
-              // Botón 2: Evaluar trabajos
-              _buildMainButton(
-                context,
-                texto: 'Evaluar trabajos',
-                icono: Icons.check_circle_outline_rounded,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const MenuEvaluacionesWidget()),
-                ),
-              ),
-              const SizedBox(height: 16),
+                  // Tarjeta 2: Evaluar trabajos
+                  _buildGridCard(
+                    context,
+                    titulo: 'Evaluar\ntrabajos',
+                    subtitulo: 'Gestioná tus reseñas',
+                    icono: Icons.check_circle_outline_rounded,
+                    colorIcono: const Color(0xFF10B981), // Verde
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const MenuEvaluacionesWidget()),
+                    ),
+                  ),
 
-              // Botón 3: Compartir Tarjeta personal
-              _buildMainButton(
-                context,
-                texto: 'Compartir Tarjeta personal',
-                icono: Icons.badge_rounded,
-                onTap: () async {
-                  final String? userId = UserSession().uid;
-                  
-                  if (userId != null && userId.isNotEmpty) {
-                    // 1. Mostrar un indicador de carga temporal mientras validamos
-                    showDialog(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (context) => const Center(child: CircularProgressIndicator()),
-                    );
-
-                    try {
-                      // 2. Consultar el documento del usuario en Firestore
-                      final doc = await FirebaseFirestore.instance.collection('usuarios').doc(userId).get();
+                  // Tarjeta 3: Compartir Tarjeta
+                  _buildGridCard(
+                    context,
+                    titulo: 'Compartir\ntarjeta',
+                    subtitulo: 'Enviá tu perfil web',
+                    icono: Icons.badge_rounded,
+                    colorIcono: const Color(0xFF8B5CF6), // Púrpura
+                    onTap: () async {
+                      final String? userId = UserSession().uid;
                       
-                      // Ocultar indicador de carga
-                      if (context.mounted) Navigator.pop(context);
+                      if (userId != null && userId.isNotEmpty) {
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (context) => const Center(child: CircularProgressIndicator()),
+                        );
 
-                      if (doc.exists) {
-                        final data = doc.data() as Map<String, dynamic>;
-                        
-                        // Extraemos la información clave para validar
-                        final profesiones = data['profesiones'] as List<dynamic>? ?? [];
-                        final zonasCobertura = data['zonas_cobertura'] as Map<String, dynamic>? ?? {};
-                        final localidades = zonasCobertura['localidades'] as List<dynamic>? ?? [];
-                        final esTrabajador = data['es_trabajador'] == true;
+                        try {
+                          final doc = await FirebaseFirestore.instance.collection('usuarios').doc(userId).get();
+                          if (context.mounted) Navigator.pop(context);
 
-                        // 3. Validar si tiene configurado el perfil profesional
-                        if (profesiones.isEmpty || localidades.isEmpty || !esTrabajador) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Para compartir tu tarjeta, primero configurá tus especialidades y zonas.'),
-                                duration: Duration(seconds: 4),
-                              ),
-                            );
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const RegistroTrabajadorWidget()),
-                            );
+                          if (doc.exists) {
+                            final data = doc.data() as Map<String, dynamic>;
+                            final profesiones = data['profesiones'] as List<dynamic>? ?? [];
+                            final zonasCobertura = data['zonas_cobertura'] as Map<String, dynamic>? ?? {};
+                            final localidades = zonasCobertura['localidades'] as List<dynamic>? ?? [];
+                            final esTrabajador = data['es_trabajador'] == true;
+
+                            if (profesiones.isEmpty || localidades.isEmpty || !esTrabajador) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Para compartir tu tarjeta, primero configurá tus especialidades y zonas.'),
+                                    duration: Duration(seconds: 4),
+                                  ),
+                                );
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => const RegistroTrabajadorWidget()),
+                                );
+                              }
+                            } else {
+                              if (context.mounted) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => TarjetaDigitalWidget(
+                                      usuarioRef: FirebaseFirestore.instance.collection('usuarios').doc(userId),
+                                    ),
+                                  ),
+                                );
+                              }
+                            }
                           }
-                        } else {
-                          // 4. Si todo está correcto, avanza a la tarjeta digital
+                        } catch (e) {
                           if (context.mounted) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => TarjetaDigitalWidget(
-                                  usuarioRef: FirebaseFirestore.instance.collection('usuarios').doc(userId),
-                                ),
-                              ),
+                            Navigator.pop(context); 
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error al validar tu perfil: $e')),
                             );
                           }
                         }
-                      }
-                    } catch (e) {
-                      if (context.mounted) {
-                        Navigator.pop(context); // Ocultar indicador de carga ante un error
+                      } else {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Error al validar tu perfil: $e')),
+                          const SnackBar(content: Text('Error: No se encontró la sesión activa.')),
                         );
                       }
-                    }
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Error: No se encontró la sesión activa.')),
-                    );
-                  }
-                },
-              ),
-              const SizedBox(height: 16),
+                    },
+                  ),
 
-              // Botón 4: Sobre mí
-              _buildMainButton(
-                context,
-                texto: 'Sobre mí',
-                icono: Icons.person_outline_rounded,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const MenuPerfilWidget()),
-                ),
+                  // Tarjeta 4: Sobre mí
+                  _buildGridCard(
+                    context,
+                    titulo: 'Sobre\nmí',
+                    subtitulo: 'Configurá tu cuenta',
+                    icono: Icons.person_outline_rounded,
+                    colorIcono: const Color(0xFF3B82F6), // Azul claro
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const MenuPerfilWidget()),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -193,36 +201,71 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     );
   }
 
-  // Widget auxiliar para mantener un diseño limpio y uniforme en los botones
-  Widget _buildMainButton(BuildContext context, {required String texto, required IconData icono, required VoidCallback onTap}) {
+  // Constructor de las tarjetas asimétricas
+  Widget _buildGridCard(BuildContext context, {
+    required String titulo, 
+    required String subtitulo, 
+    required IconData icono, 
+    required Color colorIcono,
+    required VoidCallback onTap
+  }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: const BorderRadius.only(
+        topLeft: Radius.circular(16),
+        bottomLeft: Radius.circular(16),
+        bottomRight: Radius.circular(16),
+        topRight: Radius.circular(40), // La esquina distintiva del diseño
+      ),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade200),
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(16),
+            bottomLeft: Radius.circular(16),
+            bottomRight: Radius.circular(16),
+            topRight: Radius.circular(40),
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: Colors.black.withOpacity(0.04),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icono, size: 48, color: primaryColor),
-            const SizedBox(height: 12),
-            Text(
-              texto,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: textColor,
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colorIcono.withOpacity(0.12),
+                shape: BoxShape.circle,
               ),
+              child: Icon(icono, size: 28, color: colorIcono),
+            ),
+            const Spacer(),
+            Text(
+              titulo,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: textColor,
+                height: 1.1,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              subtitulo,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF94A3B8),
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
