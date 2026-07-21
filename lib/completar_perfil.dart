@@ -142,7 +142,6 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
       _urlFotoPerfilActual = data['url_foto_perfil'] ?? data['foto_perfil'];
       _urlFotoDocumentoActual = data['url_foto_documento'] ?? data['foto_documento'];
 
-      // Hidratación de la cascada geográfica
       if (data.containsKey('direccion_geo')) {
         final geo = data['direccion_geo'];
         
@@ -251,11 +250,10 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
   // GUARDAR DATOS (Con Validación)
   // ==========================================
   Future<void> _guardarPerfil() async {
-    // Validaciones obligatorias
+    // Validaciones obligatorias actualizadas (sin CP ni foto de perfil)
     if (_calleController.text.trim().isEmpty ||
         _numeroController.text.trim().isEmpty ||
         _barrioController.text.trim().isEmpty ||
-        _cpController.text.trim().isEmpty ||
         _docNumeroController.text.trim().isEmpty ||
         _tipoDocSeleccionado == null ||
         _paisDocSeleccionado == null ||
@@ -265,13 +263,6 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
         _fechaNacimiento == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Completá todos los campos obligatorios marcados con asterisco (*).')),
-      );
-      return;
-    }
-
-    if (_fotoPerfilBytes == null && _urlFotoPerfilActual == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, subí una foto de perfil obligatoria.')),
       );
       return;
     }
@@ -422,7 +413,7 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        Center(child: _buildLabel('Foto de Perfil', obligatorio: true)),
+                        Center(child: _buildLabel('Foto de Perfil', obligatorio: false)),
                         const SizedBox(height: 24),
 
                         // --- DIRECCIÓN ---
@@ -473,7 +464,7 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
                         ),
                         const SizedBox(height: 12),
 
-                        _buildTextField(controller: _cpController, labelText: 'Código Postal', keyboardType: TextInputType.number, obligatorio: true),
+                        _buildTextField(controller: _cpController, labelText: 'Código Postal', keyboardType: TextInputType.number, obligatorio: false),
 
                         // --- IDENTIDAD ---
                         _buildSectionHeader('Datos de Identidad'),
