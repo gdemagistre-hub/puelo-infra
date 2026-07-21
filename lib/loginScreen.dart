@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'Homepage.dart';
-import 'user_session.dart'; // Importamos el singleton
+import 'user_session.dart';
+import 'registroCuenta.dart'; // Importamos la nueva pantalla de registro
 
 class LoginScreenWidget extends StatefulWidget {
   const LoginScreenWidget({super.key});
@@ -144,6 +145,62 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                     onPressed: _irAHome,
                     icon: _buildIconCircle(backgroundColor: Colors.white.withOpacity(0.2), child: const Text('f', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18))),
                     label: 'Continuar con Facebook', backgroundColor: const Color(0xFF1877F2), textColor: Colors.white,
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Divisor estético
+                  Row(
+                    children: [
+                      Expanded(child: Divider(color: Colors.grey[300], thickness: 1)),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                        child: Text('o con tu cuenta', style: TextStyle(color: subTextColor, fontSize: 13)),
+                      ),
+                      Expanded(child: Divider(color: Colors.grey[300], thickness: 1)),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  _buildLoginButton(
+                    onPressed: _irAHome,
+                    icon: _buildIconCircle(
+                      backgroundColor: primaryColor.withOpacity(0.1),
+                      child: Icon(Icons.mail_outline_rounded, color: primaryColor, size: 16),
+                    ),
+                    label: 'Ingresar con Email',
+                    backgroundColor: Colors.white,
+                    textColor: primaryColor,
+                    hasBorder: true,
+                    borderColor: primaryColor.withOpacity(0.4),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // Enlace inferior: Registrar nuevo usuario redirigiendo a la pantalla correspondiente
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        '¿Sos nuevo en Puelo? ',
+                        style: TextStyle(color: subTextColor, fontSize: 14),
+                      ),
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const RegistroCuentaWidget()),
+                          );
+                        },
+                        child: Text(
+                          'Crear usuario',
+                          style: TextStyle(
+                            color: primaryColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
