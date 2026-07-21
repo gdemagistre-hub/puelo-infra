@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'Homepage.dart';
 import 'user_session.dart';
-import 'registroCuenta.dart'; // Importamos la nueva pantalla de registro
+import 'registroCuenta.dart';
+import 'pantalla_gracias_validacion.dart';
 
 class LoginScreenWidget extends StatefulWidget {
   const LoginScreenWidget({super.key});
@@ -33,10 +34,18 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
     // Guardamos los datos en la memoria persistente
     UserSession().iniciarSesion(_selectedUserId!, _selectedUserData!);
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const HomePageWidget()),
-    );
+    // Si venimos de una validación de domicilio pendiente → mostrar pantalla de gracias
+    if (UserSession().pendingValidacionToken != null) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const PantallaGraciasValidacionWidget()),
+      );
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const HomePageWidget()),
+      );
+    }
   }
 
   @override
