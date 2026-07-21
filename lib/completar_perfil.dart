@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -37,14 +37,15 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
   String? _tipoDocSeleccionado;
   String? _paisDocSeleccionado;
   
-  File? _fotoPerfil;
+  // Usamos Uint8List para compatibilidad con Flutter Web
+  Uint8List? _fotoPerfilBytes;
   String? _urlFotoPerfilActual;
   
-  File? _fotoDocumento;
+  Uint8List? _fotoDocBytes;
   String? _urlFotoDocumentoActual;
 
   // --- VARIABLES GEOGRÁFICAS (CASCADA) ---
-  String? _paisDirId;
+  String? _paisDirId = 'AR'; // Valor por defecto
   String? _provinciaDirId;
   String? _partidoDirId;
   String? _localidadDirId;
@@ -104,7 +105,6 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
     if (doc.exists) {
       final data = doc.data()!;
       setState(() {
-        // Llenamos los campos si ya existen
         _calleController.text = data['calle'] ?? '';
         _numeroController.text = data['numero'] ?? '';
         _pisoDeptoController.text = data['piso_depto'] ?? '';
@@ -124,10 +124,6 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
 
         _urlFotoPerfilActual = data['url_foto_perfil'];
         _urlFotoDocumentoActual = data['url_foto_documento'];
-        
-        // No reseteamos la cascada geográfica completa todavía, 
-        // requeriría un proceso más complejo de carga inversa, 
-        // por ahora forzamos a que vuelva a elegir su zona si edita.
       });
     }
     setState(() => _isLoading = false);
@@ -140,8 +136,14 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
   Future<void> _cargarPaises() async {
     final query = await db.collection('cat_paises').get();
     setState(() {
-      _paises = query.docs.map((d) => d.data()).toList();
+      _paises = query.docs.map((d) {
+        var data = d.data();
+        data['id'] = d.id;
+        return data;
+      }).toList();
     });
+    
+    _onPaisSelected('AR');
   }
 
   Future<void> _onPaisSelected(String? paisId) async {
@@ -156,7 +158,6 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
       _localidades = [];
     });
 
-    // Buscamos el documento del país para extraer sus provincias
     final doc = await db.collection('cat_paises').doc(paisId).get();
     if (doc.exists && doc.data()!.containsKey('provincias')) {
       setState(() {
@@ -198,17 +199,18 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
   }
 
   // ==========================================
-  // LÓGICA DE FOTOS
+  // LÓGICA DE FOTOS (WEB COMPATIBLE)
   // ==========================================
 
   Future<void> _tomarFoto(bool esPerfil, ImageSource source) async {
     final XFile? image = await picker.pickImage(source: source, imageQuality: 70);
     if (image != null) {
+      final bytes = await image.readAsBytes(); 
       setState(() {
         if (esPerfil) {
-          _fotoPerfil = File(image.path);
+          _fotoPerfilBytes = bytes;
         } else {
-          _fotoDocumento = File(image.path);
+          _fotoDocBytes = bytes;
         }
       });
     }
@@ -252,20 +254,19 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
       String? urlPerfil = _urlFotoPerfilActual;
       String? urlDoc = _urlFotoDocumentoActual;
 
-      // 1. Subir fotos a Storage si hay nuevas
-      if (_fotoPerfil != null) {
+      // Usamos putData en lugar de putFile para compatibilidad Web
+      if (_fotoPerfilBytes != null) {
         final ref = storage.ref().child('usuarios_fotos/perfil_$_selectedUsuarioId.jpg');
-        await ref.putFile(_fotoPerfil!);
+        await ref.putData(_fotoPerfilBytes!);
         urlPerfil = await ref.getDownloadURL();
       }
 
-      if (_fotoDocumento != null) {
+      if (_fotoDocBytes != null) {
         final ref = storage.ref().child('usuarios_fotos/doc_$_selectedUsuarioId.jpg');
-        await ref.putFile(_fotoDocumento!);
+        await ref.putData(_fotoDocBytes!);
         urlDoc = await ref.getDownloadURL();
       }
 
-      // 2. Armar el mapa de actualización
       Map<String, dynamic> actualizacion = {
         'calle': _calleController.text.trim(),
         'numero': _numeroController.text.trim(),
@@ -278,14 +279,13 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
         'instagram': _instagramController.text.trim(),
         'url_foto_perfil': urlPerfil,
         'url_foto_documento': urlDoc,
-        'perfil_completo': true, // Flag de scoring
+        'perfil_completo': true, 
       };
 
       if (_fechaNacimiento != null) {
         actualizacion['fecha_nacimiento'] = Timestamp.fromDate(_fechaNacimiento!);
       }
 
-      // Solo actualizamos la geografía si el usuario la modificó
       if (_localidadDirId != null) {
         actualizacion['direccion_geo'] = {
           'pais_id': _paisDirId,
@@ -295,14 +295,13 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
         };
       }
 
-      // 3. Impactar en Firestore
       await db.collection('usuarios').doc(_selectedUsuarioId).update(actualizacion);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('¡Perfil actualizado con éxito!'), backgroundColor: Colors.green),
         );
-        Navigator.pop(context); // Volver al Home
+        Navigator.pop(context); 
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -338,7 +337,6 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // --- 1. MOCK SELECCIÓN DE USUARIO ---
                         _buildSectionHeader('Simulador de Login (Temporal)'),
                         DropdownButtonFormField<String>(
                           value: _selectedUsuarioId,
@@ -355,17 +353,17 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
 
                         if (_selectedUsuarioId != null) ...[
                           
-                          // --- 2. FOTO DE PERFIL ---
+                          // --- FOTO DE PERFIL ---
                           Center(
                             child: Stack(
                               children: [
                                 CircleAvatar(
                                   radius: 60,
                                   backgroundColor: Colors.grey[300],
-                                  backgroundImage: _fotoPerfil != null
-                                      ? FileImage(_fotoPerfil!)
+                                  backgroundImage: _fotoPerfilBytes != null
+                                      ? MemoryImage(_fotoPerfilBytes!)
                                       : (_urlFotoPerfilActual != null ? NetworkImage(_urlFotoPerfilActual!) : null) as ImageProvider?,
-                                  child: (_fotoPerfil == null && _urlFotoPerfilActual == null)
+                                  child: (_fotoPerfilBytes == null && _urlFotoPerfilActual == null)
                                       ? const Icon(Icons.person, size: 60, color: Colors.grey)
                                       : null,
                                 ),
@@ -377,7 +375,7 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
                                     radius: 20,
                                     child: IconButton(
                                       icon: const Icon(Icons.camera_alt, color: Colors.white, size: 18),
-                                      onPressed: () => _tomarFoto(true, ImageSource.gallery), // Opciones: gallery / camera
+                                      onPressed: () => _tomarFoto(true, ImageSource.gallery), 
                                     ),
                                   ),
                                 ),
@@ -386,7 +384,7 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
                           ),
                           const SizedBox(height: 24),
 
-                          // --- 3. DIRECCIÓN ---
+                          // --- DIRECCIÓN ---
                           _buildSectionHeader('Dirección de Residencia'),
                           _buildTextField(controller: _calleController, hintText: 'Calle'),
                           Row(
@@ -398,38 +396,37 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
                           ),
                           _buildTextField(controller: _barrioController, hintText: 'Barrio'),
                           
-                          // Cascada Geográfica
                           DropdownButtonFormField<String>(
                             value: _paisDirId,
                             decoration: _inputDeco('País'),
-                            items: _paises.map((p) => DropdownMenuItem<String>(value: p['id'], child: Text(p['nombre']))).toList(),
+                            items: _paises.map((p) => DropdownMenuItem<String>(value: p['id'].toString(), child: Text(p['nombre'].toString()))).toList(),
                             onChanged: _onPaisSelected,
                           ),
                           const SizedBox(height: 12),
                           DropdownButtonFormField<String>(
                             value: _provinciaDirId,
                             decoration: _inputDeco('Provincia'),
-                            items: _provincias.map((p) => DropdownMenuItem<String>(value: p['id'].toString(), child: Text(p['nombre']))).toList(),
+                            items: _provincias.map((p) => DropdownMenuItem<String>(value: p['id'].toString(), child: Text(p['nombre'].toString()))).toList(),
                             onChanged: _onProvinciaSelected,
                           ),
                           const SizedBox(height: 12),
                           DropdownButtonFormField<String>(
                             value: _partidoDirId,
                             decoration: _inputDeco('Partido / Departamento'),
-                            items: _partidos.map((p) => DropdownMenuItem<String>(value: p['departamento_id'], child: Text(p['departamento_nombre']))).toList(),
+                            items: _partidos.map((p) => DropdownMenuItem<String>(value: p['departamento_id'].toString(), child: Text(p['departamento_nombre'].toString()))).toList(),
                             onChanged: _onPartidoSelected,
                           ),
                           const SizedBox(height: 12),
                           DropdownButtonFormField<String>(
                             value: _localidadDirId,
                             decoration: _inputDeco('Localidad'),
-                            items: _localidades.map((l) => DropdownMenuItem<String>(value: l['localidad_id'], child: Text(l['localidad_nombre']))).toList(),
+                            items: _localidades.map((l) => DropdownMenuItem<String>(value: l['localidad_id'].toString(), child: Text(l['localidad_nombre'].toString()))).toList(),
                             onChanged: (val) => setState(() => _localidadDirId = val),
                           ),
                           const SizedBox(height: 12),
                           _buildTextField(controller: _cpController, hintText: 'Código Postal', keyboardType: TextInputType.number),
 
-                          // --- 4. IDENTIDAD ---
+                          // --- IDENTIDAD ---
                           _buildSectionHeader('Datos de Identidad'),
                           InkWell(
                             onTap: _seleccionarFechaNacimiento,
@@ -471,7 +468,7 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
                           const SizedBox(height: 12),
                           _buildTextField(controller: _docNumeroController, hintText: 'Número de Documento', keyboardType: TextInputType.number),
 
-                          // Foto del DNI
+                          // --- FOTO DEL DNI ---
                           const SizedBox(height: 8),
                           InkWell(
                             onTap: () => _tomarFoto(false, ImageSource.camera),
@@ -482,8 +479,8 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(color: Colors.grey.shade300),
                               ),
-                              child: _fotoDocumento != null
-                                  ? ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.file(_fotoDocumento!, fit: BoxFit.cover))
+                              child: _fotoDocBytes != null
+                                  ? ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.memory(_fotoDocBytes!, fit: BoxFit.cover))
                                   : _urlFotoDocumentoActual != null
                                       ? ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.network(_urlFotoDocumentoActual!, fit: BoxFit.cover))
                                       : Column(
@@ -497,7 +494,7 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
                             ),
                           ),
 
-                          // --- 5. SOCIAL ---
+                          // --- SOCIAL ---
                           _buildSectionHeader('Redes Sociales'),
                           _buildTextField(
                             controller: _instagramController,
@@ -513,11 +510,11 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
-                            child: const Text('Guardar y Aumentar Scoring', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                            child: const Text('Actualizar tu perfil', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                           ),
                           const SizedBox(height: 40),
                         ],
-                      ],
+                      ),
                     ),
                   ),
                 ),
