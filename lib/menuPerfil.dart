@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'registroTrabajador.dart';
 import 'completar_perfil.dart';
+import 'solicitar_validacion.dart';
 
 class MenuPerfilWidget extends StatelessWidget {
   const MenuPerfilWidget({super.key});
@@ -27,8 +28,8 @@ class MenuPerfilWidget extends StatelessWidget {
               Text(
                 'Configuración de tu cuenta',
                 style: TextStyle(
-                  fontSize: 22, 
-                  fontWeight: FontWeight.w800, 
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
                   color: textColor,
                 ),
               ),
@@ -54,6 +55,18 @@ class MenuPerfilWidget extends StatelessWidget {
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const CompletarPerfilWidget()),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              _buildActionCard(
+                context,
+                titulo: 'Pedir validación del perfil',
+                subtitulo: 'Generá un enlace para que conocidos confirmen que conocen tu domicilio. Aumentá la confianza de la comunidad.',
+                icono: Icons.verified_user_outlined,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SolicitarValidacionWidget()),
                 ),
               ),
             ],
