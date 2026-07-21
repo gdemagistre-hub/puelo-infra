@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_session.dart';
 import 'loginScreen.dart';
 import 'buscadorPrestadores.dart';
 import 'menuEvaluaciones.dart';
-import 'menuPerfil.dart'; // Importamos el nuevo menú
+import 'menuPerfil.dart';
+import 'tarjetaDigital.dart'; 
 
 class HomePageWidget extends StatefulWidget {
   const HomePageWidget({super.key});
@@ -96,7 +98,32 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               ),
               const SizedBox(height: 16),
 
-              // Botón 3: Sobre mí (Apunta al nuevo menú)
+              // Botón 3: Compartir Tarjeta personal
+              _buildMainButton(
+                context,
+                texto: 'Compartir Tarjeta personal',
+                icono: Icons.badge_rounded,
+                onTap: () {
+                  final String? userId = UserSession().uid;
+                  if (userId != null && userId.isNotEmpty) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => TarjetaDigitalWidget(
+                          usuarioRef: FirebaseFirestore.instance.collection('usuarios').doc(userId),
+                        ),
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Error: No se encontró la sesión activa.')),
+                    );
+                  }
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Botón 4: Sobre mí
               _buildMainButton(
                 context,
                 texto: 'Sobre mí',
