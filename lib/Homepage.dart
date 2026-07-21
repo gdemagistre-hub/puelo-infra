@@ -17,7 +17,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   final primaryColor = const Color(0xFF0F52BA);
   final textColor = const Color(0xFF1E293B);
 
-  void _cerrarSesion() {
+  void _cerrarSesion() { 
     UserSession().cerrarSesion();
     Navigator.pushReplacement(
       context,
