@@ -1,14 +1,14 @@
-import 'pantallaValidacion.dart'; // Agregá este import
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'splashScreen.dart';
-import 'loginScreen.dart'; // <-- Importamos la nueva pantalla de Login profesional
+import 'loginScreen.dart';
 import 'Homepage.dart'; 
 import 'registroTrabajador.dart';
 import 'buscadorPrestadores.dart';
 import 'tarjetaDigital.dart';
 import 'seleccionRol.dart'; 
+import 'pantallaValidacion.dart'; // Importamos la nueva pantalla de validación
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,17 +43,17 @@ class MyApp extends StatelessWidget {
       initialRoute: SplashScreenWidget.routePath,
       routes: {
         SplashScreenWidget.routePath: (context) => const SplashScreenWidget(),
-        LoginScreenWidget.routePath: (context) => const LoginScreenWidget(), // <-- Registramos la ruta del Login intermedio
+        LoginScreenWidget.routePath: (context) => const LoginScreenWidget(),
         HomePageWidget.routePath: (context) => const HomePageWidget(),
         RegistroTrabajadorWidget.routePath: (context) => const RegistroTrabajadorWidget(),
         BuscadorPrestadoresWidget.routePath: (context) => const BuscadorPrestadoresWidget(),
         '/seleccionRol': (context) => const SeleccionRolWidget(), 
       },
-onGenerateRoute: (settings) {
+      onGenerateRoute: (settings) {
         final settingsName = settings.name ?? '';
         final uri = Uri.parse(settingsName);
 
-        // 1. Interceptor para la validación de cuenta
+        // 1. Interceptor para la validación de cuenta vía link de WhatsApp
         if (uri.path == '/validar') {
           final String? token = uri.queryParameters['token'];
           return MaterialPageRoute(
@@ -82,15 +82,6 @@ onGenerateRoute: (settings) {
           );
         }
         
-        return null;
-      },
-      
-
-          return MaterialPageRoute(
-            settings: settings,
-            builder: (context) => TarjetaDigitalWidget(usuarioRef: userRef),
-          );
-        }
         return null;
       },
     );
