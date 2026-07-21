@@ -8,6 +8,9 @@ class UserSession {
   String? apellido;
   Map<String, dynamic>? datosCompletos;
 
+  /// Token de una validación de domicilio pendiente (generado en ValidarDomicilioWidget)
+  String? pendingValidacionToken;
+
   void iniciarSesion(String id, Map<String, dynamic> data) {
     uid = id;
     nombre = data['nombre'] ?? '';
@@ -20,7 +23,16 @@ class UserSession {
     nombre = null;
     apellido = null;
     datosCompletos = null;
+    pendingValidacionToken = null;
   }
 
   String get nombreCompleto => '$nombre $apellido'.trim();
+
+  void setPendingValidacion(String token) {
+    pendingValidacionToken = token;
+  }
+
+  void clearPendingValidacion() {
+    pendingValidacionToken = null;
+  }
 }
