@@ -8,7 +8,8 @@ import 'registroTrabajador.dart';
 import 'buscadorPrestadores.dart';
 import 'tarjetaDigital.dart';
 import 'seleccionRol.dart'; 
-import 'pantallaValidacion.dart'; // Importamos la nueva pantalla de validación
+import 'pantallaValidacion.dart';
+import 'validar_domicilio.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -62,7 +63,16 @@ class MyApp extends StatelessWidget {
           );
         }
 
-        // 2. Interceptor para la tarjeta digital (tu código existente)
+        // 2. Interceptor para validación de domicilio (nuevo)
+        if (uri.path == '/validarDomicilio' || uri.path.startsWith('/validarDomicilio')) {
+          final String? idParam = uri.queryParameters['id'];
+          return MaterialPageRoute(
+            settings: settings,
+            builder: (context) => ValidarDomicilioWidget(usuarioId: idParam),
+          );
+        }
+
+        // 3. Interceptor para la tarjeta digital
         if (uri.path == TarjetaDigitalWidget.routePath || uri.path.startsWith('/tarjetaDigital')) {
           DocumentReference? userRef;
           final String? idParam = uri.queryParameters['id'] ?? uri.queryParameters['usuarioRef'];
