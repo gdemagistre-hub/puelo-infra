@@ -5,6 +5,7 @@ import 'loginScreen.dart';
 import 'buscadorPrestadores.dart';
 import 'menuEvaluaciones.dart';
 import 'menuPerfil.dart';
+import 'registroTrabajador.dart';
 import 'tarjetaDigital.dart'; 
 
 class HomePageWidget extends StatefulWidget {
@@ -103,17 +104,69 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                 context,
                 texto: 'Compartir Tarjeta personal',
                 icono: Icons.badge_rounded,
-                onTap: () {
+                onTap: () async {
                   final String? userId = UserSession().uid;
+                  
                   if (userId != null && userId.isNotEmpty) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => TarjetaDigitalWidget(
-                          usuarioRef: FirebaseFirestore.instance.collection('usuarios').doc(userId),
-                        ),
-                      ),
+                    // 1. Mostrar un indicador de carga temporal mientras validamos
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (context) => const Center(child: CircularProgressIndicator()),
                     );
+
+                    try {
+                      // 2. Consultar el documento del usuario en Firestore
+                      final doc = await FirebaseFirestore.instance.collection('usuarios').doc(userId).get();
+                      
+                      // Ocultar indicador de carga
+                      if (context.mounted) Navigator.pop(context);
+
+                      if (doc.exists) {
+                        final data = doc.data() as Map<String, dynamic>;
+                        
+                        // Extraemos la información clave para validar
+                        final profesiones = data['profesiones'] as List<dynamic>? ?? [];
+                        final zonasCobertura = data['zonas_cobertura'] as Map<String, dynamic>? ?? {};
+                        final localidades = zonasCobertura['localidades'] as List<dynamic>? ?? [];
+                        final esTrabajador = data['es_trabajador'] == true;
+
+                        // 3. Validar si tiene configurado el perfil profesional
+                        if (profesiones.isEmpty || localidades.isEmpty || !esTrabajador) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Para compartir tu tarjeta, primero configurá tus especialidades y zonas.'),
+                                duration: Duration(seconds: 4),
+                              ),
+                            );
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const RegistroTrabajadorWidget()),
+                            );
+                          }
+                        } else {
+                          // 4. Si todo está correcto, avanza a la tarjeta digital
+                          if (context.mounted) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => TarjetaDigitalWidget(
+                                  usuarioRef: FirebaseFirestore.instance.collection('usuarios').doc(userId),
+                                ),
+                              ),
+                            );
+                          }
+                        }
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        Navigator.pop(context); // Ocultar indicador de carga ante un error
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error al validar tu perfil: $e')),
+                        );
+                      }
+                    }
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Error: No se encontró la sesión activa.')),
