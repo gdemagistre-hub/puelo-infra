@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'Homepage.dart';
+import 'user_session.dart'; // Importamos el Singleton de sesión
 
 class RegistroTrabajadorWidget extends StatefulWidget {
   const RegistroTrabajadorWidget({super.key});
@@ -16,6 +17,9 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
   final scaffoldKey = GlobalKey<ScaffoldState>();
   final db = FirebaseFirestore.instance;
 
+  String? _selectedUsuarioId;
+  bool _cargandoDatosIniciales = true;
+
   late TextEditingController _nombreController;
   late TextEditingController _apellidoController;
   late TextEditingController _documentoController;
@@ -24,7 +28,6 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
 
   List<String> _profesionesSeleccionadas = [];
   List<String> _opcionesProfesiones = [];
-  bool _cargandoCatalogos = true;
 
   // ESTADO GEOGRÁFICO - CASCADA Y MEMORIA LOCAL
   String? _paisSeleccionadoId = 'AR'; 
@@ -54,8 +57,9 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
     _documentoController = TextEditingController();
     _nombreComercialController = TextEditingController();
     _telefonoController = TextEditingController();
-    _cargarCatalogos();
-    _cargarProvincias();
+
+    _selectedUsuarioId = UserSession().uid;
+    _inicializarPantalla();
   }
 
   @override
@@ -68,6 +72,42 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
     super.dispose();
   }
 
+  // ==========================================
+  // CARGA INICIAL
+  // ==========================================
+  Future<void> _inicializarPantalla() async {
+    setState(() => _cargandoDatosIniciales = true);
+
+    await Future.wait([
+      _cargarCatalogos(),
+      _cargarProvincias(),
+      if (_selectedUsuarioId != null) _cargarDatosUsuarioActual(),
+    ]);
+
+    setState(() => _cargandoDatosIniciales = false);
+  }
+
+  Future<void> _cargarDatosUsuarioActual() async {
+    try {
+      final doc = await db.collection('usuarios').doc(_selectedUsuarioId).get();
+      if (doc.exists) {
+        final data = doc.data()!;
+        _nombreController.text = data['nombre'] ?? '';
+        _apellidoController.text = data['apellido'] ?? '';
+        _documentoController.text = data['documento'] ?? '';
+        _nombreComercialController.text = data['nombre_comercial'] ?? '';
+        _telefonoController.text = data['telefono'] ?? '';
+        
+        // Si ya tenía profesiones guardadas, las cargamos
+        if (data['profesiones'] != null) {
+          _profesionesSeleccionadas = List<String>.from(data['profesiones']);
+        }
+      }
+    } catch (e) {
+      debugPrint("Error cargando usuario: $e");
+    }
+  }
+
   Future<void> _cargarCatalogos() async {
     try {
       final oficiosSnapshot = await db.collection('cat_oficios').limit(1).get();
@@ -78,9 +118,8 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
           _opcionesProfesiones = maestro.map((e) => e.toString()).toList();
         }
       }
-      setState(() => _cargandoCatalogos = false);
     } catch (e) {
-      setState(() => _cargandoCatalogos = false);
+      debugPrint("Error cargando oficios: $e");
     }
   }
 
@@ -90,12 +129,10 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
     try {
       final doc = await db.collection('cat_paises').doc('AR').get();
       if (doc.exists && doc.data()!.containsKey('provincias')) {
-        setState(() {
-          _todasLasProvincias = List<Map<String, dynamic>>.from(doc.data()!['provincias']);
-        });
+        _todasLasProvincias = List<Map<String, dynamic>>.from(doc.data()!['provincias']);
       }
     } catch (e) {
-      print("Error cargando provincias: $e");
+      debugPrint("Error cargando provincias: $e");
     }
   }
 
@@ -113,11 +150,9 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
     });
 
     try {
-      // Descargamos TODOS los partidos de la provincia
       final depQuery = await db.collection('cat_departamentos')
           .where('provincia_id', isEqualTo: prov['id']).get();
       
-      // Descargamos TODAS las localidades de la provincia
       final locQuery = await db.collection('cat_localidades')
           .where('provincia_id', isEqualTo: prov['id']).get();
 
@@ -127,7 +162,7 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
         _cargandoZonas = false;
       });
     } catch (e) {
-      print("Error cargando zonas: $e");
+      debugPrint("Error cargando zonas: $e");
       setState(() => _cargandoZonas = false);
     }
   }
@@ -136,7 +171,6 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
     setState(() {
       _partidosSeleccionados = nuevosPartidos;
       
-      // Si el usuario desmarcó un partido, removemos las localidades que pertenecían a él
       final idsPartidosSeleccionados = nuevosPartidos.map((p) => p['id']).toList();
       
       _localidadesSeleccionadas.removeWhere((locSeleccionada) {
@@ -150,7 +184,6 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
       });
     });
   }
-
 
   // --- DIÁLOGOS DE INTERFAZ ---
 
@@ -255,25 +288,38 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
   // --- GUARDAR DATOS ---
 
   void _crearTarjetaProfesional() async {
-    if (_nombreController.text.trim().isEmpty || _apellidoController.text.trim().isEmpty || _provinciaSeleccionadaId == null) {
+    if (_selectedUsuarioId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor completa los datos obligatorios y la zona.')),
+        const SnackBar(content: Text('Error: No se encontró la sesión del usuario.')),
+      );
+      return;
+    }
+
+    if (_nombreController.text.trim().isEmpty || 
+        _apellidoController.text.trim().isEmpty || 
+        _provinciaSeleccionadaId == null ||
+        _profesionesSeleccionadas.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Por favor completá los datos obligatorios, al menos una especialidad y la zona.')),
       );
       return;
     }
 
     try {
-      final nuevoUsuarioRef = db.collection('usuarios').doc();
+      // Ahora apuntamos al documento existente del usuario
+      final usuarioRef = db.collection('usuarios').doc(_selectedUsuarioId);
       
-      await nuevoUsuarioRef.set({
+      // Usamos SetOptions(merge: true) para actualizar o crear sin borrar los datos que ya existan (ej. foto de perfil)
+      await usuarioRef.set({
         'nombre': _nombreController.text.trim(),
         'apellido': _apellidoController.text.trim(),
         'documento': _documentoController.text.trim(),
         'nombre_comercial': _nombreComercialController.text.trim(),
         'telefono': _telefonoController.text.trim(),
         'profesiones': _profesionesSeleccionadas,
-        'creado_en': FieldValue.serverTimestamp(),
         'rol': 'trabajador',
+        'es_trabajador': true, // Bandera clave para identificarlo como prestador
+        'tarjeta_actualizada_en': FieldValue.serverTimestamp(),
         'zonas_cobertura': {
           'pais_id': _paisSeleccionadoId,
           'pais_nombre': _paisSeleccionadoNombre,
@@ -282,11 +328,11 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
           'partidos': _partidosSeleccionados,
           'localidades': _localidadesSeleccionadas,
         }
-      });
+      }, SetOptions(merge: true));
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Perfil profesional creado correctamente')),
+          const SnackBar(content: Text('Perfil profesional actualizado correctamente')),
         );
         Navigator.pushAndRemoveUntil(
           context,
@@ -303,147 +349,179 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
 
   @override
   Widget build(BuildContext context) {
+    if (_selectedUsuarioId == null) {
+      return const Scaffold(
+        body: Center(child: Text('Error: Iniciá sesión nuevamente para ver tu perfil.')),
+      );
+    }
+
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
         key: scaffoldKey,
         backgroundColor: const Color(0xFFF8FAFC),
         appBar: AppBar(
-          title: const Text('Completar Perfil Profesional'),
+          title: const Text('Crear Perfil Profesional'),
           backgroundColor: primaryColor,
           foregroundColor: Colors.white,
         ),
         body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: Center(
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 500),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildSectionHeader('Datos Personales'),
-                    _buildTextField(controller: _nombreController, hintText: 'Nombre', icon: Icons.person_outline_rounded),
-                    _buildTextField(controller: _apellidoController, hintText: 'Apellido', icon: Icons.person_outline_rounded),
-                    _buildTextField(controller: _documentoController, hintText: 'Documento', icon: Icons.badge_outlined, keyboardType: TextInputType.number),
-                    _buildTextField(controller: _nombreComercialController, hintText: 'Nombre Comercial', icon: Icons.storefront_rounded),
-                    _buildTextField(controller: _telefonoController, hintText: 'Teléfono', icon: Icons.phone_outlined, keyboardType: TextInputType.phone),
+          child: _cargandoDatosIniciales
+              ? const Center(child: CircularProgressIndicator())
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Center(
+                    child: Container(
+                      constraints: const BoxConstraints(maxWidth: 500),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildSectionHeader('Datos Personales y Comerciales'),
+                          _buildTextField(controller: _nombreController, hintText: 'Nombre', icon: Icons.person_outline_rounded),
+                          _buildTextField(controller: _apellidoController, hintText: 'Apellido', icon: Icons.person_outline_rounded),
+                          _buildTextField(controller: _documentoController, hintText: 'Documento', icon: Icons.badge_outlined, keyboardType: TextInputType.number),
+                          _buildTextField(controller: _nombreComercialController, hintText: 'Nombre Comercial (Opcional)', icon: Icons.storefront_rounded),
+                          _buildTextField(controller: _telefonoController, hintText: 'Teléfono (WhatsApp)', icon: Icons.phone_outlined, keyboardType: TextInputType.phone),
 
-                    _buildSectionHeader('Zonas de Cobertura (Filtro Geográfico)'),
-                    
-                    // Selector País (Por ahora fijo en AR)
-                    _buildSelectorWidget(
-                      label: 'País',
-                      valor: _paisSeleccionadoNombre ?? 'Seleccionar',
-                      onTap: () {
-                        _mostrarSeleccionUnica(
-                          titulo: 'Seleccionar País',
-                          opciones: [{'id': 'AR', 'nombre': 'Argentina'}],
-                          onConfirm: (res) {
-                            setState(() {
-                              _paisSeleccionadoId = res['id'];
-                              _paisSeleccionadoNombre = res['nombre'];
-                            });
-                          }
-                        );
-                      }
-                    ),
+                          _buildSectionHeader('Especialidades'),
+                          _buildSelectorWidget(
+                            label: 'Oficios / Especialidades',
+                            valor: _profesionesSeleccionadas.isEmpty 
+                                ? 'Seleccionar Especialidades' 
+                                : _profesionesSeleccionadas.join(', '),
+                            onTap: () {
+                              List<Map<String, String>> opciones = _opcionesProfesiones.map((p) {
+                                return {'id': p, 'nombre': p};
+                              }).toList();
 
-                    // Selector Provincia (Dinámico desde base)
-                    _buildSelectorWidget(
-                      label: 'Provincia',
-                      valor: _provinciaSeleccionadaNombre ?? 'Seleccionar Provincia',
-                      onTap: () {
-                        List<Map<String, String>> opciones = _todasLasProvincias.map((p) {
-                          return {'id': p['id'].toString(), 'nombre': p['nombre'].toString()};
-                        }).toList();
+                              _mostrarSeleccionMultiple(
+                                titulo: 'Especialidades',
+                                opciones: opciones,
+                                seleccionadas: _profesionesSeleccionadas.map((p) => {'id': p, 'nombre': p}).toList(),
+                                onConfirm: (res) {
+                                  setState(() {
+                                    _profesionesSeleccionadas = res.map((e) => e['nombre']!).toList();
+                                  });
+                                }
+                              );
+                            }
+                          ),
 
-                        _mostrarSeleccionUnica(
-                          titulo: 'Seleccionar Provincia',
-                          opciones: opciones,
-                          onConfirm: _seleccionarProvincia
-                        );
-                      }
-                    ),
+                          _buildSectionHeader('Zonas de Cobertura (Filtro Geográfico)'),
+                          
+                          // Selector País (Por ahora fijo en AR)
+                          _buildSelectorWidget(
+                            label: 'País',
+                            valor: _paisSeleccionadoNombre ?? 'Seleccionar',
+                            onTap: () {
+                              _mostrarSeleccionUnica(
+                                titulo: 'Seleccionar País',
+                                opciones: [{'id': 'AR', 'nombre': 'Argentina'}],
+                                onConfirm: (res) {
+                                  setState(() {
+                                    _paisSeleccionadoId = res['id'];
+                                    _paisSeleccionadoNombre = res['nombre'];
+                                  });
+                                }
+                              );
+                            }
+                          ),
 
-                    // Indicador de carga de zonas
-                    if (_cargandoZonas)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 8.0),
-                        child: Center(child: CircularProgressIndicator()),
+                          // Selector Provincia (Dinámico desde base)
+                          _buildSelectorWidget(
+                            label: 'Provincia',
+                            valor: _provinciaSeleccionadaNombre ?? 'Seleccionar Provincia',
+                            onTap: () {
+                              List<Map<String, String>> opciones = _todasLasProvincias.map((p) {
+                                return {'id': p['id'].toString(), 'nombre': p['nombre'].toString()};
+                              }).toList();
+
+                              _mostrarSeleccionUnica(
+                                titulo: 'Seleccionar Provincia',
+                                opciones: opciones,
+                                onConfirm: _seleccionarProvincia
+                              );
+                            }
+                          ),
+
+                          // Indicador de carga de zonas
+                          if (_cargandoZonas)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 8.0),
+                              child: Center(child: CircularProgressIndicator()),
+                            ),
+
+                          // Selector Partido (Múltiple, filtrado en memoria)
+                          _buildSelectorWidget(
+                            label: 'Partidos / Departamentos',
+                            valor: _partidosSeleccionados.isEmpty 
+                                ? 'Seleccionar (Múltiple)' 
+                                : _partidosSeleccionados.map((e) => e['nombre']).join(', '),
+                            onTap: _provinciaSeleccionadaId == null || _cargandoZonas ? null : () {
+                              
+                              List<Map<String, String>> opcionesPartidos = _partidosDeProvincia.map((p) {
+                                return {
+                                  'id': p['departamento_id'].toString(), 
+                                  'nombre': p['departamento_nombre'].toString()
+                                };
+                              }).toList();
+
+                              _mostrarSeleccionMultiple(
+                                titulo: 'Seleccionar Partidos',
+                                opciones: opcionesPartidos,
+                                seleccionadas: _partidosSeleccionados,
+                                onConfirm: _actualizarLocalidadesSegunPartidos
+                              );
+                            }
+                          ),
+
+                          // Selector Localidad (Múltiple, filtrado en memoria por los partidos elegidos)
+                          _buildSelectorWidget(
+                            label: 'Localidades',
+                            valor: _localidadesSeleccionadas.isEmpty 
+                                ? 'Seleccionar Localidades (Múltiple)' 
+                                : _localidadesSeleccionadas.map((e) => e['nombre']).join(', '),
+                            onTap: _partidosSeleccionados.isEmpty || _cargandoZonas ? null : () {
+                              
+                              // Solo mostramos localidades cuyos partidos fueron seleccionados
+                              final idsPartidos = _partidosSeleccionados.map((p) => p['id']).toList();
+                              final locsFiltradas = _localidadesDeProvincia.where((l) => idsPartidos.contains(l['partido_id']));
+
+                              List<Map<String, String>> opcionesLocalidades = locsFiltradas.map((l) {
+                                return {
+                                  'id': l['localidad_id'].toString(), 
+                                  'nombre': l['localidad_nombre'].toString()
+                                };
+                              }).toList();
+
+                              _mostrarSeleccionMultiple(
+                                titulo: 'Seleccionar Localidades',
+                                opciones: opcionesLocalidades,
+                                seleccionadas: _localidadesSeleccionadas,
+                                onConfirm: (res) {
+                                  setState(() {
+                                    _localidadesSeleccionadas = res;
+                                  });
+                                }
+                              );
+                            }
+                          ),
+
+                          const SizedBox(height: 32),
+                          ElevatedButton(
+                            onPressed: _crearTarjetaProfesional,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryColor,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: const Text('Activar Tarjeta Profesional', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                          )
+                        ],
                       ),
-
-                    // Selector Partido (Múltiple, filtrado en memoria)
-                    _buildSelectorWidget(
-                      label: 'Partidos / Departamentos',
-                      valor: _partidosSeleccionados.isEmpty 
-                          ? 'Seleccionar (Múltiple)' 
-                          : _partidosSeleccionados.map((e) => e['nombre']).join(', '),
-                      onTap: _provinciaSeleccionadaId == null || _cargandoZonas ? null : () {
-                        
-                        List<Map<String, String>> opcionesPartidos = _partidosDeProvincia.map((p) {
-                          return {
-                            'id': p['departamento_id'].toString(), 
-                            'nombre': p['departamento_nombre'].toString()
-                          };
-                        }).toList();
-
-                        _mostrarSeleccionMultiple(
-                          titulo: 'Seleccionar Partidos',
-                          opciones: opcionesPartidos,
-                          seleccionadas: _partidosSeleccionados,
-                          onConfirm: _actualizarLocalidadesSegunPartidos
-                        );
-                      }
                     ),
-
-                    // Selector Localidad (Múltiple, filtrado en memoria por los partidos elegidos)
-                    _buildSelectorWidget(
-                      label: 'Localidades',
-                      valor: _localidadesSeleccionadas.isEmpty 
-                          ? 'Seleccionar Localidades (Múltiple)' 
-                          : _localidadesSeleccionadas.map((e) => e['nombre']).join(', '),
-                      onTap: _partidosSeleccionados.isEmpty || _cargandoZonas ? null : () {
-                        
-                        // Solo mostramos localidades cuyos partidos fueron seleccionados
-                        final idsPartidos = _partidosSeleccionados.map((p) => p['id']).toList();
-                        final locsFiltradas = _localidadesDeProvincia.where((l) => idsPartidos.contains(l['partido_id']));
-
-                        List<Map<String, String>> opcionesLocalidades = locsFiltradas.map((l) {
-                          return {
-                            'id': l['localidad_id'].toString(), 
-                            'nombre': l['localidad_nombre'].toString()
-                          };
-                        }).toList();
-
-                        _mostrarSeleccionMultiple(
-                          titulo: 'Seleccionar Localidades',
-                          opciones: opcionesLocalidades,
-                          seleccionadas: _localidadesSeleccionadas,
-                          onConfirm: (res) {
-                            setState(() {
-                              _localidadesSeleccionadas = res;
-                            });
-                          }
-                        );
-                      }
-                    ),
-
-                    const SizedBox(height: 32),
-                    ElevatedButton(
-                      onPressed: _crearTarjetaProfesional,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryColor,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: const Text('Crear Tarjeta Profesional', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                    )
-                  ],
+                  ),
                 ),
-              ),
-            ),
-          ),
         ),
       ),
     );
