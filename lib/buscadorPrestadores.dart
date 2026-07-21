@@ -20,6 +20,11 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
   String _selectedRubro = 'Todos';
   final List<String> _rubros = ['Todos', 'Electricista', 'Plomero', 'Gasista', 'Carpintero', 'Pintor', 'Construcción'];
 
+  // Controladores de texto para los campos buscables
+  final TextEditingController _provinciaController = TextEditingController();
+  final TextEditingController _partidoController = TextEditingController();
+  final TextEditingController _localidadController = TextEditingController();
+
   // NUEVOS FILTROS GEOGRÁFICOS DINÁMICOS
   String? selectedProvinciaId;
   String? selectedPartidoId;
@@ -35,6 +40,14 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     _loadProvincias();
   }
 
+  @override
+  void dispose() {
+    _provinciaController.dispose();
+    _partidoController.dispose();
+    _localidadController.dispose();
+    super.dispose();
+  }
+
   // --- LÓGICA DE CASCADA DESDE FIRESTORE ---
   Future<void> _loadProvincias() async {
     final doc = await db.collection('cat_paises').doc('AR').get();
@@ -46,7 +59,9 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
   }
 
   Future<void> _onProvinciaSelected(String? provId) async {
-    if (provId == null) return;
+    // Al cambiar la provincia, limpiamos los selectores hijos
+    _partidoController.clear();
+    _localidadController.clear();
     
     setState(() {
       selectedProvinciaId = provId;
@@ -55,6 +70,8 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
       partidos = [];
       localidades = [];
     });
+
+    if (provId == null) return;
 
     final query = await db.collection('cat_departamentos')
         .where('provincia_id', isEqualTo: provId)
@@ -66,13 +83,16 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
   }
 
   Future<void> _onPartidoSelected(String? partId) async {
-    if (partId == null) return;
+    // Al cambiar el partido, limpiamos el selector hijo
+    _localidadController.clear();
     
     setState(() {
       selectedPartidoId = partId;
       selectedLocalidadId = null;
       localidades = [];
     });
+
+    if (partId == null) return;
 
     final query = await db.collection('cat_localidades')
         .where('partido_id', isEqualTo: partId)
@@ -107,6 +127,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                 color: Colors.white,
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     TextField(
                       decoration: InputDecoration(
@@ -119,46 +140,68 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                     ),
                     const SizedBox(height: 12.0),
                     
-                    // SELECTORES DE FILTRO GEOGRÁFICO DINÁMICOS
-                    DropdownButtonFormField<String>(
-                      value: selectedProvinciaId,
-                      decoration: const InputDecoration(labelText: 'Provincia', border: OutlineInputBorder()),
-                      items: provincias.map((p) {
-                        return DropdownMenuItem<String>(
-                          value: p['id'],
-                          child: Text(p['nombre']),
+                    // SELECTORES DE FILTRO GEOGRÁFICO (BUSCABLES)
+                    DropdownMenu<String>(
+                      controller: _provinciaController,
+                      expandedInsets: EdgeInsets.zero, // Para que ocupe todo el ancho
+                      enableFilter: true, // Permite tipear para filtrar
+                      requestFocusOnTap: true,
+                      label: const Text('Provincia'),
+                      inputDecorationTheme: InputDecorationTheme(
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      ),
+                      dropdownMenuEntries: provincias.map((p) {
+                        return DropdownMenuEntry<String>(
+                          value: p['id'].toString(),
+                          label: p['nombre'].toString(),
                         );
                       }).toList(),
-                      onChanged: _onProvinciaSelected,
+                      onSelected: _onProvinciaSelected,
                     ),
                     const SizedBox(height: 12.0),
+                    
                     Row(
                       children: [
                         Expanded(
-                          child: DropdownButtonFormField<String>(
-                            value: selectedPartidoId,
-                            decoration: const InputDecoration(labelText: 'Partido', border: OutlineInputBorder()),
-                            items: partidos.map((p) {
-                              return DropdownMenuItem<String>(
-                                value: p['departamento_id'],
-                                child: Text(p['departamento_nombre'], overflow: TextOverflow.ellipsis),
+                          child: DropdownMenu<String>(
+                            controller: _partidoController,
+                            expandedInsets: EdgeInsets.zero,
+                            enableFilter: true,
+                            requestFocusOnTap: true,
+                            label: const Text('Partido'),
+                            inputDecorationTheme: InputDecorationTheme(
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
+                            ),
+                            dropdownMenuEntries: partidos.map((p) {
+                              return DropdownMenuEntry<String>(
+                                value: p['departamento_id'].toString(),
+                                label: p['departamento_nombre'].toString(),
                               );
                             }).toList(),
-                            onChanged: _onPartidoSelected,
+                            onSelected: _onPartidoSelected,
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: DropdownButtonFormField<String>(
-                            value: selectedLocalidadId,
-                            decoration: const InputDecoration(labelText: 'Localidad', border: OutlineInputBorder()),
-                            items: localidades.map((l) {
-                              return DropdownMenuItem<String>(
-                                value: l['localidad_id'],
-                                child: Text(l['localidad_nombre'], overflow: TextOverflow.ellipsis),
+                          child: DropdownMenu<String>(
+                            controller: _localidadController,
+                            expandedInsets: EdgeInsets.zero,
+                            enableFilter: true,
+                            requestFocusOnTap: true,
+                            label: const Text('Localidad'),
+                            inputDecorationTheme: InputDecorationTheme(
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
+                            ),
+                            dropdownMenuEntries: localidades.map((l) {
+                              return DropdownMenuEntry<String>(
+                                value: l['localidad_id'].toString(),
+                                label: l['localidad_nombre'].toString(),
                               );
                             }).toList(),
-                            onChanged: (val) => setState(() => selectedLocalidadId = val),
+                            onSelected: (val) => setState(() => selectedLocalidadId = val),
                           ),
                         ),
                       ],
@@ -229,14 +272,20 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                         if (!tienePartido) return false;
                       }
 
-                      // 4. Filtro por Rubro
-                      final rubro = (data['rubro'] ?? '').toString();
-                      if (_selectedRubro != 'Todos' && rubro != _selectedRubro) return false;
+                      // 4. Filtro por Rubro (Adaptado al nuevo formato de lista "profesiones")
+                      final List<dynamic> profesiones = data['profesiones'] ?? [];
+                      if (_selectedRubro != 'Todos' && !profesiones.contains(_selectedRubro)) {
+                        return false;
+                      }
 
-                      // 5. Filtro por texto
+                      // 5. Filtro por texto libre
                       final nombre = (data['nombre'] ?? '').toString().toLowerCase();
                       final apellido = (data['apellido'] ?? '').toString().toLowerCase();
-                      return nombre.contains(_searchQuery) || apellido.contains(_searchQuery) || rubro.toLowerCase().contains(_searchQuery);
+                      final profesionesStr = profesiones.join(' ').toLowerCase();
+                      
+                      return nombre.contains(_searchQuery) || 
+                             apellido.contains(_searchQuery) || 
+                             profesionesStr.contains(_searchQuery);
                     }).toList();
 
                     if (filteredDocs.isEmpty) {
@@ -249,20 +298,40 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                       itemBuilder: (context, index) {
                         final doc = filteredDocs[index];
                         final data = doc.data() as Map<String, dynamic>;
+                        
                         final double promedio = (data['promedioEstrellas'] ?? 0.0).toDouble();
                         final int cantidadEvaluadores = data['cantidadEvaluadores'] ?? 0;
+                        final List<dynamic> profesiones = data['profesiones'] ?? [];
 
                         return Card(
                           margin: const EdgeInsets.only(bottom: 12.0),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 1,
                           child: ListTile(
-                            leading: const CircleAvatar(child: Icon(Icons.person)),
-                            title: Text('${data['nombre'] ?? ''} ${data['apellido'] ?? ''}'),
-                            subtitle: Text(data['rubro'] ?? 'Prestador'),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            leading: CircleAvatar(
+                              backgroundColor: primaryColor.withOpacity(0.1),
+                              child: Icon(Icons.person, color: primaryColor),
+                            ),
+                            title: Text(
+                              '${data['nombre'] ?? ''} ${data['apellido'] ?? ''}', 
+                              style: TextStyle(fontWeight: FontWeight.bold, color: textColor),
+                            ),
+                            subtitle: Text(
+                              profesiones.isNotEmpty ? profesiones.join(', ') : 'Prestador',
+                              style: const TextStyle(color: Colors.grey),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.star_rounded, color: Color(0xFFFFB000), size: 18),
-                                Text(cantidadEvaluadores > 0 ? promedio.toStringAsFixed(1) : 'Nuevo'),
+                                const Icon(Icons.star_rounded, color: Color(0xFFFFB000), size: 20),
+                                const SizedBox(width: 4),
+                                Text(
+                                  cantidadEvaluadores > 0 ? promedio.toStringAsFixed(1) : 'Nuevo',
+                                  style: TextStyle(fontWeight: FontWeight.bold, color: textColor),
+                                ),
                               ],
                             ),
                             onTap: () {
