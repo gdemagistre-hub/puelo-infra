@@ -63,7 +63,7 @@ class MyApp extends StatelessWidget {
           );
         }
 
-        // 2. Interceptor para validación de domicilio (nuevo)
+        // 2. Interceptor para validación de domicilio
         if (uri.path == '/validarDomicilio' || uri.path.startsWith('/validarDomicilio')) {
           final String? idParam = uri.queryParameters['id'];
           return MaterialPageRoute(
