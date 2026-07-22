@@ -171,7 +171,6 @@ class _SolicitarValidacionWidgetState extends State<SolicitarValidacionWidget> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Panel de acciones (idéntico en estilo a la tarjeta digital)
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -235,7 +234,6 @@ class _SolicitarValidacionWidgetState extends State<SolicitarValidacionWidget> {
                     ),
                   ),
                   const SizedBox(height: 28),
-
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
