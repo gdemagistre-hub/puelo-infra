@@ -19,7 +19,14 @@ class HomePageWidget extends StatefulWidget {
 
 class _HomePageWidgetState extends State<HomePageWidget> {
   final primaryColor = const Color(0xFF0F52BA);
-  final accentBlue = const Color(0xFF00BCD4); // tono de la imagen adjunta
+  final accentBlue = const Color(0xFF00BCD4);
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   void _cerrarSesion() {
     UserSession().cerrarSesion();
@@ -87,10 +94,18 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Abriendo guía: Cómo promocionar tus trabajos en Instagram...')),
     );
-    // Aquí después podés navegar a una pantalla real de la guía
   }
 
-  // Genera las iniciales del usuario logueado
+  void _irABuscador([String? query]) {
+    final texto = (query ?? _searchController.text).trim();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BuscadorPrestadoresWidget(initialQuery: texto.isEmpty ? null : texto),
+      ),
+    );
+  }
+
   String _getInitials() {
     final nombreCompleto = UserSession().nombreCompleto.trim();
     if (nombreCompleto.isEmpty) return 'U';
@@ -109,7 +124,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         : 'Usuario';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F9FF), // azul muy suave como la imagen
+      backgroundColor: const Color(0xFFF0F9FF),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -131,7 +146,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           ],
         ),
         actions: [
-          // Círculo con iniciales del usuario (reemplaza la campana)
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: CircleAvatar(
@@ -157,8 +171,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: TextField(
+                controller: _searchController,
+                textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
-                  hintText: 'What service do you need',
+                  hintText: '¿Qué servicio buscas?',
                   prefixIcon: const Icon(Icons.search, color: Colors.grey),
                   filled: true,
                   fillColor: Colors.white,
@@ -167,15 +183,18 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                     borderSide: BorderSide.none,
                   ),
                 ),
+                onSubmitted: (value) {
+                  _irABuscador(value);
+                },
               ),
             ),
 
-            // Banner más pequeño (20% menos de altura) + más contraste
+            // Banner
             GestureDetector(
               onTap: _irAGuiaInstagram,
               child: Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
-                height: 128, // 160 * 0.8 = 128 → 20% más pequeño
+                height: 128,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
                   gradient: LinearGradient(
@@ -219,7 +238,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
             const SizedBox(height: 24),
 
-            // Services Grid - 4 iconos
+            // Services Grid
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: Text(
@@ -236,7 +255,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               childAspectRatio: 0.9,
               children: [
                 _buildServiceIcon(Icons.search, 'Buscar Servicios', () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const BuscadorPrestadoresWidget()));
+                  _irABuscador();
                 }),
                 _buildServiceIcon(Icons.check_circle_outline, 'Evaluar Trabajos', () {
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()));
