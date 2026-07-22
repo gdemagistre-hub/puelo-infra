@@ -18,6 +18,8 @@ class HomePageWidget extends StatefulWidget {
 }
 
 class _HomePageWidgetState extends State<HomePageWidget> {
+  int _currentIndex = 0;
+
   final primaryColor = const Color(0xFF0F52BA);
   final textColor = const Color(0xFF1E293B);
 
@@ -27,6 +29,33 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       context,
       MaterialPageRoute(builder: (context) => const LoginScreenWidget()),
     );
+  }
+
+  final List<Widget> _screens = [
+    const HomePageWidget(),           // 0 - Home
+    const MenuEvaluacionesWidget(),   // 1 - Evaluar trabajos (+)
+    const SizedBox(),                 // 2 - Chat (pendiente)
+    const MenuPerfilWidget(),         // 3 - Perfil
+  ];
+
+  void _onTabTapped(int index) {
+    if (index == _currentIndex) return;
+
+    if (index == 0) {
+      // Ya estamos en home
+      return;
+    } else if (index == 1) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const MenuEvaluacionesWidget()),
+      );
+    } else if (index == 3) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const MenuPerfilWidget()),
+      );
+    }
+    // El índice 2 (chat) queda pendiente de implementación
   }
 
   @override
@@ -75,7 +104,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               ),
             ),
 
-            // Promotional Banner (espacio reservado para imagen de DB)
+            // Promotional Banner
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16),
               height: 160,
@@ -83,7 +112,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                 borderRadius: BorderRadius.circular(16),
                 color: primaryColor.withOpacity(0.1),
                 image: const DecorationImage(
-                  image: AssetImage('assets/banner_placeholder.jpg'), // Reemplazar luego por URL de Firestore
+                  image: AssetImage('assets/banner_placeholder.jpg'), // ← Reemplazar con URL de Firestore después
                   fit: BoxFit.cover,
                 ),
               ),
@@ -147,23 +176,35 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
             const SizedBox(height: 12),
 
-            // Provider Cards (ejemplos)
             _buildProviderCard('Electricians repair', 'Our reliable, full service and licensed electricians repair breaker panel surges.', '1.2 km', Colors.purple),
             _buildProviderCard('Electricians repair', 'Our reliable, full service and licensed electricians repair breaker panel surges.', '1.2 km', Colors.red),
             _buildProviderCard('Electricians repair', 'Our reliable, full service and licensed electricians repair breaker panel surges.', '1.2 km', Colors.teal),
-
-            const SizedBox(height: 80), // espacio para bottom nav
           ],
         ),
       ),
       bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: _onTabTapped,
         selectedItemColor: primaryColor,
         unselectedItemColor: Colors.grey,
+        type: BottomNavigationBarType.fixed,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: ''),
-          BottomNavigationBarItem(icon: Icon(Icons.add_circle_outline), label: ''),
-          BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), label: ''),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: ''),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.add_circle_outline),
+            label: 'Evaluar',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.chat_bubble_outline),
+            label: 'Mensajes',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Perfil',
+          ),
         ],
       ),
     );
@@ -178,9 +219,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8),
-            ],
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8)],
           ),
           child: Icon(icon, size: 32, color: primaryColor),
         ),
@@ -197,9 +236,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
-        ],
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
       ),
       child: Row(
         children: [
