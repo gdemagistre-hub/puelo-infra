@@ -29,6 +29,71 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     );
   }
 
+  // Lógica completa para compartir tarjeta
+  void _compartirTarjeta() async {
+    final String? userId = UserSession().uid;
+    if (userId == null || userId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error: No se encontró la sesión activa.')),
+      );
+      return;
+    }
+
+    // Mostrar indicador de carga
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final doc = await FirebaseFirestore.instance.collection('usuarios').doc(userId).get();
+      if (context.mounted) Navigator.pop(context); // cerrar loading
+
+      if (doc.exists) {
+        final data = doc.data() as Map<String, dynamic>;
+
+        final profesiones = data['profesiones'] as List<dynamic>? ?? [];
+        final zonasCobertura = data['zonas_cobertura'] as Map<String, dynamic>? ?? {};
+        final localidades = zonasCobertura['localidades'] as List<dynamic>? ?? [];
+        final esTrabajador = data['es_trabajador'] == true;
+
+        if (profesiones.isEmpty || localidades.isEmpty || !esTrabajador) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Para compartir tu tarjeta, primero configurá tus especialidades y zonas.'),
+                duration: Duration(seconds: 4),
+              ),
+            );
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const RegistroTrabajadorWidget()),
+            );
+          }
+        } else {
+          if (context.mounted) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => TarjetaDigitalWidget(
+                  usuarioRef: FirebaseFirestore.instance.collection('usuarios').doc(userId),
+                ),
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al validar tu perfil: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final String nombreMostrar = UserSession().nombreCompleto.isNotEmpty
@@ -108,7 +173,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
             const SizedBox(height: 24),
 
-            // Services Grid - Solo 4 iconos
+            // Services Grid - 4 iconos
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: Text('Servicios', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
@@ -122,17 +187,14 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               childAspectRatio: 0.9,
               children: [
                 _buildServiceIcon(Icons.search, 'Buscar Servicios', () {
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const BuscadorPrestadoresWidget()));
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const BuscadorPrestadoresWidget()));
                 }),
                 _buildServiceIcon(Icons.check_circle_outline, 'Evaluar Trabajos', () {
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const MenuEvaluacionesWidget()));
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()));
                 }),
-                _buildServiceIcon(Icons.badge, 'Compartir Tarjeta', () {
-                  // Lógica existente de tarjeta digital
-                  // (puedes pegar aquí la lógica completa que tenías antes)
-                }),
+                _buildServiceIcon(Icons.badge, 'Compartir Tarjeta', _compartirTarjeta),
                 _buildServiceIcon(Icons.person_outline, 'Sobre Mí', () {
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const MenuPerfilWidget()));
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuPerfilWidget()));
                 }),
               ],
             ),
@@ -146,7 +208,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
             const SizedBox(height: 12),
 
-            // Placeholder de mensajes (puedes reemplazar luego con lista real)
             _buildProviderCard('Electricians repair', 'Nuestro electricista completó el trabajo en tiempo récord.', 'Hace 2h', Colors.purple),
             _buildProviderCard('Plumbing Service', 'Se reparó la pérdida de agua en la cocina.', 'Ayer', Colors.blue),
           ],
@@ -163,7 +224,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
         ],
         onTap: (index) {
-          if (index == 0) return; // Ya estamos en home
+          if (index == 0) return;
           if (index == 1) {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()));
           }
@@ -208,7 +269,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       ),
       child: Row(
         children: [
-          CircleAvatar(backgroundColor: color.withOpacity(0.1), child: Text(title[0], style: TextStyle(color: color, fontWeight: FontWeight.bold))),
+          CircleAvatar(
+            backgroundColor: color.withOpacity(0.1),
+            child: Text(title[0], style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
