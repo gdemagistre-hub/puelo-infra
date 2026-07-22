@@ -8,7 +8,7 @@ class UserSession {
   String? apellido;
   Map<String, dynamic>? datosCompletos;
 
-  /// Token de una validación de domicilio pendiente (generado en ValidarDomicilioWidget)
+  /// Token de una validación de domicilio pendiente
   String? pendingValidacionToken;
 
   void iniciarSesion(String id, Map<String, dynamic> data) {
