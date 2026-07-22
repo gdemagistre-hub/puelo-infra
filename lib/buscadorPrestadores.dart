@@ -6,6 +6,9 @@ import 'menuPerfil.dart';
 class BuscadorPrestadoresWidget extends StatefulWidget {
   const BuscadorPrestadoresWidget({super.key});
 
+  static const String routeName = 'BuscadorPrestadores';
+  static const String routePath = '/buscador-prestadores';
+
   @override
   State<BuscadorPrestadoresWidget> createState() => _BuscadorPrestadoresWidgetState();
 }
@@ -33,7 +36,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     super.dispose();
   }
 
-  // Genera iniciales a partir del nombre completo
   String _getInitials(String? nombre, String? apellido) {
     final n = (nombre ?? '').trim();
     final a = (apellido ?? '').trim();
@@ -46,7 +48,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     return a[0].toUpperCase();
   }
 
-  // Color consistente según el id o nombre
   Color _getColorForUser(String key) {
     final hash = key.hashCode.abs();
     return _pastelColors[hash % _pastelColors.length];
@@ -170,9 +171,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
 
                     return GestureDetector(
                       onTap: () {
-                        // Al tocar la tarjeta se abre el perfil
-                        // Por ahora usamos MenuPerfilWidget.
-                        // Después podemos crear un PerfilPublicoWidget(usuarioId: docId)
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -216,7 +214,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                             ),
                             const SizedBox(width: 14),
 
-                            // Información del prestador
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -244,7 +241,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                               ),
                             ),
 
-                            // Distancia
                             Text(
                               distancia,
                               style: const TextStyle(
