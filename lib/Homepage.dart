@@ -29,7 +29,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     );
   }
 
-  // Lógica completa para compartir tarjeta
   void _compartirTarjeta() async {
     final String? userId = UserSession().uid;
     if (userId == null || userId.isEmpty) {
@@ -39,7 +38,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       return;
     }
 
-    // Mostrar indicador de carga
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -48,11 +46,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
     try {
       final doc = await FirebaseFirestore.instance.collection('usuarios').doc(userId).get();
-      if (context.mounted) Navigator.pop(context); // cerrar loading
+      if (context.mounted) Navigator.pop(context);
 
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
-
         final profesiones = data['profesiones'] as List<dynamic>? ?? [];
         final zonasCobertura = data['zonas_cobertura'] as Map<String, dynamic>? ?? {};
         final localidades = zonasCobertura['localidades'] as List<dynamic>? ?? [];
@@ -61,37 +58,31 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         if (profesiones.isEmpty || localidades.isEmpty || !esTrabajador) {
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Para compartir tu tarjeta, primero configurá tus especialidades y zonas.'),
-                duration: Duration(seconds: 4),
-              ),
+              const SnackBar(content: Text('Para compartir tu tarjeta, primero configurá tus especialidades y zonas.')),
             );
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const RegistroTrabajadorWidget()),
-            );
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const RegistroTrabajadorWidget()));
           }
         } else {
           if (context.mounted) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => TarjetaDigitalWidget(
-                  usuarioRef: FirebaseFirestore.instance.collection('usuarios').doc(userId),
-                ),
-              ),
-            );
+            Navigator.push(context, MaterialPageRoute(builder: (_) => TarjetaDigitalWidget(usuarioRef: FirebaseFirestore.instance.collection('usuarios').doc(userId))));
           }
         }
       }
     } catch (e) {
       if (context.mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al validar tu perfil: $e')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
+  }
+
+  // Acción del banner (puedes cambiar el texto y destino fácilmente)
+  void _irAGuiaInstagram() {
+    // Aquí puedes navegar a un mini-manual o mostrar un diálogo
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Abriendo guía: Cómo promocionar tus trabajos en Instagram...')),
+    );
+    // Navigator.push(context, MaterialPageRoute(builder: (_) => const GuiaInstagramWidget()));
   }
 
   @override
@@ -113,10 +104,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined, color: Colors.black),
-            onPressed: () {},
-          ),
+          IconButton(icon: const Icon(Icons.notifications_outlined, color: Colors.black), onPressed: () {}),
         ],
       ),
       body: SingleChildScrollView(
@@ -132,41 +120,42 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                   prefixIcon: const Icon(Icons.search, color: Colors.grey),
                   filled: true,
                   fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(30),
-                    borderSide: BorderSide.none,
-                  ),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
                 ),
               ),
             ),
 
-            // Promotional Banner
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              height: 160,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                color: primaryColor.withOpacity(0.1),
-                image: const DecorationImage(
-                  image: AssetImage('assets/banner_placeholder.jpg'),
-                  fit: BoxFit.cover,
+            // Banner Promocional / Informativo
+            GestureDetector(
+              onTap: _irAGuiaInstagram,
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                height: 160,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  color: primaryColor.withOpacity(0.1),
+                  image: const DecorationImage(
+                    image: AssetImage('assets/banner_placeholder.jpg'),
+                    fit: BoxFit.cover,
+                  ),
                 ),
-              ),
-              child: const Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Text(
-                      'PROFESSIONAL BATHROOM CLEANING',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
-                    ),
-                    Text(
-                      'Save Up to 70% off',
-                      style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800),
-                    ),
-                  ],
+                child: const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Text(
+                        '¿Sabes cómo comunicar tus trabajos en Instagram?',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Toca aquí para ver el mini-manual',
+                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -186,22 +175,15 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               padding: const EdgeInsets.symmetric(horizontal: 12),
               childAspectRatio: 0.9,
               children: [
-                _buildServiceIcon(Icons.search, 'Buscar Servicios', () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const BuscadorPrestadoresWidget()));
-                }),
-                _buildServiceIcon(Icons.check_circle_outline, 'Evaluar Trabajos', () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()));
-                }),
+                _buildServiceIcon(Icons.search, 'Buscar Servicios', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BuscadorPrestadoresWidget()))),
+                _buildServiceIcon(Icons.check_circle_outline, 'Evaluar Trabajos', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()))),
                 _buildServiceIcon(Icons.badge, 'Compartir Tarjeta', _compartirTarjeta),
-                _buildServiceIcon(Icons.person_outline, 'Sobre Mí', () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuPerfilWidget()));
-                }),
+                _buildServiceIcon(Icons.person_outline, 'Sobre Mí', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuPerfilWidget()))),
               ],
             ),
 
             const SizedBox(height: 24),
 
-            // Últimos Mensajes
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: Text('Últimos Mensajes', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
@@ -225,12 +207,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         ],
         onTap: (index) {
           if (index == 0) return;
-          if (index == 1) {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()));
-          }
-          if (index == 3) {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuPerfilWidget()));
-          }
+          if (index == 1) Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()));
+          if (index == 3) Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuPerfilWidget()));
         },
       ),
     );
@@ -269,10 +247,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            backgroundColor: color.withOpacity(0.1),
-            child: Text(title[0], style: TextStyle(color: color, fontWeight: FontWeight.bold)),
-          ),
+          CircleAvatar(backgroundColor: color.withOpacity(0.1), child: Text(title[0], style: TextStyle(color: color, fontWeight: FontWeight.bold))),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
