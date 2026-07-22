@@ -19,7 +19,7 @@ class HomePageWidget extends StatefulWidget {
 
 class _HomePageWidgetState extends State<HomePageWidget> {
   final primaryColor = const Color(0xFF0F52BA);
-  final textColor = const Color(0xFF1E293B);
+  final accentBlue = const Color(0xFF00BCD4); // tono de la imagen adjunta
 
   void _cerrarSesion() {
     UserSession().cerrarSesion();
@@ -64,7 +64,14 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           }
         } else {
           if (context.mounted) {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => TarjetaDigitalWidget(usuarioRef: FirebaseFirestore.instance.collection('usuarios').doc(userId))));
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => TarjetaDigitalWidget(
+                  usuarioRef: FirebaseFirestore.instance.collection('usuarios').doc(userId),
+                ),
+              ),
+            );
           }
         }
       }
@@ -76,13 +83,23 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     }
   }
 
-  // Acción del banner (puedes cambiar el texto y destino fácilmente)
   void _irAGuiaInstagram() {
-    // Aquí puedes navegar a un mini-manual o mostrar un diálogo
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Abriendo guía: Cómo promocionar tus trabajos en Instagram...')),
     );
-    // Navigator.push(context, MaterialPageRoute(builder: (_) => const GuiaInstagramWidget()));
+    // Aquí después podés navegar a una pantalla real de la guía
+  }
+
+  // Genera las iniciales del usuario logueado
+  String _getInitials() {
+    final nombreCompleto = UserSession().nombreCompleto.trim();
+    if (nombreCompleto.isEmpty) return 'U';
+
+    final partes = nombreCompleto.split(' ');
+    if (partes.length >= 2) {
+      return '${partes[0][0]}${partes[1][0]}'.toUpperCase();
+    }
+    return partes[0][0].toUpperCase();
   }
 
   @override
@@ -92,19 +109,44 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         : 'Usuario';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF0F9FF), // azul muy suave como la imagen
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Hola $nombreMostrar', style: const TextStyle(color: Colors.black, fontSize: 20, fontWeight: FontWeight.bold)),
-            const Text('¿Qué vas a hacer hoy?', style: TextStyle(color: Colors.grey, fontSize: 14)),
+            Text(
+              'Hola $nombreMostrar',
+              style: const TextStyle(
+                color: Colors.black,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const Text(
+              '¿Qué vas a hacer hoy?',
+              style: TextStyle(color: Colors.grey, fontSize: 14),
+            ),
           ],
         ),
         actions: [
-          IconButton(icon: const Icon(Icons.notifications_outlined, color: Colors.black), onPressed: () {}),
+          // Círculo con iniciales del usuario (reemplaza la campana)
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: CircleAvatar(
+              radius: 20,
+              backgroundColor: primaryColor,
+              child: Text(
+                _getInitials(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
       body: SingleChildScrollView(
@@ -120,39 +162,54 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                   prefixIcon: const Icon(Icons.search, color: Colors.grey),
                   filled: true,
                   fillColor: Colors.white,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
               ),
             ),
 
-            // Banner Promocional / Informativo
+            // Banner más pequeño (20% menos de altura) + más contraste
             GestureDetector(
               onTap: _irAGuiaInstagram,
               child: Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
-                height: 160,
+                height: 128, // 160 * 0.8 = 128 → 20% más pequeño
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
-                  color: primaryColor.withOpacity(0.1),
-                  image: const DecorationImage(
-                    image: AssetImage('assets/banner_placeholder.jpg'),
-                    fit: BoxFit.cover,
+                  gradient: LinearGradient(
+                    colors: [
+                      primaryColor.withOpacity(0.85),
+                      accentBlue.withOpacity(0.9),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
                 ),
                 child: const Padding(
                   padding: EdgeInsets.all(16.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.end,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
                         '¿Sabes cómo comunicar tus trabajos en Instagram?',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          height: 1.3,
+                        ),
                       ),
-                      SizedBox(height: 4),
+                      SizedBox(height: 6),
                       Text(
                         'Toca aquí para ver el mini-manual',
-                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ],
                   ),
@@ -165,7 +222,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             // Services Grid - 4 iconos
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Text('Servicios', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              child: Text(
+                'Servicios',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
             ),
             const SizedBox(height: 12),
             GridView.count(
@@ -175,23 +235,43 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               padding: const EdgeInsets.symmetric(horizontal: 12),
               childAspectRatio: 0.9,
               children: [
-                _buildServiceIcon(Icons.search, 'Buscar Servicios', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BuscadorPrestadoresWidget()))),
-                _buildServiceIcon(Icons.check_circle_outline, 'Evaluar Trabajos', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()))),
+                _buildServiceIcon(Icons.search, 'Buscar Servicios', () {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const BuscadorPrestadoresWidget()));
+                }),
+                _buildServiceIcon(Icons.check_circle_outline, 'Evaluar Trabajos', () {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()));
+                }),
                 _buildServiceIcon(Icons.badge, 'Compartir Tarjeta', _compartirTarjeta),
-                _buildServiceIcon(Icons.person_outline, 'Sobre Mí', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuPerfilWidget()))),
+                _buildServiceIcon(Icons.person_outline, 'Sobre Mí', () {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuPerfilWidget()));
+                }),
               ],
             ),
 
             const SizedBox(height: 24),
 
+            // Últimos Mensajes
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Text('Últimos Mensajes', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              child: Text(
+                'Últimos Mensajes',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
             ),
             const SizedBox(height: 12),
 
-            _buildProviderCard('Electricians repair', 'Nuestro electricista completó el trabajo en tiempo récord.', 'Hace 2h', Colors.purple),
-            _buildProviderCard('Plumbing Service', 'Se reparó la pérdida de agua en la cocina.', 'Ayer', Colors.blue),
+            _buildProviderCard(
+              'Electricians repair',
+              'Nuestro electricista completó el trabajo en tiempo récord.',
+              'Hace 2h',
+              Colors.blue,
+            ),
+            _buildProviderCard(
+              'Plumbing Service',
+              'Se reparó la pérdida de agua en la cocina.',
+              'Ayer',
+              Colors.purple,
+            ),
           ],
         ),
       ),
@@ -207,8 +287,12 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         ],
         onTap: (index) {
           if (index == 0) return;
-          if (index == 1) Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()));
-          if (index == 3) Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuPerfilWidget()));
+          if (index == 1) {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()));
+          }
+          if (index == 3) {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuPerfilWidget()));
+          }
         },
       ),
     );
@@ -225,12 +309,18 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8)],
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8),
+              ],
             ),
             child: Icon(icon, size: 32, color: primaryColor),
           ),
           const SizedBox(height: 6),
-          Text(label, style: const TextStyle(fontSize: 12), textAlign: TextAlign.center),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 12),
+            textAlign: TextAlign.center,
+          ),
         ],
       ),
     );
@@ -243,22 +333,38 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
+        ],
       ),
       child: Row(
         children: [
-          CircleAvatar(backgroundColor: color.withOpacity(0.1), child: Text(title[0], style: TextStyle(color: color, fontWeight: FontWeight.bold))),
+          CircleAvatar(
+            backgroundColor: color.withOpacity(0.15),
+            child: Text(
+              title[0],
+              style: TextStyle(color: color, fontWeight: FontWeight.bold),
+            ),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text(description, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)),
+                Text(
+                  description,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13),
+                ),
               ],
             ),
           ),
-          Text(time, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+          Text(
+            time,
+            style: const TextStyle(color: Colors.grey, fontSize: 12),
+          ),
         ],
       ),
     );
