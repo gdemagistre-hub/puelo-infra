@@ -6,11 +6,10 @@ import 'buscadorPrestadores.dart';
 import 'menuEvaluaciones.dart';
 import 'menuPerfil.dart';
 import 'registroTrabajador.dart';
-import 'tarjetaDigital.dart'; 
+import 'tarjetaDigital.dart';
 
 class HomePageWidget extends StatefulWidget {
   const HomePageWidget({super.key});
-
   static const String routeName = 'HomePage';
   static const String routePath = '/home';
 
@@ -32,200 +31,195 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final String nombreMostrar = UserSession().nombreCompleto.isNotEmpty 
-        ? UserSession().nombreCompleto 
-        : 'Invitado';
+    final String nombreMostrar = UserSession().nombreCompleto.isNotEmpty
+        ? UserSession().nombreCompleto.split(' ').first
+        : 'Usuario';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text('Panel Principal'),
-        backgroundColor: primaryColor,
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.white,
         elevation: 0,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Hi $nombreMostrar', style: const TextStyle(color: Colors.black, fontSize: 20, fontWeight: FontWeight.bold)),
+            const Text('A3 opp. California Street 222', style: TextStyle(color: Colors.grey, fontSize: 14)),
+          ],
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout_rounded),
-            tooltip: 'Cerrar sesión',
-            onPressed: _cerrarSesion,
+            icon: const Icon(Icons.notifications_outlined, color: Colors.black),
+            onPressed: () {},
           ),
         ],
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Bienvenido, $nombreMostrar',
-                style: TextStyle(
-                  fontSize: 24, 
-                  fontWeight: FontWeight.w800, 
-                  color: textColor,
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Search Bar
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: TextField(
+                decoration: InputDecoration(
+                  hintText: 'What service do you need',
+                  prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
               ),
-              const SizedBox(height: 8),
-              const Text(
-                '¿Qué te gustaría hacer hoy?',
-                style: TextStyle(
-                  fontSize: 16, 
-                  color: Color(0xFF64748B),
+            ),
+
+            // Promotional Banner (espacio reservado para imagen de DB)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              height: 160,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                color: primaryColor.withOpacity(0.1),
+                image: const DecorationImage(
+                  image: AssetImage('assets/banner_placeholder.jpg'), // Reemplazar luego por URL de Firestore
+                  fit: BoxFit.cover,
                 ),
               ),
-              const SizedBox(height: 40),
-              
-              // Botón 1: Buscar servicios
-              _buildMainButton(
-                context,
-                texto: 'Buscar servicios',
-                icono: Icons.search_rounded,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const BuscadorPrestadoresWidget()),
+              child: const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Text(
+                      'PROFESSIONAL BATHROOM CLEANING',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+                    ),
+                    Text(
+                      'Save Up to 70% off',
+                      style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 16),
+            ),
 
-              // Botón 2: Evaluar trabajos
-              _buildMainButton(
-                context,
-                texto: 'Evaluar trabajos',
-                icono: Icons.check_circle_outline_rounded,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const MenuEvaluacionesWidget()),
-                ),
+            const SizedBox(height: 24),
+
+            // Services Grid
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Text('Services', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            ),
+            const SizedBox(height: 12),
+            GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 4,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              childAspectRatio: 0.9,
+              children: [
+                _buildServiceIcon(Icons.cleaning_services, 'Cleaning'),
+                _buildServiceIcon(Icons.restaurant, 'Kitchen'),
+                _buildServiceIcon(Icons.bathtub, 'Bathroom'),
+                _buildServiceIcon(Icons.person, 'Maid'),
+                _buildServiceIcon(Icons.handyman, 'Carpenting'),
+                _buildServiceIcon(Icons.plumbing, 'Plumbing'),
+                _buildServiceIcon(Icons.build, 'Repair'),
+                _buildServiceIcon(Icons.park, 'Gardening'),
+              ],
+            ),
+
+            const SizedBox(height: 24),
+
+            // Best Service Providers
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: const [
+                  Text('Best service providers', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  Text('View all', style: TextStyle(color: Colors.red)),
+                ],
               ),
-              const SizedBox(height: 16),
+            ),
+            const SizedBox(height: 12),
 
-              // Botón 3: Compartir Tarjeta personal
-              _buildMainButton(
-                context,
-                texto: 'Compartir Tarjeta personal',
-                icono: Icons.badge_rounded,
-                onTap: () async {
-                  final String? userId = UserSession().uid;
-                  
-                  if (userId != null && userId.isNotEmpty) {
-                    // 1. Mostrar un indicador de carga temporal mientras validamos
-                    showDialog(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (context) => const Center(child: CircularProgressIndicator()),
-                    );
+            // Provider Cards (ejemplos)
+            _buildProviderCard('Electricians repair', 'Our reliable, full service and licensed electricians repair breaker panel surges.', '1.2 km', Colors.purple),
+            _buildProviderCard('Electricians repair', 'Our reliable, full service and licensed electricians repair breaker panel surges.', '1.2 km', Colors.red),
+            _buildProviderCard('Electricians repair', 'Our reliable, full service and licensed electricians repair breaker panel surges.', '1.2 km', Colors.teal),
 
-                    try {
-                      // 2. Consultar el documento del usuario en Firestore
-                      final doc = await FirebaseFirestore.instance.collection('usuarios').doc(userId).get();
-                      
-                      // Ocultar indicador de carga
-                      if (context.mounted) Navigator.pop(context);
-
-                      if (doc.exists) {
-                        final data = doc.data() as Map<String, dynamic>;
-                        
-                        // Extraemos la información clave para validar
-                        final profesiones = data['profesiones'] as List<dynamic>? ?? [];
-                        final zonasCobertura = data['zonas_cobertura'] as Map<String, dynamic>? ?? {};
-                        final localidades = zonasCobertura['localidades'] as List<dynamic>? ?? [];
-                        final esTrabajador = data['es_trabajador'] == true;
-
-                        // 3. Validar si tiene configurado el perfil profesional
-                        if (profesiones.isEmpty || localidades.isEmpty || !esTrabajador) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Para compartir tu tarjeta, primero configurá tus especialidades y zonas.'),
-                                duration: Duration(seconds: 4),
-                              ),
-                            );
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const RegistroTrabajadorWidget()),
-                            );
-                          }
-                        } else {
-                          // 4. Si todo está correcto, avanza a la tarjeta digital
-                          if (context.mounted) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => TarjetaDigitalWidget(
-                                  usuarioRef: FirebaseFirestore.instance.collection('usuarios').doc(userId),
-                                ),
-                              ),
-                            );
-                          }
-                        }
-                      }
-                    } catch (e) {
-                      if (context.mounted) {
-                        Navigator.pop(context); // Ocultar indicador de carga ante un error
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Error al validar tu perfil: $e')),
-                        );
-                      }
-                    }
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Error: No se encontró la sesión activa.')),
-                    );
-                  }
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Botón 4: Sobre mí
-              _buildMainButton(
-                context,
-                texto: 'Sobre mí',
-                icono: Icons.person_outline_rounded,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const MenuPerfilWidget()),
-                ),
-              ),
-            ],
-          ),
+            const SizedBox(height: 80), // espacio para bottom nav
+          ],
         ),
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        selectedItemColor: primaryColor,
+        unselectedItemColor: Colors.grey,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: ''),
+          BottomNavigationBarItem(icon: Icon(Icons.add_circle_outline), label: ''),
+          BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), label: ''),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: ''),
+        ],
       ),
     );
   }
 
-  // Widget auxiliar para mantener un diseño limpio y uniforme en los botones
-  Widget _buildMainButton(BuildContext context, {required String texto, required IconData icono, required VoidCallback onTap}) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade200),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
+  Widget _buildServiceIcon(IconData icon, String label) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8),
+            ],
+          ),
+          child: Icon(icon, size: 32, color: primaryColor),
         ),
-        child: Column(
-          children: [
-            Icon(icono, size: 48, color: primaryColor),
-            const SizedBox(height: 12),
-            Text(
-              texto,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: textColor,
-              ),
+        const SizedBox(height: 6),
+        Text(label, style: const TextStyle(fontSize: 12)),
+      ],
+    );
+  }
+
+  Widget _buildProviderCard(String title, String description, String distance, Color color) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
+        ],
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 28,
+            backgroundColor: color.withOpacity(0.1),
+            child: Text(title[0], style: TextStyle(fontSize: 24, color: color, fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(description, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: Colors.grey)),
+              ],
             ),
-          ],
-        ),
+          ),
+          Text(distance, style: const TextStyle(color: Colors.grey)),
+        ],
       ),
     );
   }
