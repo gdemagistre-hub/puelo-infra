@@ -23,10 +23,8 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
 
   bool _loading = true;
   String? _error;
-  Map<String, dynamic>? _datosTarget;
   String _nombreTarget = '';
 
-  // Pasos: 0 = ¿Conoce?, 1 = elegir domicilio, 2 = tiempo viviendo
   int _paso = 0;
   bool? _conoce;
   List<String> _opcionesDomicilio = [];
@@ -85,7 +83,6 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
       _nombreTarget = '${data['nombre'] ?? ''} ${data['apellido'] ?? ''}'.trim();
       if (_nombreTarget.isEmpty) _nombreTarget = 'esta persona';
 
-      _datosTarget = data;
       setState(() => _loading = false);
     } catch (e) {
       setState(() {
@@ -138,7 +135,6 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
       candidatas.shuffle();
       opciones.addAll(candidatas.take(2));
 
-      // Si no hay suficientes, rellenamos con la real (el usuario igual puede elegir)
       while (opciones.length < 3) {
         opciones.add(_domicilioReal!);
       }
@@ -146,7 +142,6 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
       opciones.shuffle();
       _opcionesDomicilio = opciones;
     } catch (e) {
-      // Fallback mínimo
       _opcionesDomicilio = [_domicilioReal!, _domicilioReal!, _domicilioReal!];
     }
 
@@ -177,7 +172,6 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
       return;
     }
 
-    // Paso 2 → guardar y ir a login
     if (_tiempoViviendo == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Seleccioná una opción de tiempo.')),
@@ -270,7 +264,6 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Indicador de paso
                         Row(
                           children: List.generate(3, (i) {
                             return Expanded(
