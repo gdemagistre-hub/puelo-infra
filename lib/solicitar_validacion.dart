@@ -270,9 +270,9 @@ class _SolicitarValidacionWidgetState extends State<SolicitarValidacionWidget> {
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          '1. Confirmarán si te conocen.\n'
-                          '2. Elegirán tu domicilio real entre 3 opciones.\n'
-                          '3. Indicarán hace cuánto vivís ahí (dato solo informativo).',
+                          'Es un proceso simple, donde la persona confirma\n'
+                          'que te conoce respondiendo tres preguntas.\n'
+                          'No hay mejor manera que el acomppañamiento de quienes nos conocen',
                           style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.5),
                         ),
                       ],
