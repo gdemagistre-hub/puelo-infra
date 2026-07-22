@@ -3,7 +3,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'tarjetaDigital.dart';
 
 class BuscadorPrestadoresWidget extends StatefulWidget {
-  const BuscadorPrestadoresWidget({super.key});
+  final String? initialQuery;
+
+  const BuscadorPrestadoresWidget({
+    super.key,
+    this.initialQuery,
+  });
 
   static const String routeName = 'BuscadorPrestadores';
   static const String routePath = '/buscadorPrestadores';
@@ -16,16 +21,16 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
   final scaffoldKey = GlobalKey<ScaffoldState>();
   final db = FirebaseFirestore.instance;
 
-  String _searchQuery = '';
+  late String _searchQuery;
+  final TextEditingController _searchController = TextEditingController();
+
   String _selectedRubro = 'Todos';
   final List<String> _rubros = ['Todos', 'Electricista', 'Plomero', 'Gasista', 'Carpintero', 'Pintor', 'Construcción'];
 
-  // Controladores de texto para los campos buscables
   final TextEditingController _provinciaController = TextEditingController();
   final TextEditingController _partidoController = TextEditingController();
   final TextEditingController _localidadController = TextEditingController();
 
-  // NUEVOS FILTROS GEOGRÁFICOS DINÁMICOS
   String? selectedProvinciaId;
   String? selectedPartidoId;
   String? selectedLocalidadId;
@@ -37,18 +42,22 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
   @override
   void initState() {
     super.initState();
+    // Precargar el texto que viene del Homepage
+    final initial = widget.initialQuery?.trim() ?? '';
+    _searchQuery = initial.toLowerCase();
+    _searchController.text = initial;
     _loadProvincias();
   }
 
   @override
   void dispose() {
+    _searchController.dispose();
     _provinciaController.dispose();
     _partidoController.dispose();
     _localidadController.dispose();
     super.dispose();
   }
 
-  // --- LÓGICA DE CASCADA DESDE FIRESTORE ---
   Future<void> _loadProvincias() async {
     final doc = await db.collection('cat_paises').doc('AR').get();
     if (doc.exists && doc.data()!.containsKey('provincias')) {
@@ -59,10 +68,9 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
   }
 
   Future<void> _onProvinciaSelected(String? provId) async {
-    // Al cambiar la provincia, limpiamos los selectores hijos
     _partidoController.clear();
     _localidadController.clear();
-    
+
     setState(() {
       selectedProvinciaId = provId;
       selectedPartidoId = null;
@@ -83,9 +91,8 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
   }
 
   Future<void> _onPartidoSelected(String? partId) async {
-    // Al cambiar el partido, limpiamos el selector hijo
     _localidadController.clear();
-    
+
     setState(() {
       selectedPartidoId = partId;
       selectedLocalidadId = null;
@@ -122,7 +129,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
         body: SafeArea(
           child: Column(
             children: [
-              // Barra de búsqueda y selectores geográficos
               Container(
                 color: Colors.white,
                 padding: const EdgeInsets.all(16.0),
@@ -130,6 +136,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     TextField(
+                      controller: _searchController,
                       decoration: InputDecoration(
                         hintText: 'Buscar por nombre o especialidad...',
                         prefixIcon: const Icon(Icons.search),
@@ -139,12 +146,11 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                       onChanged: (value) => setState(() => _searchQuery = value.toLowerCase()),
                     ),
                     const SizedBox(height: 12.0),
-                    
-                    // SELECTORES DE FILTRO GEOGRÁFICO (BUSCABLES)
+
                     DropdownMenu<String>(
                       controller: _provinciaController,
-                      expandedInsets: EdgeInsets.zero, // Para que ocupe todo el ancho
-                      enableFilter: true, // Permite tipear para filtrar
+                      expandedInsets: EdgeInsets.zero,
+                      enableFilter: true,
                       requestFocusOnTap: true,
                       label: const Text('Provincia'),
                       inputDecorationTheme: InputDecorationTheme(
@@ -160,7 +166,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                       onSelected: _onProvinciaSelected,
                     ),
                     const SizedBox(height: 12.0),
-                    
+
                     Row(
                       children: [
                         Expanded(
@@ -207,8 +213,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                       ],
                     ),
                     const SizedBox(height: 12.0),
-                    
-                    // CARRUSEL DE RUBROS
+
                     SizedBox(
                       height: 40,
                       child: ListView.builder(
@@ -234,7 +239,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                 ),
               ),
 
-              // LISTADO FILTRADO DESDE FIRESTORE
               Expanded(
                 child: StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance.collection('usuarios').snapshots(),
@@ -245,47 +249,39 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
 
                     final filteredDocs = docs.where((doc) {
                       final data = doc.data() as Map<String, dynamic>;
-                      
-                      // 1. Validación de rol
+
                       if (data['rol'] != 'trabajador') return false;
 
-                      // Descomposición del mapa de cobertura
                       final cobertura = data['zonas_cobertura'] as Map<String, dynamic>?;
                       if (cobertura == null) return false;
 
                       final String providerProvinciaId = cobertura['provincia_id'] ?? '';
                       final List<dynamic> provLocalidades = cobertura['localidades'] ?? [];
 
-                      // 2. Filtrado por Provincia (si el usuario eligió una)
                       if (selectedProvinciaId != null && providerProvinciaId != selectedProvinciaId) {
                         return false;
                       }
 
-                      // 3. Filtrado por Partido y Localidad
                       if (selectedLocalidadId != null) {
-                        // Si eligió una localidad exacta, el prestador debe tenerla
                         final tieneLocalidad = provLocalidades.any((l) => l['id'] == selectedLocalidadId);
                         if (!tieneLocalidad) return false;
                       } else if (selectedPartidoId != null) {
-                        // Si eligió un partido pero no una localidad, mostramos todos los del partido
                         final tienePartido = provLocalidades.any((l) => l['partido_id'] == selectedPartidoId);
                         if (!tienePartido) return false;
                       }
 
-                      // 4. Filtro por Rubro (Adaptado al nuevo formato de lista "profesiones")
                       final List<dynamic> profesiones = data['profesiones'] ?? [];
                       if (_selectedRubro != 'Todos' && !profesiones.contains(_selectedRubro)) {
                         return false;
                       }
 
-                      // 5. Filtro por texto libre
                       final nombre = (data['nombre'] ?? '').toString().toLowerCase();
                       final apellido = (data['apellido'] ?? '').toString().toLowerCase();
                       final profesionesStr = profesiones.join(' ').toLowerCase();
-                      
-                      return nombre.contains(_searchQuery) || 
-                             apellido.contains(_searchQuery) || 
-                             profesionesStr.contains(_searchQuery);
+
+                      return nombre.contains(_searchQuery) ||
+                          apellido.contains(_searchQuery) ||
+                          profesionesStr.contains(_searchQuery);
                     }).toList();
 
                     if (filteredDocs.isEmpty) {
@@ -298,7 +294,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                       itemBuilder: (context, index) {
                         final doc = filteredDocs[index];
                         final data = doc.data() as Map<String, dynamic>;
-                        
+
                         final double promedio = (data['promedioEstrellas'] ?? 0.0).toDouble();
                         final int cantidadEvaluadores = data['cantidadEvaluadores'] ?? 0;
                         final List<dynamic> profesiones = data['profesiones'] ?? [];
@@ -314,7 +310,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                               child: Icon(Icons.person, color: primaryColor),
                             ),
                             title: Text(
-                              '${data['nombre'] ?? ''} ${data['apellido'] ?? ''}', 
+                              '${data['nombre'] ?? ''} ${data['apellido'] ?? ''}',
                               style: TextStyle(fontWeight: FontWeight.bold, color: textColor),
                             ),
                             subtitle: Text(
