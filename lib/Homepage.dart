@@ -18,8 +18,6 @@ class HomePageWidget extends StatefulWidget {
 }
 
 class _HomePageWidgetState extends State<HomePageWidget> {
-  int _currentIndex = 0;
-
   final primaryColor = const Color(0xFF0F52BA);
   final textColor = const Color(0xFF1E293B);
 
@@ -29,33 +27,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       context,
       MaterialPageRoute(builder: (context) => const LoginScreenWidget()),
     );
-  }
-
-  final List<Widget> _screens = [
-    const HomePageWidget(),           // 0 - Home
-    const MenuEvaluacionesWidget(),   // 1 - Evaluar trabajos (+)
-    const SizedBox(),                 // 2 - Chat (pendiente)
-    const MenuPerfilWidget(),         // 3 - Perfil
-  ];
-
-  void _onTabTapped(int index) {
-    if (index == _currentIndex) return;
-
-    if (index == 0) {
-      // Ya estamos en home
-      return;
-    } else if (index == 1) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const MenuEvaluacionesWidget()),
-      );
-    } else if (index == 3) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const MenuPerfilWidget()),
-      );
-    }
-    // El índice 2 (chat) queda pendiente de implementación
   }
 
   @override
@@ -72,8 +43,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Hi $nombreMostrar', style: const TextStyle(color: Colors.black, fontSize: 20, fontWeight: FontWeight.bold)),
-            const Text('A3 opp. California Street 222', style: TextStyle(color: Colors.grey, fontSize: 14)),
+            Text('Hola $nombreMostrar', style: const TextStyle(color: Colors.black, fontSize: 20, fontWeight: FontWeight.bold)),
+            const Text('¿Qué vas a hacer hoy?', style: TextStyle(color: Colors.grey, fontSize: 14)),
           ],
         ),
         actions: [
@@ -112,7 +83,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                 borderRadius: BorderRadius.circular(16),
                 color: primaryColor.withOpacity(0.1),
                 image: const DecorationImage(
-                  image: AssetImage('assets/banner_placeholder.jpg'), // ← Reemplazar con URL de Firestore después
+                  image: AssetImage('assets/banner_placeholder.jpg'),
                   fit: BoxFit.cover,
                 ),
               ),
@@ -137,10 +108,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
             const SizedBox(height: 24),
 
-            // Services Grid
+            // Services Grid - Solo 4 iconos
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Text('Services', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              child: Text('Servicios', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 12),
             GridView.count(
@@ -150,86 +121,83 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               padding: const EdgeInsets.symmetric(horizontal: 12),
               childAspectRatio: 0.9,
               children: [
-                _buildServiceIcon(Icons.cleaning_services, 'Cleaning'),
-                _buildServiceIcon(Icons.restaurant, 'Kitchen'),
-                _buildServiceIcon(Icons.bathtub, 'Bathroom'),
-                _buildServiceIcon(Icons.person, 'Maid'),
-                _buildServiceIcon(Icons.handyman, 'Carpenting'),
-                _buildServiceIcon(Icons.plumbing, 'Plumbing'),
-                _buildServiceIcon(Icons.build, 'Repair'),
-                _buildServiceIcon(Icons.park, 'Gardening'),
+                _buildServiceIcon(Icons.search, 'Buscar Servicios', () {
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const BuscadorPrestadoresWidget()));
+                }),
+                _buildServiceIcon(Icons.check_circle_outline, 'Evaluar Trabajos', () {
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const MenuEvaluacionesWidget()));
+                }),
+                _buildServiceIcon(Icons.badge, 'Compartir Tarjeta', () {
+                  // Lógica existente de tarjeta digital
+                  // (puedes pegar aquí la lógica completa que tenías antes)
+                }),
+                _buildServiceIcon(Icons.person_outline, 'Sobre Mí', () {
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const MenuPerfilWidget()));
+                }),
               ],
             ),
 
             const SizedBox(height: 24),
 
-            // Best Service Providers
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  Text('Best service providers', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                  Text('View all', style: TextStyle(color: Colors.red)),
-                ],
-              ),
+            // Últimos Mensajes
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Text('Últimos Mensajes', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 12),
 
-            _buildProviderCard('Electricians repair', 'Our reliable, full service and licensed electricians repair breaker panel surges.', '1.2 km', Colors.purple),
-            _buildProviderCard('Electricians repair', 'Our reliable, full service and licensed electricians repair breaker panel surges.', '1.2 km', Colors.red),
-            _buildProviderCard('Electricians repair', 'Our reliable, full service and licensed electricians repair breaker panel surges.', '1.2 km', Colors.teal),
+            // Placeholder de mensajes (puedes reemplazar luego con lista real)
+            _buildProviderCard('Electricians repair', 'Nuestro electricista completó el trabajo en tiempo récord.', 'Hace 2h', Colors.purple),
+            _buildProviderCard('Plumbing Service', 'Se reparó la pérdida de agua en la cocina.', 'Ayer', Colors.blue),
           ],
         ),
       ),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: _onTabTapped,
         selectedItemColor: primaryColor,
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.add_circle_outline), label: 'Evaluar'),
+          BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), label: 'Mensajes'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
+        ],
+        onTap: (index) {
+          if (index == 0) return; // Ya estamos en home
+          if (index == 1) {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()));
+          }
+          if (index == 3) {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuPerfilWidget()));
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _buildServiceIcon(IconData icon, String label, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8)],
+            ),
+            child: Icon(icon, size: 32, color: primaryColor),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.add_circle_outline),
-            label: 'Evaluar',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.chat_bubble_outline),
-            label: 'Mensajes',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Perfil',
-          ),
+          const SizedBox(height: 6),
+          Text(label, style: const TextStyle(fontSize: 12), textAlign: TextAlign.center),
         ],
       ),
     );
   }
 
-  Widget _buildServiceIcon(IconData icon, String label) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8)],
-          ),
-          child: Icon(icon, size: 32, color: primaryColor),
-        ),
-        const SizedBox(height: 6),
-        Text(label, style: const TextStyle(fontSize: 12)),
-      ],
-    );
-  }
-
-  Widget _buildProviderCard(String title, String description, String distance, Color color) {
+  Widget _buildProviderCard(String title, String description, String time, Color color) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       padding: const EdgeInsets.all(16),
@@ -240,22 +208,18 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: color.withOpacity(0.1),
-            child: Text(title[0], style: TextStyle(fontSize: 24, color: color, fontWeight: FontWeight.bold)),
-          ),
+          CircleAvatar(backgroundColor: color.withOpacity(0.1), child: Text(title[0], style: TextStyle(color: color, fontWeight: FontWeight.bold))),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text(description, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                Text(description, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)),
               ],
             ),
           ),
-          Text(distance, style: const TextStyle(color: Colors.grey)),
+          Text(time, style: const TextStyle(color: Colors.grey, fontSize: 12)),
         ],
       ),
     );
