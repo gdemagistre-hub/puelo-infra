@@ -1,6 +1,12 @@
-import 'package:flutter/material.dart';
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+
+import 'dni_ocr_helper.dart';
 import 'user_session.dart';
 
 class DatosPersonalesFlotanteWidget extends StatefulWidget {
@@ -12,7 +18,9 @@ class DatosPersonalesFlotanteWidget extends StatefulWidget {
 
 class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteWidget> {
   final primaryColor = const Color(0xFF0F52BA);
+  final accentBlue = const Color(0xFF00BCD4);
   final _formKey = GlobalKey<FormState>();
+  final _ocrHelper = DniOcrHelper();
 
   final _nombreController = TextEditingController();
   final _apellidoController = TextEditingController();
@@ -24,8 +32,14 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
   String? _paisDoc;
   DateTime? _fechaNacimiento;
   String? _urlFotoDocumento;
+
   bool _loading = true;
   bool _saving = false;
+  bool _procesandoOcr = false;
+
+  bool _docValidado = false;
+  String? _docHashDatos;
+  String? _docValidadoHash;
 
   final List<String> _tiposDoc = ['DNI', 'Pasaporte', 'CI', 'CUIT', 'Otro'];
   final List<String> _paises = ['Argentina', 'Uruguay', 'Chile', 'Paraguay', 'Brasil', 'Bolivia', 'Otro'];
@@ -38,6 +52,7 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
 
   @override
   void dispose() {
+    _ocrHelper.dispose();
     _nombreController.dispose();
     _apellidoController.dispose();
     _docNumeroController.dispose();
@@ -65,6 +80,9 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
         _tipoDoc = data['tipo_doc'] ?? data['tipo_documento'];
         _paisDoc = data['pais_doc'] ?? data['pais_emision'];
         _urlFotoDocumento = data['url_foto_documento']?.toString();
+        _docValidado = data['doc_validado'] == true;
+        _docHashDatos = data['doc_hash_datos']?.toString();
+        _docValidadoHash = data['doc_validado_hash']?.toString();
 
         if (data['fecha_nacimiento'] != null) {
           if (data['fecha_nacimiento'] is Timestamp) {
@@ -78,12 +96,11 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
       debugPrint('Error cargando datos personales: $e');
     }
 
-    setState(() => _loading = false);
+    if (mounted) setState(() => _loading = false);
   }
 
   Future<void> _seleccionarFecha() async {
     final DateTime initial = _fechaNacimiento ?? DateTime(1990, 1, 1);
-
     try {
       final DateTime? picked = await showDatePicker(
         context: context,
@@ -107,12 +124,10 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
           );
         },
       );
-
       if (picked != null && mounted) {
         setState(() => _fechaNacimiento = picked);
       }
     } catch (e) {
-      debugPrint('Error showDatePicker: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('No se pudo abrir el calendario: $e')),
@@ -120,6 +135,244 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
       }
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // OCR + popup + validación + hash + imagen comprimida
+  // ---------------------------------------------------------------------------
+
+  Future<void> _iniciarEscaneoDocumento({required bool camara}) async {
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('El escaneo de documento solo está disponible en el celular.'),
+        ),
+      );
+      return;
+    }
+
+    // Pedimos que el perfil ya tenga datos cargados para poder cotejar
+    if (_nombreController.text.trim().isEmpty ||
+        _apellidoController.text.trim().isEmpty ||
+        _docNumeroController.text.trim().isEmpty ||
+        _paisDoc == null ||
+        _fechaNacimiento == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Completá nombre, apellido, documento, país y fecha antes de escanear.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _procesandoOcr = true);
+
+    try {
+      final foto = await _ocrHelper.capturarFotoDocumento(camara: camara);
+      if (foto == null) {
+        setState(() => _procesandoOcr = false);
+        return;
+      }
+
+      final texto = await _ocrHelper.leerTextoDeArchivo(foto.path);
+      if (texto == null || texto.trim().isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No se pudo leer texto del documento. Probá con mejor luz.')),
+          );
+        }
+        setState(() => _procesandoOcr = false);
+        return;
+      }
+
+      final ocr = DniOcrHelper.parsearTexto(texto);
+      if (!mounted) return;
+      setState(() => _procesandoOcr = false);
+
+      final confirmado = await _mostrarPopupDatosOcr(ocr);
+      if (confirmado != true) return;
+
+      // Usuario confirmó los datos detectados → cotejar con perfil
+      final resultado = DniOcrHelper.validarContraPerfil(
+        ocr: ocr,
+        nombreUsuario: _nombreController.text.trim(),
+        apellidoUsuario: _apellidoController.text.trim(),
+        numeroUsuario: _docNumeroController.text.trim(),
+        paisUsuario: _paisDoc,
+        fechaUsuario: _fechaNacimiento,
+      );
+
+      if (!resultado.ok) {
+        if (mounted) {
+          await showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text('No coinciden los datos'),
+              content: Text(
+                'Revisá estas comparaciones:\n\n'
+                '• Nombre: ${resultado.nombreOk ? "OK" : "No coincide"}\n'
+                '• Apellido: ${resultado.apellidoOk ? "OK" : "No coincide"}\n'
+                '• Documento: ${resultado.documentoOk ? "OK" : "No coincide"}\n'
+                '• País: ${resultado.paisOk ? "OK" : "No coincide"}\n'
+                '• Fecha nac.: ${resultado.fechaOk ? "OK" : "No coincide"}\n\n'
+                'Corregí el perfil o volvé a escanear el documento.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text('Entendido', style: TextStyle(color: primaryColor)),
+                ),
+              ],
+            ),
+          );
+        }
+        return;
+      }
+
+      // Coincidencia OK → subir imagen comprimida + guardar flags/hash
+      setState(() => _procesandoOcr = true);
+      final uid = UserSession().uid!;
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('usuarios')
+          .child(uid)
+          .child('documento_identidad.jpg');
+
+      // La foto ya viene con imageQuality: 45 del picker
+      final upload = await storageRef.putFile(
+        File(foto.path),
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
+      final url = await upload.ref.getDownloadURL();
+
+      final hashAncla = DniOcrHelper.hashDatosAncla(
+        nombre: _nombreController.text.trim(),
+        apellido: _apellidoController.text.trim(),
+        numero: _docNumeroController.text.trim(),
+        pais: _paisDoc,
+        fecha: _fechaNacimiento,
+      );
+
+      await FirebaseFirestore.instance.collection('usuarios').doc(uid).set({
+        'url_foto_documento': url,
+        'doc_validado': true,
+        'doc_validado_hash': resultado.hash,
+        'doc_validado_en': Timestamp.fromDate(resultado.timestamp!),
+        'doc_hash_datos': hashAncla,
+        'ocr_texto': ocr.textoCrudo,
+        'ocr_nombres': ocr.nombres,
+        'ocr_apellidos': ocr.apellidos,
+        'ocr_doc_numero': ocr.numeroDocumento,
+        'ocr_pais': ocr.paisEmision,
+        'ocr_fecha_nacimiento':
+            ocr.fechaNacimiento != null ? Timestamp.fromDate(ocr.fechaNacimiento!) : null,
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      if (mounted) {
+        setState(() {
+          _urlFotoDocumento = url;
+          _docValidado = true;
+          _docHashDatos = hashAncla;
+          _docValidadoHash = resultado.hash;
+          _procesandoOcr = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Documento validado: los datos coinciden.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error OCR/validación: $e');
+      if (mounted) {
+        setState(() => _procesandoOcr = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al procesar documento: $e')),
+        );
+      }
+    }
+  }
+
+  Future<bool?> _mostrarPopupDatosOcr(DatosOcrDocumento ocr) {
+    final fechaStr = ocr.fechaNacimiento != null
+        ? DateFormat('dd/MM/yyyy').format(ocr.fechaNacimiento!)
+        : '—';
+
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            'Datos detectados del documento',
+            style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  '¿Estos datos son correctos?',
+                  style: TextStyle(fontSize: 14, color: Color(0xFF64748B)),
+                ),
+                const SizedBox(height: 16),
+                _ocrRow('Nombre(s)', ocr.nombres.isEmpty ? '—' : ocr.nombres.join(' ')),
+                _ocrRow('Apellido(s)', ocr.apellidos.isEmpty ? '—' : ocr.apellidos.join(' ')),
+                _ocrRow('N° documento', ocr.numeroDocumento ?? '—'),
+                _ocrRow('País de emisión', ocr.paisEmision ?? '—'),
+                _ocrRow('Fecha de nacimiento', fechaStr),
+              ],
+            ),
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar', style: TextStyle(color: Color(0xFF64748B))),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('Confirmar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _ocrRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(label, style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Guardar datos (invalida validación si cambian datos ancla)
+  // ---------------------------------------------------------------------------
 
   Future<void> _actualizarDatos() async {
     if (!_formKey.currentState!.validate()) return;
@@ -130,7 +383,18 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
     setState(() => _saving = true);
 
     try {
-      await FirebaseFirestore.instance.collection('usuarios').doc(uid).set({
+      final hashActual = DniOcrHelper.hashDatosAncla(
+        nombre: _nombreController.text.trim(),
+        apellido: _apellidoController.text.trim(),
+        numero: _docNumeroController.text.trim(),
+        pais: _paisDoc,
+        fecha: _fechaNacimiento,
+      );
+
+      // Si había validación y cambiaron los datos ancla → se pierde el plus
+      final sigueValidado = _docValidado && _docHashDatos != null && _docHashDatos == hashActual;
+
+      final payload = <String, dynamic>{
         'nombre': _nombreController.text.trim(),
         'apellido': _apellidoController.text.trim(),
         'tipo_doc': _tipoDoc,
@@ -140,12 +404,34 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
         'email': _emailController.text.trim(),
         'instagram': _instagramController.text.trim(),
         'updated_at': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+        'doc_validado': sigueValidado,
+      };
+
+      if (!sigueValidado && _docValidado) {
+        payload['doc_validado_hash'] = FieldValue.delete();
+        payload['doc_validado_en'] = FieldValue.delete();
+        payload['doc_hash_datos'] = FieldValue.delete();
+      }
+
+      await FirebaseFirestore.instance.collection('usuarios').doc(uid).set(payload, SetOptions(merge: true));
 
       if (mounted) {
+        setState(() {
+          _docValidado = sigueValidado;
+          if (!sigueValidado) {
+            _docHashDatos = null;
+            _docValidadoHash = null;
+          }
+        });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Datos actualizados correctamente'),
+          SnackBar(
+            content: Text(
+              sigueValidado
+                  ? 'Datos actualizados (validación de documento intacta)'
+                  : (_docValidado
+                      ? 'Datos actualizados. Se invalidó la validación del documento porque cambiaron datos clave.'
+                      : 'Datos actualizados correctamente'),
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -153,14 +439,16 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al actualizar: $e')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al actualizar: $e')));
       }
     }
 
-    setState(() => _saving = false);
+    if (mounted) setState(() => _saving = false);
   }
+
+  // ---------------------------------------------------------------------------
+  // UI
+  // ---------------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -181,44 +469,68 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
       ),
       body: _loading
           ? Center(child: CircularProgressIndicator(color: primaryColor))
-          : Form(
-              key: _formKey,
-              child: ListView(
-                padding: const EdgeInsets.all(20),
-                children: [
-                  _buildField('Nombre', _nombreController, required: true),
-                  _buildField('Apellido', _apellidoController, required: true),
-                  _buildDropdown('Tipo de documento', _tipoDoc, _tiposDoc, (v) => setState(() => _tipoDoc = v)),
-                  _buildDropdown('País de emisión', _paisDoc, _paises, (v) => setState(() => _paisDoc = v)),
-                  _buildField('Número de documento', _docNumeroController),
-                  _buildFechaNacimiento(),
-                  _buildFotoDocumento(),
-                  _buildField('Email', _emailController, keyboard: TextInputType.emailAddress),
-                  _buildField('Usuario de Instagram', _instagramController, hint: '@usuario'),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton.icon(
-                      onPressed: _saving ? null : _actualizarDatos,
-                      icon: _saving
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Icon(Icons.save_outlined),
-                      label: Text(_saving ? 'Guardando...' : 'Actualizar los datos'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryColor,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          : Stack(
+              children: [
+                Form(
+                  key: _formKey,
+                  child: ListView(
+                    padding: const EdgeInsets.all(20),
+                    children: [
+                      _buildField('Nombre', _nombreController, required: true),
+                      _buildField('Apellido', _apellidoController, required: true),
+                      _buildDropdown('Tipo de documento', _tipoDoc, _tiposDoc, (v) => setState(() => _tipoDoc = v)),
+                      _buildDropdown('País de emisión', _paisDoc, _paises, (v) => setState(() => _paisDoc = v)),
+                      _buildField('Número de documento', _docNumeroController),
+                      _buildFechaNacimiento(),
+                      _buildFotoDocumento(),
+                      _buildField('Email', _emailController, keyboard: TextInputType.emailAddress),
+                      _buildField('Usuario de Instagram', _instagramController, hint: '@usuario'),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton.icon(
+                          onPressed: _saving || _procesandoOcr ? null : _actualizarDatos,
+                          icon: _saving
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Icon(Icons.save_outlined),
+                          label: Text(_saving ? 'Guardando...' : 'Actualizar los datos'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryColor,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+                ),
+                if (_procesandoOcr)
+                  Container(
+                    color: Colors.black45,
+                    child: Center(
+                      child: Card(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CircularProgressIndicator(color: primaryColor),
+                              const SizedBox(height: 16),
+                              const Text('Procesando documento...', style: TextStyle(fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20),
-                ],
-              ),
+              ],
             ),
     );
   }
@@ -241,9 +553,7 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
-        validator: required
-            ? (v) => (v == null || v.trim().isEmpty) ? 'Campo obligatorio' : null
-            : null,
+        validator: required ? (v) => (v == null || v.trim().isEmpty) ? 'Campo obligatorio' : null : null,
       ),
     );
   }
@@ -283,9 +593,7 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
             suffixIcon: const Icon(Icons.calendar_today_outlined),
           ),
           child: Text(
-            _fechaNacimiento != null
-                ? DateFormat('dd/MM/yyyy').format(_fechaNacimiento!)
-                : 'Seleccionar fecha',
+            _fechaNacimiento != null ? DateFormat('dd/MM/yyyy').format(_fechaNacimiento!) : 'Seleccionar fecha',
             style: TextStyle(
               color: _fechaNacimiento != null ? Colors.black87 : Colors.grey,
               fontSize: 16,
@@ -302,10 +610,28 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Foto del documento', style: TextStyle(fontSize: 14, color: Colors.black54)),
+          Row(
+            children: [
+              const Text('Foto del documento', style: TextStyle(fontSize: 14, color: Colors.black54)),
+              const Spacer(),
+              if (_docValidado)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.green.shade300),
+                  ),
+                  child: const Text(
+                    'Documento validado',
+                    style: TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.w600),
+                  ),
+                ),
+            ],
+          ),
           const SizedBox(height: 8),
           Container(
-            height: 120,
+            height: 140,
             width: double.infinity,
             decoration: BoxDecoration(
               color: Colors.grey.shade100,
@@ -328,6 +654,52 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
                   )
                 : null,
           ),
+          const SizedBox(height: 10),
+          if (kIsWeb)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F0FE),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'El escaneo del documento con OCR solo está disponible desde el celular (Android/iOS).',
+                style: TextStyle(fontSize: 13, color: Color(0xFF1E293B)),
+              ),
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _procesandoOcr ? null : () => _iniciarEscaneoDocumento(camara: true),
+                    icon: const Icon(Icons.photo_camera_outlined),
+                    label: const Text('Escanear'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: primaryColor,
+                      side: BorderSide(color: primaryColor),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _procesandoOcr ? null : () => _iniciarEscaneoDocumento(camara: false),
+                    icon: const Icon(Icons.photo_library_outlined),
+                    label: const Text('Galería'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: primaryColor,
+                      side: BorderSide(color: primaryColor.withOpacity(0.5)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
     );
