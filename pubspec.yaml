@@ -83,3 +83,8 @@ flutter:
     - assets/provincia.json
     - assets/departamentos.json
     - assets/localidades.json
+
+  google_mlkit_text_recognition: ^0.14.0
+  crypto: ^3.0.3
+  # image_picker ya lo tenés
+  # firebase_storage ya lo tenés
