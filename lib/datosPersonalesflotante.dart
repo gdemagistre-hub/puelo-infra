@@ -82,15 +82,42 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
   }
 
   Future<void> _seleccionarFecha() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _fechaNacimiento ?? DateTime(1990, 1, 1),
-      firstDate: DateTime(1920),
-      lastDate: DateTime.now(),
-      locale: const Locale('es', 'AR'),
-    );
-    if (picked != null) {
-      setState(() => _fechaNacimiento = picked);
+    final DateTime initial = _fechaNacimiento ?? DateTime(1990, 1, 1);
+
+    try {
+      final DateTime? picked = await showDatePicker(
+        context: context,
+        initialDate: initial,
+        firstDate: DateTime(1920),
+        lastDate: DateTime.now(),
+        helpText: 'Fecha de nacimiento',
+        cancelText: 'Cancelar',
+        confirmText: 'Aceptar',
+        fieldLabelText: 'Fecha',
+        builder: (context, child) {
+          return Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: ColorScheme.light(
+                primary: primaryColor,
+                onPrimary: Colors.white,
+                onSurface: Colors.black87,
+              ),
+            ),
+            child: child!,
+          );
+        },
+      );
+
+      if (picked != null && mounted) {
+        setState(() => _fechaNacimiento = picked);
+      }
+    } catch (e) {
+      debugPrint('Error showDatePicker: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No se pudo abrir el calendario: $e')),
+        );
+      }
     }
   }
 
@@ -175,7 +202,11 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
                     child: ElevatedButton.icon(
                       onPressed: _saving ? null : _actualizarDatos,
                       icon: _saving
-                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
                           : const Icon(Icons.save_outlined),
                       label: Text(_saving ? 'Guardando...' : 'Actualizar los datos'),
                       style: ElevatedButton.styleFrom(
@@ -192,7 +223,13 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
     );
   }
 
-  Widget _buildField(String label, TextEditingController controller, {bool required = false, TextInputType? keyboard, String? hint}) {
+  Widget _buildField(
+    String label,
+    TextEditingController controller, {
+    bool required = false,
+    TextInputType? keyboard,
+    String? hint,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: TextFormField(
@@ -211,7 +248,12 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
     );
   }
 
-  Widget _buildDropdown(String label, String? value, List<String> items, ValueChanged<String?> onChanged) {
+  Widget _buildDropdown(
+    String label,
+    String? value,
+    List<String> items,
+    ValueChanged<String?> onChanged,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: DropdownButtonFormField<String>(
@@ -232,6 +274,7 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
       padding: const EdgeInsets.only(bottom: 16),
       child: InkWell(
         onTap: _seleccionarFecha,
+        borderRadius: BorderRadius.circular(12),
         child: InputDecorator(
           decoration: InputDecoration(
             labelText: 'Fecha de nacimiento',
