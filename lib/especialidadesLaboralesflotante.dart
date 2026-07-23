@@ -18,6 +18,7 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
   List<String> _oficiosSeleccionados = [];
   bool _loading = true;
   bool _saving = false;
+  String? _errorCarga;
 
   @override
   void initState() {
@@ -32,28 +33,51 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
   }
 
   Future<void> _cargarTodo() async {
-    await Future.wait([
-      _cargarCatalogos(),
-      _cargarDatosUsuario(),
-    ]);
+    setState(() {
+      _loading = true;
+      _errorCarga = null;
+    });
+
+    try {
+      await _cargarCatalogos();
+      await _cargarDatosUsuario();
+    } catch (e) {
+      _errorCarga = e.toString();
+      debugPrint('Error general carga: $e');
+    }
+
     if (mounted) setState(() => _loading = false);
   }
 
-  /// Misma lógica que registroTrabajador.dart:
-  /// cat_oficios → primer documento → campo lista "maestro"
+  /// Misma fuente que registroTrabajador.dart:
+  /// colección cat_oficios → campo lista "maestro"
   Future<void> _cargarCatalogos() async {
     try {
-      final oficiosSnapshot = await db.collection('cat_oficios').limit(1).get();
-      if (oficiosSnapshot.docs.isNotEmpty) {
-        final data = oficiosSnapshot.docs.first.data();
-        final List<dynamic>? maestro = data['maestro'] as List<dynamic>?;
-        if (maestro != null) {
-          _oficiosDisponibles = maestro.map((e) => e.toString()).toList();
+      final oficiosSnapshot = await db.collection('cat_oficios').get();
+      debugPrint('cat_oficios docs: ${oficiosSnapshot.docs.length}');
+
+      for (final doc in oficiosSnapshot.docs) {
+        final data = doc.data();
+        debugPrint('cat_oficios/${doc.id} keys=${data.keys.toList()}');
+
+        final raw = data['maestro'];
+        if (raw is List && raw.isNotEmpty) {
+          _oficiosDisponibles =
+              raw.map((e) => e.toString().trim()).where((s) => s.isNotEmpty).toList();
+          debugPrint('Oficios OK (${_oficiosDisponibles.length}): $_oficiosDisponibles');
+          return;
         }
       }
-      debugPrint('Oficios cargados desde cat_oficios.maestro: $_oficiosDisponibles');
+
+      if (_oficiosDisponibles.isEmpty) {
+        _errorCarga = oficiosSnapshot.docs.isEmpty
+            ? 'La colección cat_oficios está vacía o no hay permisos de lectura.'
+            : 'Ningún documento de cat_oficios tiene el campo lista "maestro".';
+      }
     } catch (e) {
-      debugPrint('Error cargando oficios: $e');
+      _errorCarga = 'Error leyendo cat_oficios: $e';
+      debugPrint(_errorCarga);
+      rethrow;
     }
   }
 
@@ -109,7 +133,76 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
       }
     }
 
-    setState(() => _saving = false);
+    if (mounted) setState(() => _saving = false);
+  }
+
+  void _mostrarSeleccionEspecialidades() {
+    final opciones = _oficiosDisponibles.map((p) => {'id': p, 'nombre': p}).toList();
+    List<Map<String, String>> tempSeleccionadas =
+        _oficiosSeleccionados.map((p) => {'id': p, 'nombre': p}).toList();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text(
+                'Especialidades',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+              ),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: opciones.isEmpty
+                    ? const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Text('No hay especialidades disponibles.', textAlign: TextAlign.center),
+                      )
+                    : ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: opciones.length,
+                        itemBuilder: (context, index) {
+                          final item = opciones[index];
+                          final isChecked = tempSeleccionadas.any((e) => e['id'] == item['id']);
+                          return CheckboxListTile(
+                            title: Text(item['nombre']!, style: const TextStyle(color: Color(0xFF1E293B))),
+                            value: isChecked,
+                            activeColor: primaryColor,
+                            onChanged: (checked) {
+                              setDialogState(() {
+                                if (checked == true) {
+                                  tempSeleccionadas.add(item);
+                                } else {
+                                  tempSeleccionadas.removeWhere((e) => e['id'] == item['id']);
+                                }
+                              });
+                            },
+                          );
+                        },
+                      ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _oficiosSeleccionados = tempSeleccionadas.map((e) => e['nombre']!).toList();
+                    });
+                    Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
+                  child: const Text('Confirmar', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -128,6 +221,13 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.black54),
+            tooltip: 'Recargar oficios',
+            onPressed: _loading ? null : _cargarTodo,
+          ),
+        ],
       ),
       body: _loading
           ? Center(child: CircularProgressIndicator(color: primaryColor))
@@ -154,7 +254,49 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
                   style: TextStyle(fontSize: 13, color: Colors.grey),
                 ),
                 const SizedBox(height: 12),
-                if (_oficiosDisponibles.isEmpty)
+                InkWell(
+                  onTap: _oficiosDisponibles.isEmpty ? null : _mostrarSeleccionEspecialidades,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Oficios / Especialidades',
+                                style: TextStyle(fontSize: 12, color: Colors.grey),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _oficiosSeleccionados.isEmpty
+                                    ? 'Seleccionar Especialidades'
+                                    : _oficiosSeleccionados.join(', '),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1E293B),
+                                ),
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.arrow_drop_down, color: Colors.grey),
+                      ],
+                    ),
+                  ),
+                ),
+                if (_oficiosDisponibles.isEmpty) ...[
+                  const SizedBox(height: 16),
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -162,38 +304,57 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.orange.shade200),
                     ),
-                    child: const Text(
-                      'No se encontraron oficios en cat_oficios.maestro',
-                      style: TextStyle(fontSize: 13, color: Color(0xFF9A3412)),
-                    ),
-                  )
-                else
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: _oficiosDisponibles.map((oficio) {
-                      final selected = _oficiosSeleccionados.contains(oficio);
-                      return FilterChip(
-                        label: Text(oficio),
-                        selected: selected,
-                        selectedColor: primaryColor.withOpacity(0.15),
-                        checkmarkColor: primaryColor,
-                        labelStyle: TextStyle(
-                          color: selected ? primaryColor : Colors.black87,
-                          fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'No se cargaron oficios desde cat_oficios.maestro',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF9A3412),
+                          ),
                         ),
-                        onSelected: (val) {
-                          setState(() {
-                            if (val) {
-                              _oficiosSeleccionados.add(oficio);
-                            } else {
-                              _oficiosSeleccionados.remove(oficio);
-                            }
-                          });
-                        },
-                      );
-                    }).toList(),
+                        if (_errorCarga != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            _errorCarga!,
+                            style: const TextStyle(fontSize: 12, color: Color(0xFF9A3412)),
+                          ),
+                        ],
+                        const SizedBox(height: 8),
+                        TextButton.icon(
+                          onPressed: _cargarTodo,
+                          icon: const Icon(Icons.refresh, size: 18),
+                          label: const Text('Reintentar'),
+                        ),
+                      ],
+                    ),
                   ),
+                ] else ...[
+                  const SizedBox(height: 12),
+                  if (_oficiosSeleccionados.isNotEmpty)
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _oficiosSeleccionados.map((o) {
+                        return Chip(
+                          label: Text(o),
+                          deleteIcon: const Icon(Icons.close, size: 16),
+                          onDeleted: () {
+                            setState(() => _oficiosSeleccionados.remove(o));
+                          },
+                          backgroundColor: primaryColor.withOpacity(0.1),
+                          labelStyle: TextStyle(color: primaryColor, fontWeight: FontWeight.w600),
+                        );
+                      }).toList(),
+                    ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${_oficiosDisponibles.length} especialidades disponibles en catálogo',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
                 const SizedBox(height: 32),
                 SizedBox(
                   width: double.infinity,
