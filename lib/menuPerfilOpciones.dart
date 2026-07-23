@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'completar_perfil.dart';
-import 'registroTrabajador.dart';
-import 'menuPerfil.dart';
+import 'datosPersonalesflotante.dart';
+import 'Domicilioflotante.dart';
+import 'especialidadesLaboralesflotante.dart';
+import 'ZonaDeTrabajoflotante.dart';
+import 'perfilCompletoflotante.dart';
 
 class MenuPerfilOpcionesWidget extends StatelessWidget {
   final VoidCallback? onClose;
@@ -10,6 +12,26 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
     super.key,
     this.onClose,
   });
+
+  void _abrirFlotante(BuildContext context, Widget page) {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => page,
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          const begin = Offset(1.0, 0.0);
+          const end = Offset.zero;
+          final tween = Tween(begin: begin, end: end).chain(
+            CurveTween(curve: Curves.easeOutCubic),
+          );
+          return SlideTransition(
+            position: animation.drive(tween),
+            child: child,
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 300),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,52 +42,27 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
       _MenuItem(
         icon: Icons.person_outline_rounded,
         label: 'Datos personales',
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const CompletarPerfilWidget()),
-          );
-        },
+        onTap: () => _abrirFlotante(context, const DatosPersonalesFlotanteWidget()),
       ),
       _MenuItem(
         icon: Icons.home_work_outlined,
         label: 'Domicilio',
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const CompletarPerfilWidget()),
-          );
-        },
+        onTap: () => _abrirFlotante(context, const DomicilioFlotanteWidget()),
       ),
       _MenuItem(
         icon: Icons.work_outline_rounded,
         label: 'Especialidades laborales',
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const RegistroTrabajadorWidget()),
-          );
-        },
+        onTap: () => _abrirFlotante(context, const EspecialidadesLaboralesFlotanteWidget()),
       ),
       _MenuItem(
         icon: Icons.map_outlined,
         label: 'Zona de trabajo preferida',
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const RegistroTrabajadorWidget()),
-          );
-        },
+        onTap: () => _abrirFlotante(context, const ZonaDeTrabajoFlotanteWidget()),
       ),
       _MenuItem(
         icon: Icons.badge_outlined,
         label: 'Mi perfil completo',
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const MenuPerfilWidget()),
-          );
-        },
+        onTap: () => _abrirFlotante(context, const PerfilCompletoFlotanteWidget()),
       ),
     ];
 
