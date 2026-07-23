@@ -338,7 +338,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               }),
               _buildServiceIcon(Icons.badge, 'Compartir Tarjeta', _compartirTarjeta),
               _buildServiceIcon(Icons.person_outline, 'Sobre Mí', () {
-                setState(() => _currentIndex = 3);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const MenuPerfilWidget()),
+                );
               }),
             ],
           ),
