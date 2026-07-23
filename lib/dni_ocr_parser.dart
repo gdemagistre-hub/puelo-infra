@@ -115,12 +115,12 @@ class DniOcrParser {
     for (var i = 0; i < lineas.length; i++) {
       final l = lineas[i].toUpperCase();
       if ((l.contains('APELLIDO') || l.contains('SURNAME')) && i + 1 < lineas.length) {
-        apellidos.addAll(_tokens(lineas[i + 1]));
+        apellidos.addAll(tokensPersona(lineas[i + 1]));
       }
       if ((l.contains('NOMBRE') || l.contains('GIVEN') || l.contains('NAMES')) &&
           !l.contains('APELLIDO') &&
           i + 1 < lineas.length) {
-        nombres.addAll(_tokens(lineas[i + 1]));
+        nombres.addAll(tokensPersona(lineas[i + 1]));
       }
     }
 
@@ -134,7 +134,7 @@ class DniOcrParser {
             !linea.contains('SEXO') &&
             !linea.contains('EJEMPLAR') &&
             !linea.contains('IDENTIDAD')) {
-          final toks = _tokens(linea);
+          final toks = tokensPersona(linea);
           if (apellidos.isEmpty) {
             apellidos.addAll(toks);
           } else if (nombres.isEmpty) {
@@ -154,33 +154,6 @@ class DniOcrParser {
     );
   }
 
-  static List<String> _tokens(String raw) {
-    return raw
-        .replaceAll(RegExp(r'[^A-Za-zÁÉÍÓÚáéíóúÑñÜü\s]'), ' ')
-        .split(RegExp(r'\s+'))
-        .map((e) => e.trim())
-        .where((e) => e.length >= 2)
-        .toList();
-  }
-
-  static String _norm(String s) => s
-      .toLowerCase()
-      .replaceAll(RegExp(r'[áàä]'), 'a')
-      .replaceAll(RegExp(r'[éèë]'), 'e')
-      .replaceAll(RegExp(r'[íìï]'), 'i')
-      .replaceAll(RegExp(r'[óòö]'), 'o')
-      .replaceAll(RegExp(r'[úùü]'), 'u')
-      .replaceAll('ñ', 'n')
-      .replaceAll(RegExp(r'[^a-z0-9]'), '');
-
-  static String _normDoc(String s) => s.replaceAll(RegExp(r'\D'), '');
-
-  /// Reglas:
-  /// - al menos un nombre OCR ∈ nombres cargados
-  /// - al menos un apellido OCR ∈ apellidos cargados
-  /// - número documento igual
-  /// - país emisión igual
-  /// - fecha nacimiento igual
   static ResultadoCotejoDni validarContraPerfil({
     required DatosOcrDni ocr,
     required String nombreUsuario,
@@ -189,10 +162,10 @@ class DniOcrParser {
     required String? paisUsuario,
     required DateTime? fechaUsuario,
   }) {
-    final nombresUser = _tokens(nombreUsuario).map(_norm).toSet();
-    final apellidosUser = _tokens(apellidoUsuario).map(_norm).toSet();
-    final nombresOcr = ocr.nombres.map(_norm).toSet();
-    final apellidosOcr = ocr.apellidos.map(_norm).toSet();
+    final nombresUser = tokensPersona(nombreUsuario).map(norm).toSet();
+    final apellidosUser = tokensPersona(apellidoUsuario).map(norm).toSet();
+    final nombresOcr = ocr.nombres.map(norm).toSet();
+    final apellidosOcr = ocr.apellidos.map(norm).toSet();
 
     final nombreOk = nombresUser.isNotEmpty &&
         nombresOcr.isNotEmpty &&
@@ -202,13 +175,13 @@ class DniOcrParser {
         apellidosOcr.isNotEmpty &&
         apellidosUser.intersection(apellidosOcr).isNotEmpty;
 
-    final documentoOk = _normDoc(numeroUsuario).isNotEmpty &&
+    final documentoOk = normDoc(numeroUsuario).isNotEmpty &&
         ocr.numeroDocumento != null &&
-        _normDoc(numeroUsuario) == _normDoc(ocr.numeroDocumento!);
+        normDoc(numeroUsuario) == normDoc(ocr.numeroDocumento!);
 
     final paisOk = (paisUsuario ?? '').trim().isNotEmpty &&
         (ocr.paisEmision ?? '').trim().isNotEmpty &&
-        _norm(paisUsuario!) == _norm(ocr.paisEmision!);
+        norm(paisUsuario!) == norm(ocr.paisEmision!);
 
     bool fechaOk = false;
     if (fechaUsuario != null && ocr.fechaNacimiento != null) {
@@ -224,10 +197,10 @@ class DniOcrParser {
     if (ok) {
       ts = DateTime.now().toUtc();
       final payload = [
-        _normDoc(numeroUsuario),
+        normDoc(numeroUsuario),
         nombresUser.join(','),
         apellidosUser.join(','),
-        _norm(paisUsuario ?? ''),
+        norm(paisUsuario ?? ''),
         '${fechaUsuario!.year}-${fechaUsuario.month}-${fechaUsuario.day}',
         ts.toIso8601String(),
       ].join('|');
@@ -246,7 +219,6 @@ class DniOcrParser {
     );
   }
 
-  /// Hash ancla sin timestamp: para invalidar si editan datos clave
   static String hashDatosAncla({
     required String nombre,
     required String apellido,
@@ -255,10 +227,10 @@ class DniOcrParser {
     required DateTime? fecha,
   }) {
     final payload = [
-      _normDoc(numero),
-      _tokens(nombre).map(_norm).join(','),
-      _tokens(apellido).map(_norm).join(','),
-      _norm(pais ?? ''),
+      normDoc(numero),
+      tokensPersona(nombre).map(norm).join(','),
+      tokensPersona(apellido).map(norm).join(','),
+      norm(pais ?? ''),
       fecha == null ? '' : '${fecha.year}-${fecha.month}-${fecha.day}',
     ].join('|');
     return sha256.convert(utf8.encode(payload)).toString();
