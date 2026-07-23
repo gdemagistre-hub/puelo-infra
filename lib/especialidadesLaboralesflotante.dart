@@ -18,6 +18,7 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
   Set<String> _oficiosSeleccionados = {};
   bool _loading = true;
   bool _saving = false;
+  String _fuente = '';
 
   @override
   void initState() {
@@ -32,77 +33,158 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
   }
 
   Future<void> _cargarTodo() async {
-    await Future.wait([
-      _cargarOficiosDesdeFirebase(),
-      _cargarDatosUsuario(),
-    ]);
+    await _cargarOficiosDesdeFirebase();
+    await _cargarDatosUsuario();
     if (mounted) setState(() => _loading = false);
   }
 
-  Future<void> _cargarOficiosDesdeFirebase() async {
-    final List<String> nombres = [];
+  String _extraerNombre(Map<String, dynamic> data, String docId) {
+    final candidatos = [
+      data['nombre'],
+      data['name'],
+      data['oficio'],
+      data['profesion'],
+      data['titulo'],
+      data['label'],
+      data['descripcion'],
+    ];
+    for (final c in candidatos) {
+      if (c != null && c.toString().trim().isNotEmpty) {
+        return c.toString().trim();
+      }
+    }
+    if (docId.isNotEmpty && docId.length < 50) return docId;
+    return '';
+  }
 
+  Future<List<String>> _leerColeccion(String collectionName) async {
+    final List<String> nombres = [];
     try {
-      final snap = await db.collection('cat_oficios').orderBy('nombre').get();
+      final snap = await db.collection(collectionName).get();
       for (final doc in snap.docs) {
-        final data = doc.data();
-        final nombre = (data['nombre'] ?? data['name'] ?? data['oficio'] ?? doc.id).toString().trim();
+        final nombre = _extraerNombre(doc.data(), doc.id);
         if (nombre.isNotEmpty) nombres.add(nombre);
       }
+      debugPrint('Colección $collectionName → ${nombres.length} oficios');
     } catch (e) {
-      debugPrint('cat_oficios: $e');
+      debugPrint('Error leyendo $collectionName: $e');
     }
+    return nombres;
+  }
 
-    if (nombres.isEmpty) {
-      try {
-        final snap = await db.collection('oficios').orderBy('nombre').get();
-        for (final doc in snap.docs) {
-          final data = doc.data();
-          final nombre = (data['nombre'] ?? data['name'] ?? data['oficio'] ?? doc.id).toString().trim();
-          if (nombre.isNotEmpty) nombres.add(nombre);
-        }
-      } catch (e) {
-        debugPrint('oficios: $e');
-      }
-    }
+  Future<List<String>> _leerDocumentoLista(String collection, String docId) async {
+    final List<String> nombres = [];
+    try {
+      final doc = await db.collection(collection).doc(docId).get();
+      if (!doc.exists) return nombres;
+      final data = doc.data()!;
 
-    if (nombres.isEmpty) {
-      try {
-        final snap = await db.collection('profesiones').orderBy('nombre').get();
-        for (final doc in snap.docs) {
-          final data = doc.data();
-          final nombre = (data['nombre'] ?? data['name'] ?? doc.id).toString().trim();
-          if (nombre.isNotEmpty) nombres.add(nombre);
-        }
-      } catch (e) {
-        debugPrint('profesiones: $e');
-      }
-    }
+      final posiblesListas = [
+        data['lista'],
+        data['items'],
+        data['oficios'],
+        data['profesiones'],
+        data['rubros'],
+        data['data'],
+      ];
 
-    if (nombres.isEmpty) {
-      try {
-        final doc = await db.collection('cat_config').doc('oficios').get();
-        if (doc.exists) {
-          final lista = doc.data()?['lista'] as List<dynamic>? ??
-              doc.data()?['items'] as List<dynamic>? ??
-              [];
+      for (final lista in posiblesListas) {
+        if (lista is List && lista.isNotEmpty) {
           for (final item in lista) {
             if (item is String && item.trim().isNotEmpty) {
               nombres.add(item.trim());
             } else if (item is Map) {
-              final n = (item['nombre'] ?? item['name'] ?? '').toString().trim();
+              final n = (item['nombre'] ?? item['name'] ?? item['oficio'] ?? '').toString().trim();
               if (n.isNotEmpty) nombres.add(n);
             }
           }
+          break;
         }
-      } catch (e) {
-        debugPrint('cat_config/oficios: $e');
       }
+
+      if (nombres.isEmpty) {
+        data.forEach((key, value) {
+          if (value is String && value.trim().isNotEmpty && key != 'updated_at') {
+            nombres.add(value.trim());
+          }
+        });
+      }
+
+      debugPrint('Doc $collection/$docId → ${nombres.length} oficios');
+    } catch (e) {
+      debugPrint('Error leyendo $collection/$docId: $e');
+    }
+    return nombres;
+  }
+
+  Future<List<String>> _leerDesdeUsuarios() async {
+    final Set<String> nombres = {};
+    try {
+      final snap = await db.collection('usuarios').limit(200).get();
+      for (final doc in snap.docs) {
+        final profesiones = doc.data()['profesiones'];
+        if (profesiones is List) {
+          for (final p in profesiones) {
+            final s = p.toString().trim();
+            if (s.isNotEmpty) nombres.add(s);
+          }
+        }
+      }
+      debugPrint('Usuarios → ${nombres.length} oficios únicos');
+    } catch (e) {
+      debugPrint('Error leyendo profesiones de usuarios: $e');
+    }
+    return nombres.toList();
+  }
+
+  Future<void> _cargarOficiosDesdeFirebase() async {
+    List<String> nombres = [];
+
+    final colecciones = [
+      'cat_oficios',
+      'oficios',
+      'profesiones',
+      'cat_profesiones',
+      'rubros',
+      'cat_rubros',
+      'especialidades',
+      'cat_especialidades',
+    ];
+
+    for (final col in colecciones) {
+      nombres = await _leerColeccion(col);
+      if (nombres.isNotEmpty) {
+        _fuente = col;
+        break;
+      }
+    }
+
+    if (nombres.isEmpty) {
+      final docsLista = [
+        ['cat_config', 'oficios'],
+        ['cat_config', 'profesiones'],
+        ['catalogos', 'oficios'],
+        ['catalogos', 'profesiones'],
+        ['config', 'oficios'],
+      ];
+      for (final pair in docsLista) {
+        nombres = await _leerDocumentoLista(pair[0], pair[1]);
+        if (nombres.isNotEmpty) {
+          _fuente = '${pair[0]}/${pair[1]}';
+          break;
+        }
+      }
+    }
+
+    if (nombres.isEmpty) {
+      nombres = await _leerDesdeUsuarios();
+      if (nombres.isNotEmpty) _fuente = 'usuarios.profesiones';
     }
 
     final unicos = nombres.toSet().toList()
       ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
     _oficiosDisponibles = unicos;
+    debugPrint('Oficios finales (${_oficiosDisponibles.length}) desde $_fuente');
   }
 
   Future<void> _cargarDatosUsuario() async {
@@ -117,6 +199,13 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
             (data['nombre_comercial'] ?? data['nombreComercial'] ?? '').toString();
         final profesiones = data['profesiones'] as List<dynamic>? ?? [];
         _oficiosSeleccionados = profesiones.map((e) => e.toString()).toSet();
+
+        for (final o in _oficiosSeleccionados) {
+          if (!_oficiosDisponibles.contains(o)) {
+            _oficiosDisponibles.add(o);
+          }
+        }
+        _oficiosDisponibles.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
       }
     } catch (e) {
       debugPrint('Error cargando datos usuario: $e');
@@ -197,9 +286,11 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  'Podés elegir más de uno',
-                  style: TextStyle(fontSize: 13, color: Colors.grey),
+                Text(
+                  _oficiosDisponibles.isEmpty
+                      ? 'No se encontraron oficios en la base'
+                      : 'Podés elegir más de uno${_fuente.isNotEmpty ? ' · fuente: $_fuente' : ''}',
+                  style: const TextStyle(fontSize: 13, color: Colors.grey),
                 ),
                 const SizedBox(height: 12),
                 if (_oficiosDisponibles.isEmpty)
@@ -212,7 +303,7 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
                     ),
                     child: const Text(
                       'No se encontraron oficios en Firebase.\n'
-                      'Verificá que exista la colección cat_oficios (o oficios) con campo "nombre".',
+                      'Subí el archivo registroTrabajador.dart para ajustar la colección exacta.',
                       style: TextStyle(fontSize: 13, color: Color(0xFF9A3412)),
                     ),
                   )
