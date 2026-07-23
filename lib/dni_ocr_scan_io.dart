@@ -1,15 +1,12 @@
-import 'dart:io';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 
 class DniOcrScanResult {
   final String texto;
-  final String imagePath;
   final List<int> imageBytes;
 
   const DniOcrScanResult({
     required this.texto,
-    required this.imagePath,
     required this.imageBytes,
   });
 }
@@ -37,7 +34,6 @@ class DniOcrScanner {
 
     return DniOcrScanResult(
       texto: result.text,
-      imagePath: foto.path,
       imageBytes: bytes,
     );
   }
