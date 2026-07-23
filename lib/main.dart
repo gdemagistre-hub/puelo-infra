@@ -76,7 +76,7 @@ class MyApp extends StatelessWidget {
             userRef = settings.arguments as DocumentReference?;
           }
 
-          return MaterialPageRoute(
+          return MaterialPageRoute( 
             settings: settings,
             builder: (context) => TarjetaDigitalWidget(usuarioRef: userRef),
           );
