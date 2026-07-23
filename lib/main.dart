@@ -3,16 +3,17 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'splashScreen.dart';
 import 'loginScreen.dart';
-import 'Homepage.dart'; 
+import 'Homepage.dart';
 import 'registroTrabajador.dart';
 import 'buscadorPrestadores.dart';
 import 'tarjetaDigital.dart';
-import 'seleccionRol.dart'; 
-import 'pantallaValidacion.dart'; // Importamos la nueva pantalla de validación
+import 'seleccionRol.dart';
+import 'pantallaValidacion.dart';
+import 'validar_domicilio.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   await Firebase.initializeApp(
     options: const FirebaseOptions(
       apiKey: "AIzaSyAr6iPh8NaDBD4qwo3LvfpE4j9k7RfKTwQ",
@@ -23,7 +24,7 @@ void main() async {
       appId: "1:74624927314:web:3fadcc533dd1f3a985818b",
     ),
   );
-  
+
   runApp(const MyApp());
 }
 
@@ -47,13 +48,13 @@ class MyApp extends StatelessWidget {
         HomePageWidget.routePath: (context) => const HomePageWidget(),
         RegistroTrabajadorWidget.routePath: (context) => const RegistroTrabajadorWidget(),
         BuscadorPrestadoresWidget.routePath: (context) => const BuscadorPrestadoresWidget(),
-        '/seleccionRol': (context) => const SeleccionRolWidget(), 
+        '/seleccionRol': (context) => const SeleccionRolWidget(),
       },
       onGenerateRoute: (settings) {
         final settingsName = settings.name ?? '';
         final uri = Uri.parse(settingsName);
 
-        // 1. Interceptor para la validación de cuenta vía link de WhatsApp
+        // 1. Validación de cuenta vía link de WhatsApp
         if (uri.path == '/validar') {
           final String? token = uri.queryParameters['token'];
           return MaterialPageRoute(
@@ -62,10 +63,22 @@ class MyApp extends StatelessWidget {
           );
         }
 
-        // 2. Interceptor para la tarjeta digital (tu código existente)
-        if (uri.path == TarjetaDigitalWidget.routePath || uri.path.startsWith('/tarjetaDigital')) {
+        // 2. Validación de domicilio por referencia de terceros
+        if (uri.path == '/validarDomicilio' ||
+            uri.path.startsWith('/validarDomicilio')) {
+          final String? idParam = uri.queryParameters['id'];
+          return MaterialPageRoute(
+            settings: settings,
+            builder: (context) => ValidarDomicilioWidget(usuarioId: idParam),
+          );
+        }
+
+        // 3. Tarjeta digital
+        if (uri.path == TarjetaDigitalWidget.routePath ||
+            uri.path.startsWith('/tarjetaDigital')) {
           DocumentReference? userRef;
-          final String? idParam = uri.queryParameters['id'] ?? uri.queryParameters['usuarioRef'];
+          final String? idParam =
+              uri.queryParameters['id'] ?? uri.queryParameters['usuarioRef'];
 
           if (idParam != null && idParam.isNotEmpty) {
             userRef = FirebaseFirestore.instance.doc('usuarios/$idParam');
@@ -76,12 +89,12 @@ class MyApp extends StatelessWidget {
             userRef = settings.arguments as DocumentReference?;
           }
 
-          return MaterialPageRoute( 
+          return MaterialPageRoute(
             settings: settings,
             builder: (context) => TarjetaDigitalWidget(usuarioRef: userRef),
           );
         }
-        
+
         return null;
       },
     );
