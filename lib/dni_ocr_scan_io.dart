@@ -20,8 +20,7 @@ class DniOcrScanner {
   Future<DniOcrScanResult?> capturarYEscanear({bool camara = true}) async {
     final foto = await _picker.pickImage(
       source: camara ? ImageSource.camera : ImageSource.gallery,
-      // calidad reducida para no inflar Storage
-      imageQuality: 40,
+      imageQuality: 40, // calidad reducida para Storage
       maxWidth: 1280,
       maxHeight: 1280,
     );
