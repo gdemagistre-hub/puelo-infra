@@ -42,7 +42,16 @@ class ResultadoCotejoDni {
 }
 
 class DniOcrParser {
-  static String normTexto(String s) => s
+  static List<String> tokensPersona(String raw) {
+    return raw
+        .replaceAll(RegExp(r'[^A-Za-zÁÉÍÓÚáéíóúÑñÜü\s]'), ' ')
+        .split(RegExp(r'\s+'))
+        .map((e) => e.trim())
+        .where((e) => e.length >= 2)
+        .toList();
+  }
+
+  static String norm(String s) => s
       .toLowerCase()
       .replaceAll(RegExp(r'[áàä]'), 'a')
       .replaceAll(RegExp(r'[éèë]'), 'e')
@@ -54,16 +63,6 @@ class DniOcrParser {
 
   static String normDoc(String s) => s.replaceAll(RegExp(r'\D'), '');
 
-  static List<String> tokensPersona(String raw) {
-    return raw
-        .replaceAll(RegExp(r'[^A-Za-zÁÉÍÓÚáéíóúÑñÜü\s]'), ' ')
-        .split(RegExp(r'\s+'))
-        .map((e) => e.trim())
-        .where((e) => e.length >= 2)
-        .toList();
-  }
-
-  /// Parseo heurístico de DNI / documento latino
   static DatosOcrDni parsear(String texto) {
     final upper = texto.toUpperCase();
     final lineas = texto
@@ -116,16 +115,15 @@ class DniOcrParser {
     for (var i = 0; i < lineas.length; i++) {
       final l = lineas[i].toUpperCase();
       if ((l.contains('APELLIDO') || l.contains('SURNAME')) && i + 1 < lineas.length) {
-        apellidos.addAll(_tokensPersona(lineas[i + 1]));
+        apellidos.addAll(_tokens(lineas[i + 1]));
       }
       if ((l.contains('NOMBRE') || l.contains('GIVEN') || l.contains('NAMES')) &&
           !l.contains('APELLIDO') &&
           i + 1 < lineas.length) {
-        nombres.addAll(_tokensPersona(lineas[i + 1]));
+        nombres.addAll(_tokens(lineas[i + 1]));
       }
     }
 
-    // Fallback: líneas en mayúsculas tipo persona
     if (nombres.isEmpty && apellidos.isEmpty) {
       for (final linea in lineas) {
         if (RegExp(r'^[A-ZÁÉÍÓÚÑ ]{3,}$').hasMatch(linea) &&
@@ -136,7 +134,7 @@ class DniOcrParser {
             !linea.contains('SEXO') &&
             !linea.contains('EJEMPLAR') &&
             !linea.contains('IDENTIDAD')) {
-          final toks = _tokensPersona(linea);
+          final toks = _tokens(linea);
           if (apellidos.isEmpty) {
             apellidos.addAll(toks);
           } else if (nombres.isEmpty) {
@@ -156,7 +154,7 @@ class DniOcrParser {
     );
   }
 
-  static List<String> _tokensPersona(String raw) {
+  static List<String> _tokens(String raw) {
     return raw
         .replaceAll(RegExp(r'[^A-Za-zÁÉÍÓÚáéíóúÑñÜü\s]'), ' ')
         .split(RegExp(r'\s+'))
@@ -177,12 +175,12 @@ class DniOcrParser {
 
   static String _normDoc(String s) => s.replaceAll(RegExp(r'\D'), '');
 
-  /// Reglas pedidas:
-  /// - al menos un nombre OCR coincide con algún nombre cargado
-  /// - al menos un apellido OCR coincide con algún apellido cargado
-  /// - número de documento igual
-  /// - país de emisión igual
-  /// - fecha de nacimiento igual
+  /// Reglas:
+  /// - al menos un nombre OCR ∈ nombres cargados
+  /// - al menos un apellido OCR ∈ apellidos cargados
+  /// - número documento igual
+  /// - país emisión igual
+  /// - fecha nacimiento igual
   static ResultadoCotejoDni validarContraPerfil({
     required DatosOcrDni ocr,
     required String nombreUsuario,
@@ -248,7 +246,7 @@ class DniOcrParser {
     );
   }
 
-  /// Hash ancla (sin timestamp) para invalidar si el usuario edita datos clave
+  /// Hash ancla sin timestamp: para invalidar si editan datos clave
   static String hashDatosAncla({
     required String nombre,
     required String apellido,
