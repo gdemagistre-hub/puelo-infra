@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'tarjetaDigital.dart';
 
-class BuscadorPrestadoresWidget extends StatefulWidget {
+class BuscadorPrestadoresWidget extends StatefulWidget { 
   final String? initialQuery;
 
   const BuscadorPrestadoresWidget({
