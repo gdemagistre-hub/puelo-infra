@@ -11,25 +11,10 @@ class EspecialidadesLaboralesFlotanteWidget extends StatefulWidget {
 
 class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLaboralesFlotanteWidget> {
   final primaryColor = const Color(0xFF0F52BA);
+  final db = FirebaseFirestore.instance;
   final _nombreComercialController = TextEditingController();
 
-  final List<String> _oficiosDisponibles = [
-    'Electricista',
-    'Plomero',
-    'Gasista',
-    'Carpintero',
-    'Pintor',
-    'Construcción',
-    'Albañil',
-    'Jardinero',
-    'Limpieza',
-    'Aire acondicionado',
-    'Cerrajero',
-    'Herrero',
-    'Techista',
-    'Otro',
-  ];
-
+  List<String> _oficiosDisponibles = [];
   Set<String> _oficiosSeleccionados = {};
   bool _loading = true;
   bool _saving = false;
@@ -37,7 +22,7 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
   @override
   void initState() {
     super.initState();
-    _cargarDatos();
+    _cargarTodo();
   }
 
   @override
@@ -46,26 +31,96 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
     super.dispose();
   }
 
-  Future<void> _cargarDatos() async {
-    final uid = UserSession().uid;
-    if (uid == null) {
-      setState(() => _loading = false);
-      return;
-    }
+  Future<void> _cargarTodo() async {
+    await Future.wait([
+      _cargarOficiosDesdeFirebase(),
+      _cargarDatosUsuario(),
+    ]);
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _cargarOficiosDesdeFirebase() async {
+    final List<String> nombres = [];
 
     try {
-      final doc = await FirebaseFirestore.instance.collection('usuarios').doc(uid).get();
+      final snap = await db.collection('cat_oficios').orderBy('nombre').get();
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        final nombre = (data['nombre'] ?? data['name'] ?? data['oficio'] ?? doc.id).toString().trim();
+        if (nombre.isNotEmpty) nombres.add(nombre);
+      }
+    } catch (e) {
+      debugPrint('cat_oficios: $e');
+    }
+
+    if (nombres.isEmpty) {
+      try {
+        final snap = await db.collection('oficios').orderBy('nombre').get();
+        for (final doc in snap.docs) {
+          final data = doc.data();
+          final nombre = (data['nombre'] ?? data['name'] ?? data['oficio'] ?? doc.id).toString().trim();
+          if (nombre.isNotEmpty) nombres.add(nombre);
+        }
+      } catch (e) {
+        debugPrint('oficios: $e');
+      }
+    }
+
+    if (nombres.isEmpty) {
+      try {
+        final snap = await db.collection('profesiones').orderBy('nombre').get();
+        for (final doc in snap.docs) {
+          final data = doc.data();
+          final nombre = (data['nombre'] ?? data['name'] ?? doc.id).toString().trim();
+          if (nombre.isNotEmpty) nombres.add(nombre);
+        }
+      } catch (e) {
+        debugPrint('profesiones: $e');
+      }
+    }
+
+    if (nombres.isEmpty) {
+      try {
+        final doc = await db.collection('cat_config').doc('oficios').get();
+        if (doc.exists) {
+          final lista = doc.data()?['lista'] as List<dynamic>? ??
+              doc.data()?['items'] as List<dynamic>? ??
+              [];
+          for (final item in lista) {
+            if (item is String && item.trim().isNotEmpty) {
+              nombres.add(item.trim());
+            } else if (item is Map) {
+              final n = (item['nombre'] ?? item['name'] ?? '').toString().trim();
+              if (n.isNotEmpty) nombres.add(n);
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('cat_config/oficios: $e');
+      }
+    }
+
+    final unicos = nombres.toSet().toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    _oficiosDisponibles = unicos;
+  }
+
+  Future<void> _cargarDatosUsuario() async {
+    final uid = UserSession().uid;
+    if (uid == null) return;
+
+    try {
+      final doc = await db.collection('usuarios').doc(uid).get();
       if (doc.exists) {
         final data = doc.data()!;
-        _nombreComercialController.text = (data['nombre_comercial'] ?? data['nombreComercial'] ?? '').toString();
+        _nombreComercialController.text =
+            (data['nombre_comercial'] ?? data['nombreComercial'] ?? '').toString();
         final profesiones = data['profesiones'] as List<dynamic>? ?? [];
         _oficiosSeleccionados = profesiones.map((e) => e.toString()).toSet();
       }
     } catch (e) {
-      debugPrint('Error cargando especialidades: $e');
+      debugPrint('Error cargando datos usuario: $e');
     }
-
-    setState(() => _loading = false);
   }
 
   Future<void> _actualizarDatos() async {
@@ -82,7 +137,7 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
     setState(() => _saving = true);
 
     try {
-      await FirebaseFirestore.instance.collection('usuarios').doc(uid).set({
+      await db.collection('usuarios').doc(uid).set({
         'nombre_comercial': _nombreComercialController.text.trim(),
         'profesiones': _oficiosSeleccionados.toList(),
         'es_trabajador': true,
@@ -116,7 +171,10 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Especialidades laborales', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Especialidades laborales',
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
       ),
       body: _loading
@@ -144,32 +202,47 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
                   style: TextStyle(fontSize: 13, color: Colors.grey),
                 ),
                 const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _oficiosDisponibles.map((oficio) {
-                    final selected = _oficiosSeleccionados.contains(oficio);
-                    return FilterChip(
-                      label: Text(oficio),
-                      selected: selected,
-                      selectedColor: primaryColor.withOpacity(0.15),
-                      checkmarkColor: primaryColor,
-                      labelStyle: TextStyle(
-                        color: selected ? primaryColor : Colors.black87,
-                        fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                      onSelected: (val) {
-                        setState(() {
-                          if (val) {
-                            _oficiosSeleccionados.add(oficio);
-                          } else {
-                            _oficiosSeleccionados.remove(oficio);
-                          }
-                        });
-                      },
-                    );
-                  }).toList(),
-                ),
+                if (_oficiosDisponibles.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.orange.shade200),
+                    ),
+                    child: const Text(
+                      'No se encontraron oficios en Firebase.\n'
+                      'Verificá que exista la colección cat_oficios (o oficios) con campo "nombre".',
+                      style: TextStyle(fontSize: 13, color: Color(0xFF9A3412)),
+                    ),
+                  )
+                else
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _oficiosDisponibles.map((oficio) {
+                      final selected = _oficiosSeleccionados.contains(oficio);
+                      return FilterChip(
+                        label: Text(oficio),
+                        selected: selected,
+                        selectedColor: primaryColor.withOpacity(0.15),
+                        checkmarkColor: primaryColor,
+                        labelStyle: TextStyle(
+                          color: selected ? primaryColor : Colors.black87,
+                          fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                        onSelected: (val) {
+                          setState(() {
+                            if (val) {
+                              _oficiosSeleccionados.add(oficio);
+                            } else {
+                              _oficiosSeleccionados.remove(oficio);
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
                 const SizedBox(height: 32),
                 SizedBox(
                   width: double.infinity,
@@ -177,7 +250,11 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
                   child: ElevatedButton.icon(
                     onPressed: _saving ? null : _actualizarDatos,
                     icon: _saving
-                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
                         : const Icon(Icons.save_outlined),
                     label: Text(_saving ? 'Guardando...' : 'Actualizar los datos'),
                     style: ElevatedButton.styleFrom(
