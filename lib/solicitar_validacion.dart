@@ -53,24 +53,44 @@ class _SolicitarValidacionWidgetState extends State<SolicitarValidacionWidget> {
     setState(() => _loading = false);
   }
 
+  String _generarLink(String idDocumento) {
+    return 'https://lifewalletpuelo.web.app/#/validarDomicilio?id=$idDocumento';
+  }
+
   Future<void> _compartirPorWhatsApp(String idDocumento) async {
-    final link = 'https://lifewalletpuelo.web.app/#/validarDomicilio?id=$idDocumento';
+    final link = _generarLink(idDocumento);
     final mensaje = Uri.encodeComponent(
-        '¡Hola! Te pido un favor: ayudame a validar mi domicilio en Puelo. '
-        'Solo te toma 1 minuto y aumenta la confianza de la comunidad.\n\n$link');
+      '¡Hola! Te pido un favor: ayudame a validar mi domicilio en Puelo. '
+      'Solo te toma 1 minuto y aumenta la confianza de la comunidad.\n\n$link',
+    );
     final url = Uri.parse('https://wa.me/?text=$mensaje');
 
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    } else {
-      _mostrarAlerta('No se pudo abrir WhatsApp');
+    try {
+      final launched = await launchUrl(
+        url,
+        mode: LaunchMode.platformDefault,
+      );
+
+      if (!launched) {
+        await Clipboard.setData(ClipboardData(text: link));
+        _mostrarAlerta('No se pudo abrir WhatsApp. El enlace se copió al portapapeles.');
+      }
+    } catch (e) {
+      debugPrint('Error abriendo WhatsApp: $e');
+      await Clipboard.setData(ClipboardData(text: link));
+      _mostrarAlerta('No se pudo abrir WhatsApp. El enlace se copió al portapapeles.');
     }
   }
 
-  void _copiarEnlaceAlPortapapeles(String idDocumento) {
-    final link = 'https://lifewalletpuelo.web.app/#/validarDomicilio?id=$idDocumento';
-    Clipboard.setData(ClipboardData(text: link));
-    _mostrarAlerta('¡Enlace copiado al portapapeles!');
+  Future<void> _copiarEnlaceAlPortapapeles(String idDocumento) async {
+    final link = _generarLink(idDocumento);
+    try {
+      await Clipboard.setData(ClipboardData(text: link));
+      _mostrarAlerta('¡Enlace copiado al portapapeles!');
+    } catch (e) {
+      debugPrint('Error copiando al portapapeles: $e');
+      _mostrarAlerta('No se pudo copiar el enlace. Intentá de nuevo.');
+    }
   }
 
   void _mostrarAlerta(String mensaje) {
@@ -80,6 +100,7 @@ class _SolicitarValidacionWidgetState extends State<SolicitarValidacionWidget> {
           content: Text(mensaje),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 3),
         ),
       );
     }
@@ -99,7 +120,11 @@ class _SolicitarValidacionWidgetState extends State<SolicitarValidacionWidget> {
     if (uid == null) {
       return Scaffold(
         backgroundColor: const Color(0xFFF8FAFC),
-        appBar: AppBar(backgroundColor: primaryColor, foregroundColor: Colors.white, title: const Text('Validación de perfil')),
+        appBar: AppBar(
+          backgroundColor: primaryColor,
+          foregroundColor: Colors.white,
+          title: const Text('Validación de perfil'),
+        ),
         body: const Center(child: Text('Error de sesión. Volvé a ingresar.')),
       );
     }
@@ -272,7 +297,7 @@ class _SolicitarValidacionWidgetState extends State<SolicitarValidacionWidget> {
                         const Text(
                           'Es un proceso simple, donde la persona confirma\n'
                           'que te conoce respondiendo tres preguntas.\n'
-                          'No hay mejor manera que el acomppañamiento de quienes nos conocen',
+                          'No hay mejor manera que el acompañamiento de quienes nos conocen',
                           style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.5),
                         ),
                       ],
