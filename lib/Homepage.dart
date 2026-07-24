@@ -8,6 +8,7 @@ import 'menuPerfil.dart';
 import 'registroTrabajador.dart';
 import 'tarjetaDigital.dart';
 import 'menuPerfilOpciones.dart';
+import 'import_dummy_usuarios.dart'; // TEMPORAL — borrar después de importar
 
 class HomePageWidget extends StatefulWidget {
   const HomePageWidget({super.key});
@@ -25,6 +26,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
   // 0 = Home, 1 = Evaluar, 2 = Mensajes, 3 = Perfil (menú flotante)
   int _currentIndex = 0;
+
+  // TEMPORAL — borrar después de importar
+  bool _importandoDummy = false;
 
   @override
   void dispose() {
@@ -69,7 +73,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         if (profesiones.isEmpty || localidades.isEmpty || !esTrabajador) {
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Para compartir tu tarjeta, primero configurá tus especialidades y zonas.')),
+              const SnackBar(
+                content: Text('Para compartir tu tarjeta, primero configurá tus especialidades y zonas.'),
+              ),
             );
             Navigator.push(context, MaterialPageRoute(builder: (_) => const RegistroTrabajadorWidget()));
           }
@@ -108,6 +114,69 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         builder: (_) => BuscadorPrestadoresWidget(initialQuery: texto.isEmpty ? null : texto),
       ),
     );
+  }
+
+  // TEMPORAL — borrar después de importar
+  Future<void> _importarDummyUsuarios() async {
+    if (_importandoDummy) return;
+
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Importar dummies'),
+        content: const Text(
+          'Esto va a cargar ~500 usuarios de prueba en Firestore '
+          '(IDs dummy_001…dummy_500).\n\n¿Continuar?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Importar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar != true) return;
+
+    setState(() => _importandoDummy = true);
+
+    try {
+      final result = await ImportDummyUsuarios.ejecutar(
+        onProgress: (hechos, total) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Importando… $hechos / $total')),
+            );
+          }
+        },
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Listo: ${result.importados} usuarios dummy importados'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al importar: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _importandoDummy = false);
+    }
   }
 
   String _getInitials() {
@@ -326,7 +395,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           GridView.count(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 4,
+            crossAxisCount: 3, // temporal con 5 íconos; volver a 4 después
             padding: const EdgeInsets.symmetric(horizontal: 12),
             childAspectRatio: 0.9,
             children: [
@@ -334,7 +403,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                 _irABuscador();
               }),
               _buildServiceIcon(Icons.check_circle_outline, 'Evaluar Trabajos', () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()));
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()),
+                );
               }),
               _buildServiceIcon(Icons.badge, 'Compartir Tarjeta', _compartirTarjeta),
               _buildServiceIcon(Icons.person_outline, 'Sobre Mí', () {
@@ -343,6 +415,12 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                   MaterialPageRoute(builder: (_) => const MenuPerfilWidget()),
                 );
               }),
+              // TEMPORAL — borrar después de importar
+              _buildServiceIcon(
+                Icons.cloud_upload_outlined,
+                _importandoDummy ? 'Importando…' : 'Cargar dummy',
+                _importandoDummy ? () {} : _importarDummyUsuarios,
+              ),
             ],
           ),
 
