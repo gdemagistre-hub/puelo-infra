@@ -14,18 +14,22 @@ class DatosPersonalesFlotanteWidget extends StatefulWidget {
   const DatosPersonalesFlotanteWidget({super.key});
 
   @override
-  State<DatosPersonalesFlotanteWidget> createState() => _DatosPersonalesFlotanteWidgetState();
+  State<DatosPersonalesFlotanteWidget> createState() =>
+      _DatosPersonalesFlotanteWidgetState();
 }
 
-class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteWidget> {
+class _DatosPersonalesFlotanteWidgetState
+    extends State<DatosPersonalesFlotanteWidget> {
   final primaryColor = const Color(0xFF0F52BA);
   final _formKey = GlobalKey<FormState>();
   final _scanner = DniOcrScanner();
 
   final _nombreController = TextEditingController();
   final _apellidoController = TextEditingController();
+  final _telefonoController = TextEditingController();
   final _docNumeroController = TextEditingController();
   final _emailController = TextEditingController();
+  final _emailConfirmController = TextEditingController();
   final _instagramController = TextEditingController();
 
   String? _tipoDoc;
@@ -33,6 +37,7 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
   DateTime? _fechaNacimiento;
   String? _urlFotoDocumento;
 
+  bool _tieneWhatsapp = false;
   bool _loading = true;
   bool _saving = false;
   bool _procesandoOcr = false;
@@ -41,7 +46,15 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
   String? _docHashDatos;
 
   final List<String> _tiposDoc = ['DNI', 'Pasaporte', 'CI', 'CUIT', 'Otro'];
-  final List<String> _paises = ['Argentina', 'Uruguay', 'Chile', 'Paraguay', 'Brasil', 'Bolivia', 'Otro'];
+  final List<String> _paises = [
+    'Argentina',
+    'Uruguay',
+    'Chile',
+    'Paraguay',
+    'Brasil',
+    'Bolivia',
+    'Otro',
+  ];
 
   @override
   void initState() {
@@ -54,8 +67,10 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
     _scanner.dispose();
     _nombreController.dispose();
     _apellidoController.dispose();
+    _telefonoController.dispose();
     _docNumeroController.dispose();
     _emailController.dispose();
+    _emailConfirmController.dispose();
     _instagramController.dispose();
     super.dispose();
   }
@@ -68,14 +83,19 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
     }
 
     try {
-      final doc = await FirebaseFirestore.instance.collection('usuarios').doc(uid).get();
+      final doc =
+          await FirebaseFirestore.instance.collection('usuarios').doc(uid).get();
       if (doc.exists) {
         final data = doc.data()!;
         _nombreController.text = (data['nombre'] ?? '').toString();
         _apellidoController.text = (data['apellido'] ?? '').toString();
+        _telefonoController.text = (data['telefono'] ?? '').toString();
+        _tieneWhatsapp = data['tiene_whatsapp'] == true;
         _docNumeroController.text =
             (data['doc_numero'] ?? data['numero_documento'] ?? '').toString();
-        _emailController.text = (data['email'] ?? '').toString();
+        final email = (data['email'] ?? '').toString();
+        _emailController.text = email;
+        _emailConfirmController.text = email;
         _instagramController.text =
             (data['instagram'] ?? data['usuario_instagram'] ?? '').toString();
         _tipoDoc = data['tipo_doc'] ?? data['tipo_documento'];
@@ -86,7 +106,8 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
 
         if (data['fecha_nacimiento'] != null) {
           if (data['fecha_nacimiento'] is Timestamp) {
-            _fechaNacimiento = (data['fecha_nacimiento'] as Timestamp).toDate();
+            _fechaNacimiento =
+                (data['fecha_nacimiento'] as Timestamp).toDate();
           } else if (data['fecha_nacimiento'] is String) {
             _fechaNacimiento = DateTime.tryParse(data['fecha_nacimiento']);
           }
@@ -97,6 +118,17 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
     }
 
     if (mounted) setState(() => _loading = false);
+  }
+
+  String? _validarTelefono(String? v) {
+    final t = (v ?? '').trim();
+    if (t.isEmpty) return 'El celular es obligatorio';
+    // +549-XXXXX-XXXX (sin el 15). Área 2 a 4 dígitos, número 4 a 8.
+    final re = RegExp(r'^\+549-\d{2,4}-\d{4,8}$');
+    if (!re.hasMatch(t)) {
+      return 'Formato: +549-11444-5555 (sin el 15)';
+    }
+    return null;
   }
 
   Future<void> _seleccionarFecha() async {
@@ -144,7 +176,9 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
     if (kIsWeb || !_scanner.isSupported) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('El escaneo de documento solo está disponible en el celular.'),
+          content: Text(
+            'El escaneo de documento solo está disponible en el celular.',
+          ),
         ),
       );
       return;
@@ -179,7 +213,9 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
           setState(() => _procesandoOcr = false);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('No se pudo leer texto del documento. Probá con mejor luz.'),
+              content: Text(
+                'No se pudo leer texto del documento. Probá con mejor luz.',
+              ),
             ),
           );
         }
@@ -207,7 +243,9 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
           await showDialog(
             context: context,
             builder: (ctx) => AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               title: const Text('No coinciden los datos'),
               content: Text(
                 'Revisá estas comparaciones:\n\n'
@@ -239,7 +277,6 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
           .child(uid)
           .child('documento_identidad.jpg');
 
-      // Imagen ya viene comprimida (imageQuality: 40 en el scanner)
       final upload = await storageRef.putData(
         Uint8List.fromList(scan.imageBytes),
         SettableMetadata(contentType: 'image/jpeg'),
@@ -265,8 +302,9 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
         'ocr_apellidos': ocr.apellidos,
         'ocr_doc_numero': ocr.numeroDocumento,
         'ocr_pais': ocr.paisEmision,
-        'ocr_fecha_nacimiento':
-            ocr.fechaNacimiento != null ? Timestamp.fromDate(ocr.fechaNacimiento!) : null,
+        'ocr_fecha_nacimiento': ocr.fechaNacimiento != null
+            ? Timestamp.fromDate(ocr.fechaNacimiento!)
+            : null,
         'updated_at': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
@@ -324,8 +362,14 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
                   style: TextStyle(fontSize: 14, color: Color(0xFF64748B)),
                 ),
                 const SizedBox(height: 16),
-                _ocrRow('Nombre(s)', ocr.nombres.isEmpty ? '—' : ocr.nombres.join(' ')),
-                _ocrRow('Apellido(s)', ocr.apellidos.isEmpty ? '—' : ocr.apellidos.join(' ')),
+                _ocrRow(
+                  'Nombre(s)',
+                  ocr.nombres.isEmpty ? '—' : ocr.nombres.join(' '),
+                ),
+                _ocrRow(
+                  'Apellido(s)',
+                  ocr.apellidos.isEmpty ? '—' : ocr.apellidos.join(' '),
+                ),
                 _ocrRow('N° documento', ocr.numeroDocumento ?? '—'),
                 _ocrRow('País de emisión', ocr.paisEmision ?? '—'),
                 _ocrRow('Fecha de nacimiento', fechaStr),
@@ -346,7 +390,9 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryColor,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
               child: const Text('Confirmar'),
             ),
@@ -385,7 +431,7 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
   }
 
   // ---------------------------------------------------------------------------
-  // Guardar datos (invalida validación si cambian datos ancla)
+  // Guardar datos
   // ---------------------------------------------------------------------------
 
   Future<void> _actualizarDatos() async {
@@ -393,6 +439,15 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
 
     final uid = UserSession().uid;
     if (uid == null) return;
+
+    final email1 = _emailController.text.trim();
+    final email2 = _emailConfirmController.text.trim();
+    if (email1 != email2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Los emails no coinciden')),
+      );
+      return;
+    }
 
     setState(() => _saving = true);
 
@@ -411,12 +466,15 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
       final payload = <String, dynamic>{
         'nombre': _nombreController.text.trim(),
         'apellido': _apellidoController.text.trim(),
+        'telefono': _telefonoController.text.trim(),
+        'tiene_whatsapp': _tieneWhatsapp,
         'tipo_doc': _tipoDoc,
         'pais_doc': _paisDoc,
         'doc_numero': _docNumeroController.text.trim(),
-        'fecha_nacimiento':
-            _fechaNacimiento != null ? Timestamp.fromDate(_fechaNacimiento!) : null,
-        'email': _emailController.text.trim(),
+        'fecha_nacimiento': _fechaNacimiento != null
+            ? Timestamp.fromDate(_fechaNacimiento!)
+            : null,
+        'email': email1,
         'instagram': _instagramController.text.trim(),
         'updated_at': FieldValue.serverTimestamp(),
         'doc_validado': sigueValidado,
@@ -433,12 +491,21 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
           .doc(uid)
           .set(payload, SetOptions(merge: true));
 
+      // Refrescar sesión en memoria
+      final session = UserSession();
+      session.nombre = _nombreController.text.trim();
+      session.apellido = _apellidoController.text.trim();
+      if (session.datosCompletos != null) {
+        session.datosCompletos = {
+          ...session.datosCompletos!,
+          ...payload,
+        };
+      }
+
       if (mounted) {
         setState(() {
           _docValidado = sigueValidado;
-          if (!sigueValidado) {
-            _docHashDatos = null;
-          }
+          if (!sigueValidado) _docHashDatos = null;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -493,8 +560,76 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
                   child: ListView(
                     padding: const EdgeInsets.all(20),
                     children: [
-                      _buildField('Nombre', _nombreController, required: true),
-                      _buildField('Apellido', _apellidoController, required: true),
+                      _buildField('Nombre *', _nombreController, required: true),
+                      _buildField(
+                        'Apellido *',
+                        _apellidoController,
+                        required: true,
+                      ),
+
+                      // Celular + WhatsApp
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _telefonoController,
+                                keyboardType: TextInputType.phone,
+                                decoration: InputDecoration(
+                                  labelText: 'Celular *',
+                                  hintText: '+549-11444-5555',
+                                  helperText:
+                                      'Código AR +549, sin el 15. Ej: +549-11-44445555',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 14,
+                                  ),
+                                ),
+                                validator: _validarTelefono,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Column(
+                              children: [
+                                const SizedBox(height: 4),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                      color: Colors.grey.shade300,
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      const Text(
+                                        'WhatsApp',
+                                        style: TextStyle(fontSize: 11),
+                                      ),
+                                      Checkbox(
+                                        value: _tieneWhatsapp,
+                                        activeColor: primaryColor,
+                                        onChanged: (v) => setState(
+                                          () => _tieneWhatsapp = v ?? false,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+
                       _buildDropdown(
                         'Tipo de documento',
                         _tipoDoc,
@@ -507,13 +642,39 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
                         _paises,
                         (v) => setState(() => _paisDoc = v),
                       ),
-                      _buildField('Número de documento', _docNumeroController),
+                      _buildField(
+                        'Número de documento',
+                        _docNumeroController,
+                      ),
                       _buildFechaNacimiento(),
                       _buildFotoDocumento(),
                       _buildField(
                         'Email',
                         _emailController,
                         keyboard: TextInputType.emailAddress,
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: TextFormField(
+                          controller: _emailConfirmController,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: InputDecoration(
+                            labelText: 'Confirmar email',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
+                          ),
+                          validator: (v) {
+                            final e1 = _emailController.text.trim();
+                            final e2 = (v ?? '').trim();
+                            if (e1 != e2) return 'Los emails no coinciden';
+                            return null;
+                          },
+                        ),
                       ),
                       _buildField(
                         'Usuario de Instagram',
@@ -525,7 +686,8 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
                         width: double.infinity,
                         height: 50,
                         child: ElevatedButton.icon(
-                          onPressed: _saving || _procesandoOcr ? null : _actualizarDatos,
+                          onPressed:
+                              _saving || _procesandoOcr ? null : _actualizarDatos,
                           icon: _saving
                               ? const SizedBox(
                                   width: 20,
@@ -536,7 +698,9 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
                                   ),
                                 )
                               : const Icon(Icons.save_outlined),
-                          label: Text(_saving ? 'Guardando...' : 'Actualizar los datos'),
+                          label: Text(
+                            _saving ? 'Guardando...' : 'Actualizar los datos',
+                          ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: primaryColor,
                             foregroundColor: Colors.white,
@@ -596,10 +760,12 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
           labelText: label,
           hintText: hint,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
         validator: required
-            ? (v) => (v == null || v.trim().isEmpty) ? 'Campo obligatorio' : null
+            ? (v) =>
+                (v == null || v.trim().isEmpty) ? 'Campo obligatorio' : null
             : null,
       ),
     );
@@ -618,9 +784,11 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
         decoration: InputDecoration(
           labelText: label,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
-        items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+        items:
+            items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
         onChanged: onChanged,
       ),
     );
@@ -636,7 +804,8 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
           decoration: InputDecoration(
             labelText: 'Fecha de nacimiento',
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             suffixIcon: const Icon(Icons.calendar_today_outlined),
           ),
           child: Text(
@@ -668,7 +837,8 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
               const Spacer(),
               if (_docValidado)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.green.shade50,
                     borderRadius: BorderRadius.circular(20),
@@ -705,11 +875,18 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.badge_outlined, size: 36, color: Colors.grey.shade400),
+                        Icon(
+                          Icons.badge_outlined,
+                          size: 36,
+                          color: Colors.grey.shade400,
+                        ),
                         const SizedBox(height: 4),
                         Text(
                           'Sin foto cargada',
-                          style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+                          style: TextStyle(
+                            color: Colors.grey.shade500,
+                            fontSize: 13,
+                          ),
                         ),
                       ],
                     ),
@@ -735,8 +912,9 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed:
-                        _procesandoOcr ? null : () => _iniciarEscaneoDocumento(camara: true),
+                    onPressed: _procesandoOcr
+                        ? null
+                        : () => _iniciarEscaneoDocumento(camara: true),
                     icon: const Icon(Icons.photo_camera_outlined),
                     label: const Text('Escanear'),
                     style: OutlinedButton.styleFrom(
@@ -752,8 +930,9 @@ class _DatosPersonalesFlotanteWidgetState extends State<DatosPersonalesFlotanteW
                 const SizedBox(width: 10),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed:
-                        _procesandoOcr ? null : () => _iniciarEscaneoDocumento(camara: false),
+                    onPressed: _procesandoOcr
+                        ? null
+                        : () => _iniciarEscaneoDocumento(camara: false),
                     icon: const Icon(Icons.photo_library_outlined),
                     label: const Text('Galería'),
                     style: OutlinedButton.styleFrom(
