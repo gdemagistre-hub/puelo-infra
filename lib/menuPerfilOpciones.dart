@@ -7,11 +7,21 @@ import 'perfilCompletoflotante.dart';
 
 class MenuPerfilOpcionesWidget extends StatelessWidget {
   final VoidCallback? onClose;
+  /// true = muestra opciones de prestador; false = solo cliente
+  final bool modoPrestador;
 
   const MenuPerfilOpcionesWidget({
     super.key,
     this.onClose,
+    this.modoPrestador = false,
   });
+
+  // Paleta
+  static const Color _clientePrimary = Color(0xFF734BE4);
+  static const Color _prestadorPrimary = Color(0xFF28B5CD);
+  static const Color _textColor = Color(0xFF1E293B);
+
+  Color get primaryColor => modoPrestador ? _prestadorPrimary : _clientePrimary;
 
   void _abrirFlotante(BuildContext context, Widget page) {
     Navigator.of(context).push(
@@ -35,30 +45,31 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = const Color(0xFF0F52BA);
-    final textColor = const Color(0xFF1E293B);
-
-    final items = [
+    // Cliente: solo datos personales, domicilio y perfil completo
+    // Prestador: todo
+    final items = <_MenuItem>[
       _MenuItem(
         icon: Icons.person_outline_rounded,
         label: 'Datos personales',
         onTap: () => _abrirFlotante(context, const DatosPersonalesFlotanteWidget()),
       ),
       _MenuItem(
-        icon: Icons.home_work_outlined,
+        icon: Icons.home_outlined,
         label: 'Domicilio',
         onTap: () => _abrirFlotante(context, const DomicilioFlotanteWidget()),
       ),
-      _MenuItem(
-        icon: Icons.work_outline_rounded,
-        label: 'Especialidades laborales',
-        onTap: () => _abrirFlotante(context, const EspecialidadesLaboralesFlotanteWidget()),
-      ),
-      _MenuItem(
-        icon: Icons.map_outlined,
-        label: 'Zona de trabajo preferida',
-        onTap: () => _abrirFlotante(context, const ZonaDeTrabajoFlotanteWidget()),
-      ),
+      if (modoPrestador) ...[
+        _MenuItem(
+          icon: Icons.handyman_outlined,
+          label: 'Especialidades laborales',
+          onTap: () => _abrirFlotante(context, const EspecialidadesLaboralesFlotanteWidget()),
+        ),
+        _MenuItem(
+          icon: Icons.map_outlined,
+          label: 'Zona de trabajo preferida',
+          onTap: () => _abrirFlotante(context, const ZonaDeTrabajoFlotanteWidget()),
+        ),
+      ],
       _MenuItem(
         icon: Icons.badge_outlined,
         label: 'Mi perfil completo',
@@ -84,13 +95,25 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-            child: Text(
-              'Mi perfil',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: textColor,
-              ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    modoPrestador ? 'Mi perfil · Prestador' : 'Mi perfil · Cliente',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: _textColor,
+                    ),
+                  ),
+                ),
+                if (onClose != null)
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 22),
+                    color: Colors.grey.shade600,
+                    onPressed: onClose,
+                  ),
+              ],
             ),
           ),
           const Divider(height: 1),
@@ -107,12 +130,20 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
                 final item = items[index];
                 return ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                  leading: Icon(item.icon, color: textColor, size: 26),
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: primaryColor.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(item.icon, color: primaryColor, size: 22),
+                  ),
                   title: Text(
                     item.label,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 16,
-                      color: textColor,
+                      color: _textColor,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
