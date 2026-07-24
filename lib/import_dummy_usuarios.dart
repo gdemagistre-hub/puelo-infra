@@ -6,7 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 /// Carga única de usuarios dummy a Firestore.
 /// Borrar este archivo después de usarlo.
 class ImportDummyUsuarios {
-  static const String assetPath = 'assets/jsons/usuarios_dummy_500.json';
+  static const String assetPath = 'assets/usuarios_dummy_500.json';
   static const String collection = 'usuarios';
 
   static Future<ImportResult> ejecutar({
