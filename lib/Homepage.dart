@@ -8,6 +8,9 @@ import 'menuPerfil.dart';
 import 'registroTrabajador.dart';
 import 'tarjetaDigital.dart';
 import 'menuPerfilOpciones.dart';
+import 'datosPersonalesflotante.dart';
+import 'ZonaDeTrabajoflotante.dart';
+import 'solicitar_validacion.dart';
 
 class HomePageWidget extends StatefulWidget {
   const HomePageWidget({super.key});
@@ -28,28 +31,295 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
   final TextEditingController _searchController = TextEditingController();
 
-  // 0 = Home, 1 = Evaluar, 2 = Mensajes, 3 = Perfil (menú flotante)
+  // 0 = Home, 3 = Perfil flotante
   int _currentIndex = 0;
 
-  // true = modo Prestador, false = modo Cliente
   bool _modoPrestador = false;
   bool _puedeSerAmbos = false;
 
+  // Top servicios (hasta 8)
+  List<_ServicioItem> _topServicios = [];
+  bool _cargandoServicios = true;
+
+  // Consejos personalizados prestador
+  List<_ConsejoItem> _consejos = [];
+  bool _cargandoConsejos = true;
+
   Color get primaryColor => _modoPrestador ? _prestadorPrimary : _clientePrimary;
+
+  /// Mapeo clave de profesión (DB) → label + icono
+  static const Map<String, _ServicioMeta> _metaServicios = {
+    'electricidad': _ServicioMeta('Electricista', Icons.electrical_services_outlined),
+    'plomeria': _ServicioMeta('Plomería', Icons.plumbing),
+    'gasista': _ServicioMeta('Gasista', Icons.local_fire_department_outlined),
+    'carpinteria': _ServicioMeta('Carpintería', Icons.handyman_outlined),
+    'pintura': _ServicioMeta('Pintura', Icons.format_paint_outlined),
+    'albanileria': _ServicioMeta('Construcción', Icons.construction_outlined),
+    'jardineria': _ServicioMeta('Jardinería', Icons.yard_outlined),
+    'limpieza': _ServicioMeta('Limpieza', Icons.cleaning_services_outlined),
+  };
+
+  /// Fallback fijo (orden de popularidad aproximado del dummy)
+  static const List<String> _fallbackOrden = [
+    'jardineria',
+    'electricidad',
+    'plomeria',
+    'pintura',
+    'carpinteria',
+    'limpieza',
+    'albanileria',
+    'gasista',
+  ];
 
   @override
   void initState() {
     super.initState();
     _detectarRol();
+    _cargarTopServicios();
   }
 
   void _detectarRol() {
     final data = UserSession().datosCompletos;
-    final esPrestador = data?['es_trabajador'] == true;
+    final esPrestador = data?['es_trabajador'] == true || data?['rol'] == 'trabajador';
     setState(() {
-      _puedeSerAmbos = esPrestador; // si es prestador puede elegir ambos modos
-      _modoPrestador = esPrestador; // por defecto arranca en el rol que tiene
+      _puedeSerAmbos = esPrestador;
+      _modoPrestador = esPrestador;
     });
+    if (esPrestador) {
+      _cargarConsejosPersonalizados();
+    } else {
+      setState(() {
+        _cargandoConsejos = false;
+        _consejos = [];
+      });
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // TOP 8 SERVICIOS (ranking diario)
+  // ---------------------------------------------------------------------------
+  /// 1) Intenta leer stats/top_servicios (documento con vigencia 24h)
+  /// 2) Si no existe o expiró → cuenta frecuencia real de profesiones en prestadores
+  /// 3) Fallback al orden fijo del catálogo conocido
+  Future<void> _cargarTopServicios() async {
+    setState(() => _cargandoServicios = true);
+    try {
+      // 1) Stats diarias (si las genera un Cloud Function / job)
+      final statsDoc =
+          await FirebaseFirestore.instance.collection('stats').doc('top_servicios').get();
+      if (statsDoc.exists) {
+        final data = statsDoc.data()!;
+        final actualizado = data['actualizado_en'];
+        DateTime? ts;
+        if (actualizado is Timestamp) ts = actualizado.toDate();
+        if (ts != null && DateTime.now().difference(ts).inHours < 24) {
+          final lista = (data['ranking'] as List<dynamic>? ?? [])
+              .map((e) => e.toString().toLowerCase().trim())
+              .where((s) => s.isNotEmpty)
+              .toList();
+          if (lista.isNotEmpty) {
+            _aplicarRanking(lista);
+            return;
+          }
+        }
+      }
+
+      // 2) Proxy de demanda: profesiones más declaradas por prestadores
+      final snap = await FirebaseFirestore.instance
+          .collection('usuarios')
+          .where('es_trabajador', isEqualTo: true)
+          .limit(400)
+          .get();
+
+      final counts = <String, int>{};
+      for (final doc in snap.docs) {
+        final profs = doc.data()['profesiones'] as List<dynamic>? ?? [];
+        for (final p in profs) {
+          final key = p.toString().toLowerCase().trim();
+          if (key.isEmpty) continue;
+          counts[key] = (counts[key] ?? 0) + 1;
+        }
+      }
+
+      if (counts.isNotEmpty) {
+        final sorted = counts.entries.toList()
+          ..sort((a, b) => b.value.compareTo(a.value));
+        _aplicarRanking(sorted.map((e) => e.key).toList());
+        return;
+      }
+
+      // 3) Fallback
+      _aplicarRanking(_fallbackOrden);
+    } catch (e) {
+      debugPrint('Error cargando top servicios: $e');
+      _aplicarRanking(_fallbackOrden);
+    }
+  }
+
+  void _aplicarRanking(List<String> claves) {
+    final items = <_ServicioItem>[];
+    final vistos = <String>{};
+
+    for (final clave in claves) {
+      if (vistos.contains(clave)) continue;
+      final meta = _metaServicios[clave];
+      if (meta == null) continue; // solo servicios reales del catálogo
+      vistos.add(clave);
+      items.add(_ServicioItem(
+        clave: clave,
+        label: meta.label,
+        icon: meta.icon,
+      ));
+      if (items.length >= 8) break;
+    }
+
+    // Completar hasta 8 con fallback si hiciera falta
+    for (final clave in _fallbackOrden) {
+      if (items.length >= 8) break;
+      if (vistos.contains(clave)) continue;
+      final meta = _metaServicios[clave];
+      if (meta == null) continue;
+      vistos.add(clave);
+      items.add(_ServicioItem(clave: clave, label: meta.label, icon: meta.icon));
+    }
+
+    if (mounted) {
+      setState(() {
+        _topServicios = items;
+        _cargandoServicios = false;
+      });
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // CONSEJOS PERSONALIZADOS (prestador)
+  // ---------------------------------------------------------------------------
+  Future<void> _cargarConsejosPersonalizados() async {
+    setState(() => _cargandoConsejos = true);
+    final uid = UserSession().uid;
+    if (uid == null) {
+      setState(() {
+        _consejos = [];
+        _cargandoConsejos = false;
+      });
+      return;
+    }
+
+    try {
+      final doc =
+          await FirebaseFirestore.instance.collection('usuarios').doc(uid).get();
+      final data = doc.data() ?? {};
+
+      final consejos = <_ConsejoItem>[];
+
+      // 1) Zona de trabajo
+      final zonas = data['zonas_cobertura'] as Map<String, dynamic>?;
+      final localidades = zonas?['localidades'] as List<dynamic>? ?? [];
+      if (localidades.isEmpty) {
+        consejos.add(_ConsejoItem(
+          title: 'Definí tu zona de trabajo',
+          body: 'Sin localidades de cobertura los clientes no te encuentran.',
+          icon: Icons.map_outlined,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ZonaDeTrabajoFlotanteWidget()),
+            );
+          },
+        ));
+      }
+
+      // 2) Número de documento
+      final docNumero = (data['doc_numero'] ?? data['numero_documento'] ?? data['documento'] ?? '')
+          .toString()
+          .trim();
+      if (docNumero.isEmpty) {
+        consejos.add(_ConsejoItem(
+          title: 'Cargá tu número de documento',
+          body: 'Es un dato clave de confianza para quienes te contratan.',
+          icon: Icons.badge_outlined,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const DatosPersonalesFlotanteWidget()),
+            );
+          },
+        ));
+      }
+
+      // 3) Fecha de nacimiento
+      if (data['fecha_nacimiento'] == null) {
+        consejos.add(_ConsejoItem(
+          title: 'Completá tu fecha de nacimiento',
+          body: 'Ayuda a validar tu identidad y a personalizar tu perfil.',
+          icon: Icons.cake_outlined,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const DatosPersonalesFlotanteWidget()),
+            );
+          },
+        ));
+      }
+
+      // 4) Validaciones de terceros (domicilio / referencias)
+      final vals = data['validaciones_recibidas'] as List<dynamic>? ?? [];
+      if (vals.isEmpty) {
+        consejos.add(_ConsejoItem(
+          title: 'Pedí validaciones de terceros',
+          body: 'Las referencias de vecinos o conocidos aumentan mucho la confianza.',
+          icon: Icons.verified_user_outlined,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SolicitarValidacionWidget()),
+            );
+          },
+        ));
+      }
+
+      // 5) Foto de documento validada (OCR)
+      final docValidado = data['doc_validado'] == true;
+      final urlFoto = (data['url_foto_documento'] ?? '').toString();
+      if (!docValidado || urlFoto.isEmpty) {
+        consejos.add(_ConsejoItem(
+          title: 'Validá tu documento con foto',
+          body: 'Escaneá el DNI: es el diferencial más fuerte frente al resto.',
+          icon: Icons.document_scanner_outlined,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const DatosPersonalesFlotanteWidget()),
+            );
+          },
+        ));
+      }
+
+      // Si está todo completo, un tip positivo
+      if (consejos.isEmpty) {
+        consejos.add(_ConsejoItem(
+          title: '¡Perfil muy completo!',
+          body: 'Seguí compartiendo tu tarjeta y pidiendo evaluaciones.',
+          icon: Icons.emoji_events_outlined,
+          onTap: _compartirTarjeta,
+        ));
+      }
+
+      if (mounted) {
+        setState(() {
+          _consejos = consejos;
+          _cargandoConsejos = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error consejos: $e');
+      if (mounted) {
+        setState(() {
+          _consejos = [];
+          _cargandoConsejos = false;
+        });
+      }
+    }
   }
 
   @override
@@ -82,7 +352,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     );
 
     try {
-      final doc = await FirebaseFirestore.instance.collection('usuarios').doc(userId).get();
+      final doc =
+          await FirebaseFirestore.instance.collection('usuarios').doc(userId).get();
       if (context.mounted) Navigator.pop(context);
 
       if (doc.exists) {
@@ -95,9 +366,16 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         if (profesiones.isEmpty || localidades.isEmpty || !esTrabajador) {
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Para compartir tu tarjeta, primero configurá tus especialidades y zonas.')),
+              const SnackBar(
+                content: Text(
+                  'Para compartir tu tarjeta, primero configurá tus especialidades y zonas.',
+                ),
+              ),
             );
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const RegistroTrabajadorWidget()));
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const RegistroTrabajadorWidget()),
+            );
           }
         } else {
           if (context.mounted) {
@@ -105,7 +383,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               context,
               MaterialPageRoute(
                 builder: (_) => TarjetaDigitalWidget(
-                  usuarioRef: FirebaseFirestore.instance.collection('usuarios').doc(userId),
+                  usuarioRef:
+                      FirebaseFirestore.instance.collection('usuarios').doc(userId),
                 ),
               ),
             );
@@ -122,7 +401,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
   void _irAGuiaInstagram() {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Abriendo guía: Cómo promocionar tus trabajos en Instagram...')),
+      const SnackBar(
+        content: Text('Abriendo guía: Cómo promocionar tus trabajos en Instagram...'),
+      ),
     );
   }
 
@@ -131,7 +412,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => BuscadorPrestadoresWidget(initialQuery: texto.isEmpty ? null : texto),
+        builder: (_) =>
+            BuscadorPrestadoresWidget(initialQuery: texto.isEmpty ? null : texto),
       ),
     );
   }
@@ -158,7 +440,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
     if (index == 1) {
       setState(() => _currentIndex = 0);
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()));
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()),
+      );
       return;
     }
 
@@ -209,7 +494,12 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               padding: const EdgeInsets.only(right: 8),
               child: GestureDetector(
                 onTap: () {
-                  setState(() => _modoPrestador = !_modoPrestador);
+                  setState(() {
+                    _modoPrestador = !_modoPrestador;
+                  });
+                  if (_modoPrestador && _consejos.isEmpty && !_cargandoConsejos) {
+                    _cargarConsejosPersonalizados();
+                  }
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -268,7 +558,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         },
         child: _currentIndex == 3
             ? MenuPerfilOpcionesWidget(
-                key: const ValueKey('perfil'),
+                key: ValueKey('perfil_$_modoPrestador'),
+                modoPrestador: _modoPrestador,
                 onClose: () => setState(() => _currentIndex = 0),
               )
             : (_modoPrestador
@@ -293,12 +584,22 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
   // ===================== VISTA CLIENTE =====================
   Widget _buildClienteBody({Key? key}) {
+    final coloresIcono = [
+      _clientePrimary,
+      _accentCoral,
+      _accentLightBlue,
+      _prestadorPrimary,
+      _dark,
+      _clientePrimary,
+      _accentCoral,
+      _prestadorPrimary,
+    ];
+
     return SingleChildScrollView(
       key: key,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Search
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(
@@ -319,40 +620,54 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
 
-          // Categorías de servicios (estilo del modelo de iconos)
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Text(
-              'Servicios',
+              'Servicios más buscados',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
           ),
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 4,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 8,
-              childAspectRatio: 0.82,
-              children: [
-                _buildCategoryIcon(Icons.cleaning_services_outlined, 'Limpieza', _clientePrimary),
-                _buildCategoryIcon(Icons.restaurant_outlined, 'Cocina', _accentCoral),
-                _buildCategoryIcon(Icons.bathtub_outlined, 'Baño', _accentLightBlue),
-                _buildCategoryIcon(Icons.person_outline, 'Doméstica', _prestadorPrimary),
-                _buildCategoryIcon(Icons.handyman_outlined, 'Carpintería', _dark),
-                _buildCategoryIcon(Icons.plumbing, 'Plomería', _clientePrimary),
-                _buildCategoryIcon(Icons.build_outlined, 'Reparaciones', _accentCoral),
-                _buildCategoryIcon(Icons.yard_outlined, 'Jardinería', _prestadorPrimary),
-              ],
+          const SizedBox(height: 4),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              'Actualizados según demanda de las últimas 24 hs',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
           ),
+          const SizedBox(height: 12),
+
+          if (_cargandoServicios)
+            const Padding(
+              padding: EdgeInsets.all(32),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _topServicios.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 8,
+                  childAspectRatio: 0.82,
+                ),
+                itemBuilder: (context, index) {
+                  final s = _topServicios[index];
+                  final color = coloresIcono[index % coloresIcono.length];
+                  return _buildCategoryIcon(s.icon, s.label, color, () {
+                    // Busca por label legible (el buscador también matchea profesiones)
+                    _irABuscador(s.label);
+                  });
+                },
+              ),
+            ),
 
           const SizedBox(height: 28),
 
-          // Acciones rápidas cliente
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Text(
@@ -378,7 +693,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                     icon: Icons.check_circle_outline,
                     label: 'Evaluar\ntrabajos',
                     onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()),
+                      );
                     },
                   ),
                 ),
@@ -388,7 +706,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
           const SizedBox(height: 28),
 
-          // Últimos mensajes (placeholder)
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Text(
@@ -422,7 +739,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Banner Instagram
           GestureDetector(
             onTap: _irAGuiaInstagram,
             child: Container(
@@ -471,7 +787,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
           const SizedBox(height: 16),
 
-          // Acciones principales prestador
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Text(
@@ -498,12 +813,15 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                   onTap: _compartirTarjeta,
                 ),
                 _buildPrestadorCard(
-                  icon: Icons.work_outline,
+                  icon: Icons.handyman_outlined,
                   title: 'Especialidades',
                   subtitle: 'Oficios y zonas',
                   color: _clientePrimary,
                   onTap: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const RegistroTrabajadorWidget()));
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const RegistroTrabajadorWidget()),
+                    );
                   },
                 ),
                 _buildPrestadorCard(
@@ -512,7 +830,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                   subtitle: 'Lo que dicen de vos',
                   color: _accentCoral,
                   onTap: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()));
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()),
+                    );
                   },
                 ),
                 _buildPrestadorCard(
@@ -521,7 +842,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                   subtitle: 'Datos y validaciones',
                   color: _dark,
                   onTap: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuPerfilWidget()));
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const MenuPerfilWidget()),
+                    );
                   },
                 ),
               ],
@@ -530,7 +854,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
           const SizedBox(height: 28),
 
-          // Tips rápidos
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Text(
@@ -538,17 +861,29 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
+          const SizedBox(height: 4),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              'Basados en lo que todavía te falta completar',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ),
           const SizedBox(height: 12),
-          _buildTipCard(
-            'Completá tu zona de cobertura',
-            'Cuantas más localidades tengas, más te van a encontrar.',
-            Icons.location_on_outlined,
-          ),
-          _buildTipCard(
-            'Pedí validaciones de domicilio',
-            'Las referencias aumentan la confianza de los clientes.',
-            Icons.verified_user_outlined,
-          ),
+
+          if (_cargandoConsejos)
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_consejos.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('No hay pendientes por ahora.'),
+            )
+          else
+            ..._consejos.map((c) => _buildTipCard(c)),
+
           const SizedBox(height: 24),
         ],
       ),
@@ -557,9 +892,14 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
   // ===================== WIDGETS AUXILIARES =====================
 
-  Widget _buildCategoryIcon(IconData icon, String label, Color accent) {
+  Widget _buildCategoryIcon(
+    IconData icon,
+    String label,
+    Color accent,
+    VoidCallback onTap,
+  ) {
     return InkWell(
-      onTap: () => _irABuscador(label),
+      onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -624,7 +964,11 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             Expanded(
               child: Text(
                 label,
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, height: 1.25),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  height: 1.25,
+                ),
               ),
             ),
           ],
@@ -680,37 +1024,60 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     );
   }
 
-  Widget _buildTipCard(String title, String body, IconData icon) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8),
-        ],
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: primaryColor, size: 28),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                const SizedBox(height: 2),
-                Text(body, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-              ],
+  Widget _buildTipCard(_ConsejoItem c) {
+    return InkWell(
+      onTap: c.onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: primaryColor.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(c.icon, color: primaryColor, size: 24),
             ),
-          ),
-        ],
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    c.title,
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    c.body,
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: Colors.grey.shade400),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildProviderCard(String title, String description, String time, Color color) {
+  Widget _buildProviderCard(
+    String title,
+    String description,
+    String time,
+    Color color,
+  ) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       padding: const EdgeInsets.all(16),
@@ -750,4 +1117,34 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       ),
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Modelos internos
+// ---------------------------------------------------------------------------
+
+class _ServicioMeta {
+  final String label;
+  final IconData icon;
+  const _ServicioMeta(this.label, this.icon);
+}
+
+class _ServicioItem {
+  final String clave;
+  final String label;
+  final IconData icon;
+  _ServicioItem({required this.clave, required this.label, required this.icon});
+}
+
+class _ConsejoItem {
+  final String title;
+  final String body;
+  final IconData icon;
+  final VoidCallback onTap;
+  _ConsejoItem({
+    required this.title,
+    required this.body,
+    required this.icon,
+    required this.onTap,
+  });
 }
