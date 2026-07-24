@@ -59,16 +59,16 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     'limpieza': _ServicioMeta('Limpieza', Icons.cleaning_services_outlined),
   };
 
-  /// Fallback fijo (orden de popularidad aproximado del dummy)
+  /// Fallback fijo (orden de popularidad aproximado)
   static const List<String> _fallbackOrden = [
-    'jardineria',
     'electricidad',
-    'plomeria',
-    'pintura',
     'carpinteria',
+    'plomeria',
+    'jardineria',
     'limpieza',
-    'albanileria',
+    'pintura',
     'gasista',
+    'albanileria',
   ];
 
   @override
@@ -80,7 +80,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
   void _detectarRol() {
     final data = UserSession().datosCompletos;
-    final esPrestador = data?['es_trabajador'] == true || data?['rol'] == 'trabajador';
+    final esPrestador =
+        data?['es_trabajador'] == true || data?['rol'] == 'trabajador';
     setState(() {
       _puedeSerAmbos = esPrestador;
       _modoPrestador = esPrestador;
@@ -96,64 +97,89 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   }
 
   // ---------------------------------------------------------------------------
-  // TOP 8 SERVICIOS (ranking diario)
+  // TOP 8 SERVICIOS (ranking diario con auto-actualización)
   // ---------------------------------------------------------------------------
-  /// 1) Intenta leer stats/top_servicios (documento con vigencia 24h)
-  /// 2) Si no existe o expiró → cuenta frecuencia real de profesiones en prestadores
-  /// 3) Fallback al orden fijo del catálogo conocido
   Future<void> _cargarTopServicios() async {
     setState(() => _cargandoServicios = true);
     try {
-      // 1) Stats diarias (si las genera un Cloud Function / job)
-      final statsDoc =
-          await FirebaseFirestore.instance.collection('stats').doc('top_servicios').get();
+      final statsRef =
+          FirebaseFirestore.instance.collection('stats').doc('top_servicios');
+      final statsDoc = await statsRef.get();
+
+      bool usarStats = false;
+      List<String> ranking = [];
+
       if (statsDoc.exists) {
         final data = statsDoc.data()!;
         final actualizado = data['actualizado_en'];
         DateTime? ts;
         if (actualizado is Timestamp) ts = actualizado.toDate();
+
         if (ts != null && DateTime.now().difference(ts).inHours < 24) {
-          final lista = (data['ranking'] as List<dynamic>? ?? [])
+          ranking = (data['ranking'] as List<dynamic>? ?? [])
               .map((e) => e.toString().toLowerCase().trim())
               .where((s) => s.isNotEmpty)
               .toList();
-          if (lista.isNotEmpty) {
-            _aplicarRanking(lista);
-            return;
-          }
+          if (ranking.isNotEmpty) usarStats = true;
         }
       }
 
-      // 2) Proxy de demanda: profesiones más declaradas por prestadores
-      final snap = await FirebaseFirestore.instance
-          .collection('usuarios')
-          .where('es_trabajador', isEqualTo: true)
-          .limit(400)
-          .get();
-
-      final counts = <String, int>{};
-      for (final doc in snap.docs) {
-        final profs = doc.data()['profesiones'] as List<dynamic>? ?? [];
-        for (final p in profs) {
-          final key = p.toString().toLowerCase().trim();
-          if (key.isEmpty) continue;
-          counts[key] = (counts[key] ?? 0) + 1;
-        }
+      // Si no hay ranking fresco → recalcular desde la DB y guardar
+      if (!usarStats) {
+        ranking = await _recalcularYGuardarRanking(statsRef);
       }
 
-      if (counts.isNotEmpty) {
-        final sorted = counts.entries.toList()
-          ..sort((a, b) => b.value.compareTo(a.value));
-        _aplicarRanking(sorted.map((e) => e.key).toList());
-        return;
-      }
-
-      // 3) Fallback
-      _aplicarRanking(_fallbackOrden);
+      _aplicarRanking(ranking.isNotEmpty ? ranking : _fallbackOrden);
     } catch (e) {
       debugPrint('Error cargando top servicios: $e');
       _aplicarRanking(_fallbackOrden);
     }
+  }
+
+  /// Cuenta profesiones de prestadores y actualiza stats/top_servicios
+  Future<List<String>> _recalcularYGuardarRanking(
+    DocumentReference statsRef,
+  ) async {
+    final counts = <String, int>{};
+
+    final snap = await FirebaseFirestore.instance
+        .collection('usuarios')
+        .where('es_trabajador', isEqualTo: true)
+        .limit(500)
+        .get();
+
+    for (final doc in snap.docs) {
+      final profs = doc.data()['profesiones'] as List<dynamic>? ?? [];
+      for (final p in profs) {
+        final key = p.toString().toLowerCase().trim();
+        if (key.isEmpty) continue;
+        if (!_metaServicios.containsKey(key)) continue;
+        counts[key] = (counts[key] ?? 0) + 1;
+      }
+    }
+
+    final sorted = counts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    final ranking = sorted.map((e) => e.key).take(8).toList();
+
+    for (final k in _fallbackOrden) {
+      if (ranking.length >= 8) break;
+      if (!ranking.contains(k)) ranking.add(k);
+    }
+
+    try {
+      await statsRef.set({
+        'ranking': ranking,
+        'actualizado_en': FieldValue.serverTimestamp(),
+        'fuente': 'app_auto',
+        'total_prestadores_muestra': snap.docs.length,
+      });
+    } catch (e) {
+      debugPrint('No se pudo guardar stats/top_servicios: $e');
+    }
+
+    return ranking;
   }
 
   void _aplicarRanking(List<String> claves) {
@@ -163,7 +189,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     for (final clave in claves) {
       if (vistos.contains(clave)) continue;
       final meta = _metaServicios[clave];
-      if (meta == null) continue; // solo servicios reales del catálogo
+      if (meta == null) continue;
       vistos.add(clave);
       items.add(_ServicioItem(
         clave: clave,
@@ -173,7 +199,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       if (items.length >= 8) break;
     }
 
-    // Completar hasta 8 con fallback si hiciera falta
     for (final clave in _fallbackOrden) {
       if (items.length >= 8) break;
       if (vistos.contains(clave)) continue;
@@ -223,16 +248,19 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           onTap: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const ZonaDeTrabajoFlotanteWidget()),
+              MaterialPageRoute(
+                builder: (_) => const ZonaDeTrabajoFlotanteWidget(),
+              ),
             );
           },
         ));
       }
 
       // 2) Número de documento
-      final docNumero = (data['doc_numero'] ?? data['numero_documento'] ?? data['documento'] ?? '')
-          .toString()
-          .trim();
+      final docNumero =
+          (data['doc_numero'] ?? data['numero_documento'] ?? data['documento'] ?? '')
+              .toString()
+              .trim();
       if (docNumero.isEmpty) {
         consejos.add(_ConsejoItem(
           title: 'Cargá tu número de documento',
@@ -241,7 +269,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           onTap: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const DatosPersonalesFlotanteWidget()),
+              MaterialPageRoute(
+                builder: (_) => const DatosPersonalesFlotanteWidget(),
+              ),
             );
           },
         ));
@@ -256,13 +286,15 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           onTap: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const DatosPersonalesFlotanteWidget()),
+              MaterialPageRoute(
+                builder: (_) => const DatosPersonalesFlotanteWidget(),
+              ),
             );
           },
         ));
       }
 
-      // 4) Validaciones de terceros (domicilio / referencias)
+      // 4) Validaciones de terceros
       final vals = data['validaciones_recibidas'] as List<dynamic>? ?? [];
       if (vals.isEmpty) {
         consejos.add(_ConsejoItem(
@@ -272,13 +304,15 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           onTap: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const SolicitarValidacionWidget()),
+              MaterialPageRoute(
+                builder: (_) => const SolicitarValidacionWidget(),
+              ),
             );
           },
         ));
       }
 
-      // 5) Foto de documento validada (OCR)
+      // 5) Foto de documento validada
       final docValidado = data['doc_validado'] == true;
       final urlFoto = (data['url_foto_documento'] ?? '').toString();
       if (!docValidado || urlFoto.isEmpty) {
@@ -289,13 +323,14 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           onTap: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const DatosPersonalesFlotanteWidget()),
+              MaterialPageRoute(
+                builder: (_) => const DatosPersonalesFlotanteWidget(),
+              ),
             );
           },
         ));
       }
 
-      // Si está todo completo, un tip positivo
       if (consejos.isEmpty) {
         consejos.add(_ConsejoItem(
           title: '¡Perfil muy completo!',
@@ -359,7 +394,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
         final profesiones = data['profesiones'] as List<dynamic>? ?? [];
-        final zonasCobertura = data['zonas_cobertura'] as Map<String, dynamic>? ?? {};
+        final zonasCobertura =
+            data['zonas_cobertura'] as Map<String, dynamic>? ?? {};
         final localidades = zonasCobertura['localidades'] as List<dynamic>? ?? [];
         final esTrabajador = data['es_trabajador'] == true;
 
@@ -383,8 +419,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               context,
               MaterialPageRoute(
                 builder: (_) => TarjetaDigitalWidget(
-                  usuarioRef:
-                      FirebaseFirestore.instance.collection('usuarios').doc(userId),
+                  usuarioRef: FirebaseFirestore.instance
+                      .collection('usuarios')
+                      .doc(userId),
                 ),
               ),
             );
@@ -394,7 +431,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     } catch (e) {
       if (context.mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -412,8 +450,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            BuscadorPrestadoresWidget(initialQuery: texto.isEmpty ? null : texto),
+        builder: (_) => BuscadorPrestadoresWidget(
+          initialQuery: texto.isEmpty ? null : texto,
+        ),
       ),
     );
   }
@@ -502,7 +541,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                   }
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: primaryColor.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(20),
@@ -553,7 +593,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           final offsetAnimation = Tween<Offset>(
             begin: const Offset(0, 1),
             end: Offset.zero,
-          ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
+          ).animate(
+            CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+          );
           return SlideTransition(position: offsetAnimation, child: child);
         },
         child: _currentIndex == 3
@@ -573,8 +615,14 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.add_circle_outline), label: 'Evaluar'),
-          BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), label: 'Mensajes'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.add_circle_outline),
+            label: 'Evaluar',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.chat_bubble_outline),
+            label: 'Mensajes',
+          ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
         ],
         onTap: _onBottomNavTap,
@@ -659,7 +707,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                   final s = _topServicios[index];
                   final color = coloresIcono[index % coloresIcono.length];
                   return _buildCategoryIcon(s.icon, s.label, color, () {
-                    // Busca por label legible (el buscador también matchea profesiones)
                     _irABuscador(s.label);
                   });
                 },
@@ -695,7 +742,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()),
+                        MaterialPageRoute(
+                          builder: (_) => const MenuEvaluacionesWidget(),
+                        ),
                       );
                     },
                   ),
@@ -820,7 +869,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const RegistroTrabajadorWidget()),
+                      MaterialPageRoute(
+                        builder: (_) => const RegistroTrabajadorWidget(),
+                      ),
                     );
                   },
                 ),
@@ -832,7 +883,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()),
+                      MaterialPageRoute(
+                        builder: (_) => const MenuEvaluacionesWidget(),
+                      ),
                     );
                   },
                 ),
@@ -844,7 +897,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const MenuPerfilWidget()),
+                      MaterialPageRoute(
+                        builder: (_) => const MenuPerfilWidget(),
+                      ),
                     );
                   },
                 ),
@@ -1055,7 +1110,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                 children: [
                   Text(
                     c.title,
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -1133,7 +1191,11 @@ class _ServicioItem {
   final String clave;
   final String label;
   final IconData icon;
-  _ServicioItem({required this.clave, required this.label, required this.icon});
+  _ServicioItem({
+    required this.clave,
+    required this.label,
+    required this.icon,
+  });
 }
 
 class _ConsejoItem {
