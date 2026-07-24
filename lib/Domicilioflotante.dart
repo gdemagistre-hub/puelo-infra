@@ -6,7 +6,8 @@ class DomicilioFlotanteWidget extends StatefulWidget {
   const DomicilioFlotanteWidget({super.key});
 
   @override
-  State<DomicilioFlotanteWidget> createState() => _DomicilioFlotanteWidgetState();
+  State<DomicilioFlotanteWidget> createState() =>
+      _DomicilioFlotanteWidgetState();
 }
 
 class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
@@ -55,7 +56,8 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
     try {
       final paisDoc = await db.collection('cat_paises').doc('AR').get();
       if (paisDoc.exists && paisDoc.data()!.containsKey('provincias')) {
-        provincias = List<Map<String, dynamic>>.from(paisDoc.data()!['provincias']);
+        provincias =
+            List<Map<String, dynamic>>.from(paisDoc.data()!['provincias']);
       }
 
       final doc = await db.collection('usuarios').doc(uid).get();
@@ -63,8 +65,10 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
         final data = doc.data()!;
         _calleController.text = (data['calle'] ?? '').toString();
         _numeroController.text = (data['numero'] ?? '').toString();
-        _pisoController.text = (data['piso_depto'] ?? data['piso'] ?? '').toString();
-        _cpController.text = (data['cp'] ?? data['codigo_postal'] ?? '').toString();
+        _pisoController.text =
+            (data['piso_depto'] ?? data['piso'] ?? '').toString();
+        _cpController.text =
+            (data['cp'] ?? data['codigo_postal'] ?? '').toString();
 
         final geo = data['direccion_geo'] as Map<String, dynamic>?;
         if (geo != null) {
@@ -88,14 +92,20 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
   }
 
   Future<void> _loadPartidos(String provId) async {
-    final query = await db.collection('cat_departamentos').where('provincia_id', isEqualTo: provId).get();
+    final query = await db
+        .collection('cat_departamentos')
+        .where('provincia_id', isEqualTo: provId)
+        .get();
     setState(() {
       partidos = query.docs.map((d) => d.data()).toList();
     });
   }
 
   Future<void> _loadLocalidades(String partId) async {
-    final query = await db.collection('cat_localidades').where('partido_id', isEqualTo: partId).get();
+    final query = await db
+        .collection('cat_localidades')
+        .where('partido_id', isEqualTo: partId)
+        .get();
     setState(() {
       localidades = query.docs.map((d) => d.data()).toList();
     });
@@ -124,6 +134,25 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
   Future<void> _actualizarDatos() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final tieneCalle = _calleController.text.trim().isNotEmpty;
+    final tieneNumero = _numeroController.text.trim().isNotEmpty;
+
+    // Si cargó calle o número → provincia, partido y localidad obligatorios
+    if (tieneCalle || tieneNumero) {
+      if (selectedProvinciaId == null ||
+          selectedPartidoId == null ||
+          selectedLocalidadId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Si cargás calle y número, también son obligatorios provincia, partido y localidad.',
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
     final uid = UserSession().uid;
     if (uid == null) return;
 
@@ -135,16 +164,36 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
       String? locNombre;
 
       if (selectedProvinciaId != null) {
-        final p = provincias.where((e) => e['id'].toString() == selectedProvinciaId).toList();
+        final p = provincias
+            .where((e) => e['id'].toString() == selectedProvinciaId)
+            .toList();
         if (p.isNotEmpty) provNombre = p.first['nombre']?.toString();
       }
       if (selectedPartidoId != null) {
-        final p = partidos.where((e) => (e['departamento_id'] ?? e['id']).toString() == selectedPartidoId).toList();
-        if (p.isNotEmpty) partNombre = (p.first['departamento_nombre'] ?? p.first['nombre'])?.toString();
+        final p = partidos
+            .where(
+              (e) =>
+                  (e['departamento_id'] ?? e['id']).toString() ==
+                  selectedPartidoId,
+            )
+            .toList();
+        if (p.isNotEmpty) {
+          partNombre =
+              (p.first['departamento_nombre'] ?? p.first['nombre'])?.toString();
+        }
       }
       if (selectedLocalidadId != null) {
-        final p = localidades.where((e) => (e['localidad_id'] ?? e['id']).toString() == selectedLocalidadId).toList();
-        if (p.isNotEmpty) locNombre = (p.first['localidad_nombre'] ?? p.first['nombre'])?.toString();
+        final p = localidades
+            .where(
+              (e) =>
+                  (e['localidad_id'] ?? e['id']).toString() ==
+                  selectedLocalidadId,
+            )
+            .toList();
+        if (p.isNotEmpty) {
+          locNombre =
+              (p.first['localidad_nombre'] ?? p.first['nombre'])?.toString();
+        }
       }
 
       await db.collection('usuarios').doc(uid).set({
@@ -165,13 +214,18 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Domicilio actualizado correctamente'), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Text('Domicilio actualizado correctamente'),
+            backgroundColor: Colors.green,
+          ),
         );
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
       }
     }
 
@@ -189,7 +243,10 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Domicilio', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Domicilio',
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
       ),
       body: _loading
@@ -199,34 +256,59 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
               child: ListView(
                 padding: const EdgeInsets.all(20),
                 children: [
-                  _buildField('Calle', _calleController, required: true),
-                  _buildField('Número', _numeroController, required: true),
+                  _buildField('Calle', _calleController),
+                  _buildField('Número', _numeroController),
                   _buildField('Piso / Departamento', _pisoController),
                   _buildDropdown(
                     'Provincia',
                     selectedProvinciaId,
-                    provincias.map((p) => MapEntry(p['id'].toString(), p['nombre'].toString())).toList(),
+                    provincias
+                        .map(
+                          (p) => MapEntry(
+                            p['id'].toString(),
+                            p['nombre'].toString(),
+                          ),
+                        )
+                        .toList(),
                     _onProvinciaChanged,
                   ),
                   _buildDropdown(
                     'Partido / Departamento',
                     selectedPartidoId,
-                    partidos.map((p) => MapEntry(
-                      (p['departamento_id'] ?? p['id']).toString(),
-                      (p['departamento_nombre'] ?? p['nombre']).toString(),
-                    )).toList(),
+                    partidos
+                        .map(
+                          (p) => MapEntry(
+                            (p['departamento_id'] ?? p['id']).toString(),
+                            (p['departamento_nombre'] ?? p['nombre'])
+                                .toString(),
+                          ),
+                        )
+                        .toList(),
                     _onPartidoChanged,
                   ),
                   _buildDropdown(
                     'Localidad',
                     selectedLocalidadId,
-                    localidades.map((l) => MapEntry(
-                      (l['localidad_id'] ?? l['id']).toString(),
-                      (l['localidad_nombre'] ?? l['nombre']).toString(),
-                    )).toList(),
+                    localidades
+                        .map(
+                          (l) => MapEntry(
+                            (l['localidad_id'] ?? l['id']).toString(),
+                            (l['localidad_nombre'] ?? l['nombre']).toString(),
+                          ),
+                        )
+                        .toList(),
                     (v) => setState(() => selectedLocalidadId = v),
                   ),
-                  _buildField('Código postal', _cpController, keyboard: TextInputType.number),
+                  _buildField(
+                    'Código postal',
+                    _cpController,
+                    keyboard: TextInputType.number,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Si cargás calle y número, provincia, partido y localidad son obligatorios.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
                   const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
@@ -234,13 +316,24 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
                     child: ElevatedButton.icon(
                       onPressed: _saving ? null : _actualizarDatos,
                       icon: _saving
-                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
                           : const Icon(Icons.save_outlined),
-                      label: Text(_saving ? 'Guardando...' : 'Actualizar los datos'),
+                      label: Text(
+                        _saving ? 'Guardando...' : 'Actualizar los datos',
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryColor,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     ),
                   ),
@@ -251,7 +344,11 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
     );
   }
 
-  Widget _buildField(String label, TextEditingController controller, {bool required = false, TextInputType? keyboard}) {
+  Widget _buildField(
+    String label,
+    TextEditingController controller, {
+    TextInputType? keyboard,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: TextFormField(
@@ -260,14 +357,19 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
         decoration: InputDecoration(
           labelText: label,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
-        validator: required ? (v) => (v == null || v.trim().isEmpty) ? 'Campo obligatorio' : null : null,
       ),
     );
   }
 
-  Widget _buildDropdown(String label, String? value, List<MapEntry<String, String>> items, ValueChanged<String?> onChanged) {
+  Widget _buildDropdown(
+    String label,
+    String? value,
+    List<MapEntry<String, String>> items,
+    ValueChanged<String?> onChanged,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: DropdownButtonFormField<String>(
@@ -275,9 +377,17 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
         decoration: InputDecoration(
           labelText: label,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
-        items: items.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value, overflow: TextOverflow.ellipsis))).toList(),
+        items: items
+            .map(
+              (e) => DropdownMenuItem(
+                value: e.key,
+                child: Text(e.value, overflow: TextOverflow.ellipsis),
+              ),
+            )
+            .toList(),
         onChanged: onChanged,
         isExpanded: true,
       ),
