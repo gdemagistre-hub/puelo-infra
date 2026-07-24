@@ -7,6 +7,7 @@ import 'perfilCompletoflotante.dart';
 
 class MenuPerfilOpcionesWidget extends StatelessWidget {
   final VoidCallback? onClose;
+
   /// true = muestra opciones de prestador; false = solo cliente
   final bool modoPrestador;
 
@@ -51,7 +52,8 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
       _MenuItem(
         icon: Icons.person_outline_rounded,
         label: 'Datos personales',
-        onTap: () => _abrirFlotante(context, const DatosPersonalesFlotanteWidget()),
+        onTap: () =>
+            _abrirFlotante(context, const DatosPersonalesFlotanteWidget()),
       ),
       _MenuItem(
         icon: Icons.home_outlined,
@@ -62,18 +64,23 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
         _MenuItem(
           icon: Icons.handyman_outlined,
           label: 'Especialidades laborales',
-          onTap: () => _abrirFlotante(context, const EspecialidadesLaboralesFlotanteWidget()),
+          onTap: () => _abrirFlotante(
+            context,
+            const EspecialidadesLaboralesFlotanteWidget(),
+          ),
         ),
         _MenuItem(
           icon: Icons.map_outlined,
           label: 'Zona de trabajo preferida',
-          onTap: () => _abrirFlotante(context, const ZonaDeTrabajoFlotanteWidget()),
+          onTap: () =>
+              _abrirFlotante(context, const ZonaDeTrabajoFlotanteWidget()),
         ),
       ],
       _MenuItem(
         icon: Icons.badge_outlined,
         label: 'Mi perfil completo',
-        onTap: () => _abrirFlotante(context, const PerfilCompletoFlotanteWidget()),
+        onTap: () =>
+            _abrirFlotante(context, const PerfilCompletoFlotanteWidget()),
       ),
     ];
 
@@ -82,6 +89,7 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Handle del bottom sheet
           Center(
             child: Container(
               margin: const EdgeInsets.only(top: 10, bottom: 8),
@@ -93,13 +101,17 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
               ),
             ),
           ),
+
+          // Título + cerrar
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+            padding: const EdgeInsets.fromLTRB(20, 4, 12, 12),
             child: Row(
               children: [
                 Expanded(
                   child: Text(
-                    modoPrestador ? 'Mi perfil · Prestador' : 'Mi perfil · Cliente',
+                    modoPrestador
+                        ? 'Mi perfil · Prestador'
+                        : 'Mi perfil · Cliente',
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -116,28 +128,38 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
               ],
             ),
           ),
+
           const Divider(height: 1),
+
+          // Lista de opciones
           Expanded(
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(vertical: 8),
               itemCount: items.length,
               separatorBuilder: (_, __) => Divider(
                 height: 1,
-                indent: 56,
+                indent: 72,
                 color: Colors.grey.shade200,
               ),
               itemBuilder: (context, index) {
                 final item = items[index];
                 return ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 6,
+                  ),
                   leading: Container(
-                    width: 40,
-                    height: 40,
+                    width: 42,
+                    height: 42,
                     decoration: BoxDecoration(
                       color: primaryColor.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(item.icon, color: primaryColor, size: 22),
+                    child: Icon(
+                      item.icon,
+                      color: primaryColor,
+                      size: 22,
+                    ),
                   ),
                   title: Text(
                     item.label,
