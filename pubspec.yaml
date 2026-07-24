@@ -87,3 +87,4 @@ flutter:
     - assets/provincia.json
     - assets/departamentos.json
     - assets/localidades.json
+    - assets/usuarios_dummy_500.json
