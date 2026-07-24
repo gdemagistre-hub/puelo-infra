@@ -11,6 +11,7 @@ import 'menuPerfilOpciones.dart';
 import 'datosPersonalesflotante.dart';
 import 'ZonaDeTrabajoflotante.dart';
 import 'solicitar_validacion.dart';
+import 'scoring_service.dart';
 
 class HomePageWidget extends StatefulWidget {
   const HomePageWidget({super.key});
@@ -22,7 +23,6 @@ class HomePageWidget extends StatefulWidget {
 }
 
 class _HomePageWidgetState extends State<HomePageWidget> {
-  // Paleta
   static const Color _clientePrimary = Color(0xFF734BE4);
   static const Color _prestadorPrimary = Color(0xFF28B5CD);
   static const Color _accentCoral = Color(0xFFF75A6D);
@@ -31,23 +31,20 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
   final TextEditingController _searchController = TextEditingController();
 
-  // 0 = Home, 3 = Perfil flotante
   int _currentIndex = 0;
 
   bool _modoPrestador = false;
   bool _puedeSerAmbos = false;
 
-  // Top servicios (hasta 8)
   List<_ServicioItem> _topServicios = [];
   bool _cargandoServicios = true;
 
-  // Consejos personalizados prestador
   List<_ConsejoItem> _consejos = [];
   bool _cargandoConsejos = true;
+  bool _corriendoBatch = false;
 
   Color get primaryColor => _modoPrestador ? _prestadorPrimary : _clientePrimary;
 
-  /// Mapeo clave de profesión (DB) → label + icono
   static const Map<String, _ServicioMeta> _metaServicios = {
     'electricidad': _ServicioMeta('Electricista', Icons.electrical_services_outlined),
     'plomeria': _ServicioMeta('Plomería', Icons.plumbing),
@@ -59,7 +56,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     'limpieza': _ServicioMeta('Limpieza', Icons.cleaning_services_outlined),
   };
 
-  /// Fallback fijo (orden de popularidad aproximado)
   static const List<String> _fallbackOrden = [
     'electricidad',
     'carpinteria',
@@ -96,9 +92,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // TOP 8 SERVICIOS (ranking diario con auto-actualización)
-  // ---------------------------------------------------------------------------
   Future<void> _cargarTopServicios() async {
     setState(() => _cargandoServicios = true);
     try {
@@ -124,7 +117,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         }
       }
 
-      // Si no hay ranking fresco → recalcular desde la DB y guardar
       if (!usarStats) {
         ranking = await _recalcularYGuardarRanking(statsRef);
       }
@@ -136,7 +128,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     }
   }
 
-  /// Cuenta profesiones de prestadores y actualiza stats/top_servicios
   Future<List<String>> _recalcularYGuardarRanking(
     DocumentReference statsRef,
   ) async {
@@ -216,9 +207,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // CONSEJOS PERSONALIZADOS (prestador)
-  // ---------------------------------------------------------------------------
   Future<void> _cargarConsejosPersonalizados() async {
     setState(() => _cargandoConsejos = true);
     final uid = UserSession().uid;
@@ -237,7 +225,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
       final consejos = <_ConsejoItem>[];
 
-      // 1) Zona de trabajo
       final zonas = data['zonas_cobertura'] as Map<String, dynamic>?;
       final localidades = zonas?['localidades'] as List<dynamic>? ?? [];
       if (localidades.isEmpty) {
@@ -256,7 +243,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         ));
       }
 
-      // 2) Número de documento
       final docNumero =
           (data['doc_numero'] ?? data['numero_documento'] ?? data['documento'] ?? '')
               .toString()
@@ -277,7 +263,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         ));
       }
 
-      // 3) Fecha de nacimiento
       if (data['fecha_nacimiento'] == null) {
         consejos.add(_ConsejoItem(
           title: 'Completá tu fecha de nacimiento',
@@ -294,7 +279,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         ));
       }
 
-      // 4) Validaciones de terceros
       final vals = data['validaciones_recibidas'] as List<dynamic>? ?? [];
       if (vals.isEmpty) {
         consejos.add(_ConsejoItem(
@@ -312,7 +296,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         ));
       }
 
-      // 5) Foto de documento validada
       final docValidado = data['doc_validado'] == true;
       final urlFoto = (data['url_foto_documento'] ?? '').toString();
       if (!docValidado || urlFoto.isEmpty) {
@@ -354,6 +337,43 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           _cargandoConsejos = false;
         });
       }
+    }
+  }
+
+  Future<void> _ejecutarBatchScoring() async {
+    if (_corriendoBatch) return;
+    setState(() => _corriendoBatch = true);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final r = await ScoringService.ejecutarBatchDiario(
+        onProgress: (hechos, _) {
+          debugPrint('Scoring batch: $hechos usuarios');
+        },
+      );
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Scores actualizados: ${r.actualizados} de ${r.procesados} usuarios',
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al recalcular scores: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _corriendoBatch = false);
     }
   }
 
@@ -630,7 +650,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     );
   }
 
-  // ===================== VISTA CLIENTE =====================
   Widget _buildClienteBody({Key? key}) {
     final coloresIcono = [
       _clientePrimary,
@@ -667,7 +686,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               onSubmitted: (value) => _irABuscador(value),
             ),
           ),
-
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Text(
@@ -684,7 +702,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
           const SizedBox(height: 12),
-
           if (_cargandoServicios)
             const Padding(
               padding: EdgeInsets.all(32),
@@ -697,7 +714,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: _topServicios.length,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate: const
+                    SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 4,
                   mainAxisSpacing: 12,
                   crossAxisSpacing: 8,
@@ -712,9 +730,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                 },
               ),
             ),
-
           const SizedBox(height: 28),
-
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Text(
@@ -752,9 +768,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               ],
             ),
           ),
-
           const SizedBox(height: 28),
-
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Text(
@@ -781,7 +795,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     );
   }
 
-  // ===================== VISTA PRESTADOR =====================
   Widget _buildPrestadorBody({Key? key}) {
     return SingleChildScrollView(
       key: key,
@@ -833,9 +846,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               ),
             ),
           ),
-
           const SizedBox(height: 16),
-
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Text(
@@ -906,9 +917,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               ],
             ),
           ),
-
           const SizedBox(height: 28),
-
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Text(
@@ -925,7 +934,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
           const SizedBox(height: 12),
-
           if (_cargandoConsejos)
             const Padding(
               padding: EdgeInsets.all(24),
@@ -939,13 +947,44 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           else
             ..._consejos.map((c) => _buildTipCard(c)),
 
+          // --- BOTÓN ADMIN TEMPORAL: batch scoring ---
           const SizedBox(height: 24),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: OutlinedButton.icon(
+              onPressed: _corriendoBatch ? null : _ejecutarBatchScoring,
+              icon: _corriendoBatch
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh),
+              label: Text(
+                _corriendoBatch
+                    ? 'Recalculando scores...'
+                    : 'Recalcular scores (admin)',
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _dark,
+                side: BorderSide(color: _dark.withOpacity(0.4)),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                minimumSize: const Size(double.infinity, 48),
+              ),
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 6, 16, 24),
+            child: Text(
+              'Temporal: corre el batch de score_credito y badge_prestador. '
+              'Sacar cuando exista el Cloud Function diario.',
+              style: TextStyle(fontSize: 11, color: Colors.grey),
+            ),
+          ),
         ],
       ),
     );
   }
-
-  // ===================== WIDGETS AUXILIARES =====================
 
   Widget _buildCategoryIcon(
     IconData icon,
@@ -1176,10 +1215,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     );
   }
 }
-
-// ---------------------------------------------------------------------------
-// Modelos internos
-// ---------------------------------------------------------------------------
 
 class _ServicioMeta {
   final String label;
