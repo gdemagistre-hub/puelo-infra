@@ -8,7 +8,6 @@ import 'menuPerfil.dart';
 import 'registroTrabajador.dart';
 import 'tarjetaDigital.dart';
 import 'menuPerfilOpciones.dart';
-import 'import_dummy_usuarios.dart'; // TEMPORAL — borrar después de importar/limpiar
 
 class HomePageWidget extends StatefulWidget {
   const HomePageWidget({super.key});
@@ -26,10 +25,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
   // 0 = Home, 1 = Evaluar, 2 = Mensajes, 3 = Perfil (menú flotante)
   int _currentIndex = 0;
-
-  // TEMPORAL — borrar después de importar/limpiar
-  bool _importandoDummy = false;
-  bool _borrandoDummy = false;
 
   @override
   void dispose() {
@@ -74,9 +69,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         if (profesiones.isEmpty || localidades.isEmpty || !esTrabajador) {
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Para compartir tu tarjeta, primero configurá tus especialidades y zonas.'),
-              ),
+              const SnackBar(content: Text('Para compartir tu tarjeta, primero configurá tus especialidades y zonas.')),
             );
             Navigator.push(context, MaterialPageRoute(builder: (_) => const RegistroTrabajadorWidget()));
           }
@@ -117,123 +110,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     );
   }
 
-  // TEMPORAL — borrar después de importar
-  Future<void> _importarDummyUsuarios() async {
-    if (_importandoDummy || _borrandoDummy) return;
-
-    final confirmar = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Importar dummies'),
-        content: const Text(
-          'Esto va a cargar ~500 usuarios de prueba en Firestore '
-          '(IDs dummy_001…dummy_500).\n\n¿Continuar?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Importar'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmar != true) return;
-
-    setState(() => _importandoDummy = true);
-
-    try {
-      final result = await ImportDummyUsuarios.ejecutar(
-        onProgress: (hechos, total) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Importando… $hechos / $total')),
-            );
-          }
-        },
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Listo: ${result.importados} usuarios dummy importados'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al importar: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _importandoDummy = false);
-    }
-  }
-
-  // TEMPORAL — borrar después de limpiar
-  Future<void> _borrarDummyUsuarios() async {
-    if (_importandoDummy || _borrandoDummy) return;
-
-    final confirmar = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Borrar dummies'),
-        content: const Text(
-          'Esto va a eliminar de Firestore todos los usuarios con dummy = true '
-          '(y/o IDs dummy_001…dummy_500).\n\n¿Continuar?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Borrar'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmar != true) return;
-
-    setState(() => _borrandoDummy = true);
-
-    try {
-      final n = await ImportDummyUsuarios.borrarTodosDummy();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Borrados $n usuarios dummy'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al borrar: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _borrandoDummy = false);
-    }
-  }
-
   String _getInitials() {
     final nombreCompleto = UserSession().nombreCompleto.trim();
     if (nombreCompleto.isEmpty) return 'U';
@@ -246,6 +122,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   }
 
   void _onBottomNavTap(int index) {
+    // Si estaba en Perfil y toca Home / Evaluar / Mensajes → cierra el menú (flota hacia abajo)
     if (_currentIndex == 3 && index != 3) {
       setState(() => _currentIndex = 0);
     }
@@ -256,13 +133,14 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     }
 
     if (index == 1) {
-      setState(() => _currentIndex = 0);
+      setState(() => _currentIndex = 0); // cierra perfil si estaba abierto
       Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()));
       return;
     }
 
     if (index == 2) {
       setState(() => _currentIndex = 0);
+      // Mensajes todavía no implementado
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Mensajes próximamente')),
       );
@@ -270,6 +148,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     }
 
     if (index == 3) {
+      // Mostrar menú de perfil flotante
       setState(() => _currentIndex = 3);
     }
   }
@@ -320,9 +199,11 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           ),
         ],
       ),
+      // El body cambia: Home normal o menú de perfil (animado)
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 280),
         transitionBuilder: (child, animation) {
+          // Flota desde abajo cuando entra el menú de perfil
           final offsetAnimation = Tween<Offset>(
             begin: const Offset(0, 1),
             end: Offset.zero,
@@ -362,6 +243,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Search Bar
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
@@ -383,6 +265,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
 
+          // Banner
           GestureDetector(
             onTap: _irAGuiaInstagram,
             child: Container(
@@ -431,6 +314,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
           const SizedBox(height: 24),
 
+          // Services Grid
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Text(
@@ -442,7 +326,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           GridView.count(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 3, // temporal; volver a 4 después de limpiar
+            crossAxisCount: 4,
             padding: const EdgeInsets.symmetric(horizontal: 12),
             childAspectRatio: 0.9,
             children: [
@@ -450,10 +334,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                 _irABuscador();
               }),
               _buildServiceIcon(Icons.check_circle_outline, 'Evaluar Trabajos', () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()),
-                );
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()));
               }),
               _buildServiceIcon(Icons.badge, 'Compartir Tarjeta', _compartirTarjeta),
               _buildServiceIcon(Icons.person_outline, 'Sobre Mí', () {
@@ -462,23 +343,12 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                   MaterialPageRoute(builder: (_) => const MenuPerfilWidget()),
                 );
               }),
-              // TEMPORAL — borrar después de importar
-              _buildServiceIcon(
-                Icons.cloud_upload_outlined,
-                _importandoDummy ? 'Importando…' : 'Cargar dummy',
-                (_importandoDummy || _borrandoDummy) ? () {} : _importarDummyUsuarios,
-              ),
-              // TEMPORAL — borrar después de limpiar
-              _buildServiceIcon(
-                Icons.delete_outline,
-                _borrandoDummy ? 'Borrando…' : 'Borrar dummy',
-                (_importandoDummy || _borrandoDummy) ? () {} : _borrarDummyUsuarios,
-              ),
             ],
           ),
 
           const SizedBox(height: 24),
 
+          // Últimos Mensajes
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Text(
