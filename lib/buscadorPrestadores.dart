@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'tarjetaDigital.dart';
+import 'scoring_service.dart';
 
 class BuscadorPrestadoresWidget extends StatefulWidget {
   final String? initialQuery;
@@ -14,7 +15,8 @@ class BuscadorPrestadoresWidget extends StatefulWidget {
   static const String routePath = '/buscadorPrestadores';
 
   @override
-  State<BuscadorPrestadoresWidget> createState() => _BuscadorPrestadoresWidgetState();
+  State<BuscadorPrestadoresWidget> createState() =>
+      _BuscadorPrestadoresWidgetState();
 }
 
 class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
@@ -37,7 +39,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     'Limpieza',
   ];
 
-  // Chip de UI → valor guardado en profesiones (dummies y catálogo)
   static const Map<String, String> _rubroToProfesion = {
     'Electricista': 'electricidad',
     'Plomero': 'plomeria',
@@ -83,7 +84,8 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     final doc = await db.collection('cat_paises').doc('AR').get();
     if (doc.exists && doc.data()!.containsKey('provincias')) {
       setState(() {
-        provincias = List<Map<String, dynamic>>.from(doc.data()!['provincias']);
+        provincias =
+            List<Map<String, dynamic>>.from(doc.data()!['provincias']);
       });
     }
   }
@@ -133,7 +135,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     });
   }
 
-  /// Iniciales para el avatar (nombre + apellido)
   String _initials(Map<String, dynamic> data) {
     final n = (data['nombre'] ?? '').toString().trim();
     final a = (data['apellido'] ?? '').toString().trim();
@@ -141,6 +142,29 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     if (a.isEmpty) return n[0].toUpperCase();
     if (n.isEmpty) return a[0].toUpperCase();
     return '${n[0]}${a[0]}'.toUpperCase();
+  }
+
+  Widget _badgeChip(String? badge) {
+    final label = ScoringService.labelBadge(badge);
+    if (label.isEmpty) return const SizedBox.shrink();
+    final c = ScoringService.coloresBadge(badge);
+    return Container(
+      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: Color(c.background),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Color(c.foreground).withOpacity(0.35)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Color(c.foreground),
+        ),
+      ),
+    );
   }
 
   @override
@@ -173,13 +197,16 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                       decoration: InputDecoration(
                         hintText: 'Buscar por nombre o especialidad...',
                         prefixIcon: const Icon(Icons.search),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
-                        contentPadding: const EdgeInsets.symmetric(vertical: 12.0),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                        ),
+                        contentPadding:
+                            const EdgeInsets.symmetric(vertical: 12.0),
                       ),
-                      onChanged: (value) => setState(() => _searchQuery = value.toLowerCase()),
+                      onChanged: (value) =>
+                          setState(() => _searchQuery = value.toLowerCase()),
                     ),
                     const SizedBox(height: 12.0),
-
                     DropdownMenu<String>(
                       controller: _provinciaController,
                       expandedInsets: EdgeInsets.zero,
@@ -187,8 +214,11 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                       requestFocusOnTap: true,
                       label: const Text('Provincia'),
                       inputDecorationTheme: InputDecorationTheme(
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                        ),
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 16.0),
                       ),
                       dropdownMenuEntries: provincias.map((p) {
                         return DropdownMenuEntry<String>(
@@ -199,7 +229,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                       onSelected: _onProvinciaSelected,
                     ),
                     const SizedBox(height: 12.0),
-
                     Row(
                       children: [
                         Expanded(
@@ -210,13 +239,19 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                             requestFocusOnTap: true,
                             label: const Text('Partido'),
                             inputDecorationTheme: InputDecorationTheme(
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12.0),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16.0,
+                              ),
                             ),
                             dropdownMenuEntries: partidos.map((p) {
                               return DropdownMenuEntry<String>(
-                                value: (p['departamento_id'] ?? p['id']).toString(),
-                                label: (p['departamento_nombre'] ?? p['nombre']).toString(),
+                                value: (p['departamento_id'] ?? p['id'])
+                                    .toString(),
+                                label: (p['departamento_nombre'] ?? p['nombre'])
+                                    .toString(),
                               );
                             }).toList(),
                             onSelected: _onPartidoSelected,
@@ -231,22 +266,28 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                             requestFocusOnTap: true,
                             label: const Text('Localidad'),
                             inputDecorationTheme: InputDecorationTheme(
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12.0),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16.0,
+                              ),
                             ),
                             dropdownMenuEntries: localidades.map((l) {
                               return DropdownMenuEntry<String>(
-                                value: (l['localidad_id'] ?? l['id']).toString(),
-                                label: (l['localidad_nombre'] ?? l['nombre']).toString(),
+                                value:
+                                    (l['localidad_id'] ?? l['id']).toString(),
+                                label: (l['localidad_nombre'] ?? l['nombre'])
+                                    .toString(),
                               );
                             }).toList(),
-                            onSelected: (val) => setState(() => selectedLocalidadId = val),
+                            onSelected: (val) =>
+                                setState(() => selectedLocalidadId = val),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12.0),
-
                     SizedBox(
                       height: 40,
                       child: ListView.builder(
@@ -262,7 +303,8 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                               selected: isSelected,
                               selectedColor: primaryColor.withOpacity(0.2),
                               checkmarkColor: primaryColor,
-                              onSelected: (selected) => setState(() => _selectedRubro = rubro),
+                              onSelected: (selected) =>
+                                  setState(() => _selectedRubro = rubro),
                             ),
                           );
                         },
@@ -271,10 +313,11 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                   ],
                 ),
               ),
-
               Expanded(
                 child: StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance.collection('usuarios').snapshots(),
+                  stream: FirebaseFirestore.instance
+                      .collection('usuarios')
+                      .snapshots(),
                   builder: (context, snapshot) {
                     if (!snapshot.hasData) {
                       return const Center(child: CircularProgressIndicator());
@@ -285,12 +328,12 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                     final filteredDocs = docs.where((doc) {
                       final data = doc.data() as Map<String, dynamic>;
 
-                      // Prestador real o dummy con es_trabajador
-                      final esPrestador =
-                          data['rol'] == 'trabajador' || data['es_trabajador'] == true;
+                      final esPrestador = data['rol'] == 'trabajador' ||
+                          data['es_trabajador'] == true;
                       if (!esPrestador) return false;
 
-                      final cobertura = data['zonas_cobertura'] as Map<String, dynamic>?;
+                      final cobertura =
+                          data['zonas_cobertura'] as Map<String, dynamic>?;
                       if (cobertura == null) return false;
 
                       final String providerProvinciaId =
@@ -300,30 +343,33 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                       final List<dynamic> provPartidos =
                           cobertura['partidos'] as List<dynamic>? ?? [];
 
-                      // Provincia (solo si el usuario eligió una)
                       if (selectedProvinciaId != null &&
-                          providerProvinciaId != selectedProvinciaId.toString()) {
-                        // Compatibilidad dummies BA/SF/MZ vs ids del catálogo
+                          providerProvinciaId !=
+                              selectedProvinciaId.toString()) {
                         final selectedNombre = provincias
-                            .where((p) => p['id'].toString() == selectedProvinciaId)
+                            .where((p) =>
+                                p['id'].toString() == selectedProvinciaId)
                             .map((p) => p['nombre'].toString().toLowerCase())
                             .cast<String>()
                             .toList();
                         final providerNombre =
-                            (cobertura['provincia_nombre'] ?? '').toString().toLowerCase();
+                            (cobertura['provincia_nombre'] ?? '')
+                                .toString()
+                                .toLowerCase();
                         final matchByName = selectedNombre.isNotEmpty &&
                             selectedNombre.first == providerNombre;
                         if (!matchByName) return false;
                       }
 
-                      // Localidad
                       if (selectedLocalidadId != null) {
                         final tieneLocalidad = provLocalidades.any((l) {
                           if (l is! Map) return false;
-                          final id = (l['id'] ?? l['localidad_id'] ?? '').toString();
-                          final nombre = (l['nombre'] ?? l['localidad_nombre'] ?? '')
-                              .toString()
-                              .toLowerCase();
+                          final id =
+                              (l['id'] ?? l['localidad_id'] ?? '').toString();
+                          final nombre =
+                              (l['nombre'] ?? l['localidad_nombre'] ?? '')
+                                  .toString()
+                                  .toLowerCase();
                           final selectedLoc = localidades
                               .where((x) =>
                                   (x['localidad_id'] ?? x['id']).toString() ==
@@ -337,54 +383,62 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                                   .toLowerCase()
                               : '';
                           return id == selectedLocalidadId ||
-                              (selectedNombre.isNotEmpty && nombre == selectedNombre);
+                              (selectedNombre.isNotEmpty &&
+                                  nombre == selectedNombre);
                         });
                         if (!tieneLocalidad) return false;
-                      }
-                      // Partido
-                      else if (selectedPartidoId != null) {
+                      } else if (selectedPartidoId != null) {
                         final tienePartido = provPartidos.any((p) {
                               if (p is! Map) return false;
                               final id = (p['id'] ?? '').toString();
-                              final nombre = (p['nombre'] ?? '').toString().toLowerCase();
+                              final nombre =
+                                  (p['nombre'] ?? '').toString().toLowerCase();
                               final selectedPart = partidos
                                   .where((x) =>
-                                      (x['departamento_id'] ?? x['id']).toString() ==
+                                      (x['departamento_id'] ?? x['id'])
+                                          .toString() ==
                                       selectedPartidoId)
                                   .toList();
                               final selectedNombre = selectedPart.isNotEmpty
-                                  ? (selectedPart.first['departamento_nombre'] ??
+                                  ? (selectedPart
+                                              .first['departamento_nombre'] ??
                                           selectedPart.first['nombre'] ??
                                           '')
                                       .toString()
                                       .toLowerCase()
                                   : '';
                               return id == selectedPartidoId ||
-                                  (selectedNombre.isNotEmpty && nombre == selectedNombre);
+                                  (selectedNombre.isNotEmpty &&
+                                      nombre == selectedNombre);
                             }) ||
                             provLocalidades.any((l) {
                               if (l is! Map) return false;
-                              return (l['partido_id'] ?? '').toString() == selectedPartidoId;
+                              return (l['partido_id'] ?? '').toString() ==
+                                  selectedPartidoId;
                             });
                         if (!tienePartido) return false;
                       }
 
-                      final List<dynamic> profesiones = data['profesiones'] ?? [];
+                      final List<dynamic> profesiones =
+                          data['profesiones'] ?? [];
                       final profesionesNorm = profesiones
                           .map((e) => e.toString().toLowerCase().trim())
                           .toList();
 
-                      // Chip de rubro → clave de profesión
                       if (_selectedRubro != 'Todos') {
                         final clave = _rubroToProfesion[_selectedRubro] ??
                             _selectedRubro.toLowerCase();
                         if (!profesionesNorm.contains(clave)) return false;
                       }
 
-                      final nombre = (data['nombre'] ?? '').toString().toLowerCase();
-                      final apellido = (data['apellido'] ?? '').toString().toLowerCase();
+                      final nombre =
+                          (data['nombre'] ?? '').toString().toLowerCase();
+                      final apellido =
+                          (data['apellido'] ?? '').toString().toLowerCase();
                       final nombreComercial =
-                          (data['nombre_comercial'] ?? '').toString().toLowerCase();
+                          (data['nombre_comercial'] ?? '')
+                              .toString()
+                              .toLowerCase();
                       final profesionesStr = profesionesNorm.join(' ');
 
                       if (_searchQuery.isEmpty) return true;
@@ -397,7 +451,9 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
 
                     if (filteredDocs.isEmpty) {
                       return const Center(
-                        child: Text('No se encontraron prestadores con estos filtros.'),
+                        child: Text(
+                          'No se encontraron prestadores con estos filtros.',
+                        ),
                       );
                     }
 
@@ -410,8 +466,12 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
 
                         final double promedio =
                             (data['promedioEstrellas'] ?? 0.0).toDouble();
-                        final int cantidadEvaluadores = data['cantidadEvaluadores'] ?? 0;
-                        final List<dynamic> profesiones = data['profesiones'] ?? [];
+                        final int cantidadEvaluadores =
+                            data['cantidadEvaluadores'] ?? 0;
+                        final List<dynamic> profesiones =
+                            data['profesiones'] ?? [];
+                        final String? badge =
+                            data['badge_prestador'] as String?;
 
                         return Card(
                           margin: const EdgeInsets.only(bottom: 12.0),
@@ -442,14 +502,21 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                                 color: textColor,
                               ),
                             ),
-                            subtitle: Text(
-                              profesiones.isNotEmpty
-                                  ? profesiones.join(', ')
-                                  : 'Prestador',
-                              style: const TextStyle(color: Colors.grey),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  profesiones.isNotEmpty
+                                      ? profesiones.join(', ')
+                                      : 'Prestador',
+                                  style: const TextStyle(color: Colors.grey),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                _badgeChip(badge),
+                              ],
                             ),
+                            isThreeLine: badge != null && badge.isNotEmpty,
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -462,7 +529,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                                 Text(
                                   cantidadEvaluadores > 0
                                       ? promedio.toStringAsFixed(1)
-                                      : 'Nuevo',
+                                      : '—',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: textColor,
@@ -474,8 +541,9 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) =>
-                                      TarjetaDigitalWidget(usuarioRef: doc.reference),
+                                  builder: (context) => TarjetaDigitalWidget(
+                                    usuarioRef: doc.reference,
+                                  ),
                                 ),
                               );
                             },
