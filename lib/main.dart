@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
+import 'config/app_env.dart';
+import 'theme/app_theme.dart';
+import 'theme/app_copy.dart';
+
 import 'splashScreen.dart';
 import 'loginScreen.dart';
 import 'Homepage.dart';
@@ -16,14 +21,18 @@ void main() async {
 
   await Firebase.initializeApp(
     options: const FirebaseOptions(
-      apiKey: "AIzaSyAr6iPh8NaDBD4qwo3LvfpE4j9k7RfKTwQ",
-      authDomain: "lifewalletpuelo.firebaseapp.com",
-      projectId: "lifewalletpuelo",
-      storageBucket: "lifewalletpuelo.firebasestorage.app",
-      messagingSenderId: "74624927314",
-      appId: "1:74624927314:web:3fadcc533dd1f3a985818b",
+      apiKey: 'AIzaSyAr6iPh8NaDBD4qwo3LvfpE4j9k7RfKTwQ',
+      authDomain: 'lifewalletpuelo.firebaseapp.com',
+      projectId: 'lifewalletpuelo',
+      storageBucket: 'lifewalletpuelo.firebasestorage.app',
+      messagingSenderId: '74624927314',
+      appId: '1:74624927314:web:3fadcc533dd1f3a985818b',
     ),
   );
+
+  if (AppEnv.verboseLogging) {
+    debugPrint('Puelo env=${AppEnv.label} showDevTools=${AppEnv.showDevTools}');
+  }
 
   runApp(const MyApp());
 }
@@ -34,27 +43,25 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Puelo MVP',
+      title: AppCopy.appName,
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primaryColor: const Color(0xFF0F52BA),
-        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
-        useMaterial3: true,
-      ),
+      // Tema default = cliente; pantallas prestador pueden envolver con Theme.
+      theme: AppTheme.light(modoPrestador: false),
       initialRoute: SplashScreenWidget.routePath,
       routes: {
         SplashScreenWidget.routePath: (context) => const SplashScreenWidget(),
         LoginScreenWidget.routePath: (context) => const LoginScreenWidget(),
         HomePageWidget.routePath: (context) => const HomePageWidget(),
-        RegistroTrabajadorWidget.routePath: (context) => const RegistroTrabajadorWidget(),
-        BuscadorPrestadoresWidget.routePath: (context) => const BuscadorPrestadoresWidget(),
+        RegistroTrabajadorWidget.routePath: (context) =>
+            const RegistroTrabajadorWidget(),
+        BuscadorPrestadoresWidget.routePath: (context) =>
+            const BuscadorPrestadoresWidget(),
         '/seleccionRol': (context) => const SeleccionRolWidget(),
       },
       onGenerateRoute: (settings) {
         final settingsName = settings.name ?? '';
         final uri = Uri.parse(settingsName);
 
-        // 1. Validación de cuenta vía link de WhatsApp
         if (uri.path == '/validar') {
           final String? token = uri.queryParameters['token'];
           return MaterialPageRoute(
@@ -63,7 +70,6 @@ class MyApp extends StatelessWidget {
           );
         }
 
-        // 2. Validación de domicilio por referencia de terceros
         if (uri.path == '/validarDomicilio' ||
             uri.path.startsWith('/validarDomicilio')) {
           final String? idParam = uri.queryParameters['id'];
@@ -73,7 +79,6 @@ class MyApp extends StatelessWidget {
           );
         }
 
-        // 3. Tarjeta digital
         if (uri.path == TarjetaDigitalWidget.routePath ||
             uri.path.startsWith('/tarjetaDigital')) {
           DocumentReference? userRef;
