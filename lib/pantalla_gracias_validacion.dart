@@ -2,18 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_session.dart';
 import 'Homepage.dart';
+import 'theme/app_colors.dart';
 
 class PantallaGraciasValidacionWidget extends StatefulWidget {
   const PantallaGraciasValidacionWidget({super.key});
 
   @override
-  State<PantallaGraciasValidacionWidget> createState() => _PantallaGraciasValidacionWidgetState();
+  State<PantallaGraciasValidacionWidget> createState() =>
+      _PantallaGraciasValidacionWidgetState();
 }
 
-class _PantallaGraciasValidacionWidgetState extends State<PantallaGraciasValidacionWidget> {
+class _PantallaGraciasValidacionWidgetState
+    extends State<PantallaGraciasValidacionWidget> {
   final db = FirebaseFirestore.instance;
-  final primaryColor = const Color(0xFF0F52BA);
-  final textColor = const Color(0xFF1E293B);
+
+  static const Color primaryColor = AppColors.cliente;
+  static const Color textColor = AppColors.text;
 
   bool _procesando = true;
   String _nombreTarget = 'la persona';
@@ -76,52 +80,78 @@ class _PantallaGraciasValidacionWidgetState extends State<PantallaGraciasValidac
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: AppColors.bg,
       body: SafeArea(
         child: Center(
           child: Padding(
             padding: const EdgeInsets.all(32.0),
             child: _procesando
-                ? Column(
+                ? const Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       CircularProgressIndicator(color: primaryColor),
-                      const SizedBox(height: 20),
-                      Text('Procesando tu colaboración...', style: TextStyle(color: textColor)),
+                      SizedBox(height: 20),
+                      Text(
+                        'Guardando tu ayuda…',
+                        style: TextStyle(color: textColor),
+                      ),
                     ],
                   )
                 : Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.check_circle_outline_rounded, size: 80, color: Color(0xFF25D366)),
+                      const Icon(
+                        Icons.check_circle_outline_rounded,
+                        size: 80,
+                        color: AppColors.success,
+                      ),
                       const SizedBox(height: 24),
-                      Text(
-                        'Su información fue recibida',
-                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textColor),
+                      const Text(
+                        '¡Gracias!',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: textColor,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'Gracias por su colaboración con $_nombreTarget.',
+                        'Tu respuesta ayuda a que otros confíen en $_nombreTarget.',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 16, color: Color(0xFF64748B)),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: AppColors.textMuted,
+                          height: 1.4,
+                        ),
                       ),
                       const SizedBox(height: 40),
                       ElevatedButton(
                         onPressed: () {
                           Navigator.pushAndRemoveUntil(
                             context,
-                            MaterialPageRoute(builder: (context) => const HomePageWidget()),
+                            MaterialPageRoute(
+                              builder: (context) => const HomePageWidget(),
+                            ),
                             (route) => false,
                           );
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: primaryColor,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 32,
+                            vertical: 16,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
-                        child: const Text('Ir al inicio', style: TextStyle(fontWeight: FontWeight.bold)),
+                        child: const Text(
+                          'Ir al inicio',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
                       ),
                     ],
                   ),
