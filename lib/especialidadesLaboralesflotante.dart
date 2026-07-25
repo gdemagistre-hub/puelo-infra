@@ -6,11 +6,17 @@ class EspecialidadesLaboralesFlotanteWidget extends StatefulWidget {
   const EspecialidadesLaboralesFlotanteWidget({super.key});
 
   @override
-  State<EspecialidadesLaboralesFlotanteWidget> createState() => _EspecialidadesLaboralesFlotanteWidgetState();
+  State<EspecialidadesLaboralesFlotanteWidget> createState() =>
+      _EspecialidadesLaboralesFlotanteWidgetState();
 }
 
-class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLaboralesFlotanteWidget> {
-  final primaryColor = const Color(0xFF0F52BA);
+class _EspecialidadesLaboralesFlotanteWidgetState
+    extends State<EspecialidadesLaboralesFlotanteWidget> {
+  // Look & feel prestador
+  static const Color primaryColor = Color(0xFF28B5CD);
+  static const Color _bg = Color(0xFFF8FAFC);
+  static const Color _textColor = Color(0xFF1E293B);
+
   final db = FirebaseFirestore.instance;
   final _nombreComercialController = TextEditingController();
 
@@ -49,8 +55,6 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
     if (mounted) setState(() => _loading = false);
   }
 
-  /// Misma fuente que registroTrabajador.dart:
-  /// colección cat_oficios → campo lista "maestro"
   Future<void> _cargarCatalogos() async {
     try {
       final oficiosSnapshot = await db.collection('cat_oficios').get();
@@ -58,13 +62,12 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
 
       for (final doc in oficiosSnapshot.docs) {
         final data = doc.data();
-        debugPrint('cat_oficios/${doc.id} keys=${data.keys.toList()}');
-
         final raw = data['maestro'];
         if (raw is List && raw.isNotEmpty) {
-          _oficiosDisponibles =
-              raw.map((e) => e.toString().trim()).where((s) => s.isNotEmpty).toList();
-          debugPrint('Oficios OK (${_oficiosDisponibles.length}): $_oficiosDisponibles');
+          _oficiosDisponibles = raw
+              .map((e) => e.toString().trim())
+              .where((s) => s.isNotEmpty)
+              .toList();
           return;
         }
       }
@@ -89,7 +92,8 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
       final doc = await db.collection('usuarios').doc(uid).get();
       if (doc.exists) {
         final data = doc.data()!;
-        _nombreComercialController.text = (data['nombre_comercial'] ?? '').toString();
+        _nombreComercialController.text =
+            (data['nombre_comercial'] ?? '').toString();
         if (data['profesiones'] != null) {
           _oficiosSeleccionados = List<String>.from(data['profesiones']);
         }
@@ -123,13 +127,18 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Especialidades actualizadas'), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Text('Especialidades actualizadas'),
+            backgroundColor: Colors.green,
+          ),
         );
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
       }
     }
 
@@ -137,7 +146,8 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
   }
 
   void _mostrarSeleccionEspecialidades() {
-    final opciones = _oficiosDisponibles.map((p) => {'id': p, 'nombre': p}).toList();
+    final opciones =
+        _oficiosDisponibles.map((p) => {'id': p, 'nombre': p}).toList();
     List<Map<String, String>> tempSeleccionadas =
         _oficiosSeleccionados.map((p) => {'id': p, 'nombre': p}).toList();
 
@@ -147,26 +157,38 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               title: const Text(
                 'Especialidades',
-                style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: _textColor,
+                ),
               ),
               content: SizedBox(
                 width: double.maxFinite,
                 child: opciones.isEmpty
                     ? const Padding(
                         padding: EdgeInsets.all(16),
-                        child: Text('No hay especialidades disponibles.', textAlign: TextAlign.center),
+                        child: Text(
+                          'No hay especialidades disponibles.',
+                          textAlign: TextAlign.center,
+                        ),
                       )
                     : ListView.builder(
                         shrinkWrap: true,
                         itemCount: opciones.length,
                         itemBuilder: (context, index) {
                           final item = opciones[index];
-                          final isChecked = tempSeleccionadas.any((e) => e['id'] == item['id']);
+                          final isChecked = tempSeleccionadas
+                              .any((e) => e['id'] == item['id']);
                           return CheckboxListTile(
-                            title: Text(item['nombre']!, style: const TextStyle(color: Color(0xFF1E293B))),
+                            title: Text(
+                              item['nombre']!,
+                              style: const TextStyle(color: _textColor),
+                            ),
                             value: isChecked,
                             activeColor: primaryColor,
                             onChanged: (checked) {
@@ -174,7 +196,9 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
                                 if (checked == true) {
                                   tempSeleccionadas.add(item);
                                 } else {
-                                  tempSeleccionadas.removeWhere((e) => e['id'] == item['id']);
+                                  tempSeleccionadas.removeWhere(
+                                    (e) => e['id'] == item['id'],
+                                  );
                                 }
                               });
                             },
@@ -185,17 +209,28 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancelar'),
+                  child: Text(
+                    'Cancelar',
+                    style: TextStyle(color: Colors.grey.shade600),
+                  ),
                 ),
                 ElevatedButton(
                   onPressed: () {
                     setState(() {
-                      _oficiosSeleccionados = tempSeleccionadas.map((e) => e['nombre']!).toList();
+                      _oficiosSeleccionados =
+                          tempSeleccionadas.map((e) => e['nombre']!).toList();
                     });
                     Navigator.pop(context);
                   },
-                  style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
-                  child: const Text('Confirmar', style: TextStyle(color: Colors.white)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text('Confirmar'),
                 ),
               ],
             );
@@ -205,64 +240,104 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
     );
   }
 
+  InputDecoration _dec(String label, {String? hint}) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      filled: true,
+      fillColor: Colors.white,
+      labelStyle: TextStyle(color: Colors.grey.shade600),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade200),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade200),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: primaryColor, width: 1.5),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: _bg,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+          color: _textColor,
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Especialidades laborales',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: _textColor,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
         ),
-        centerTitle: true,
+        centerTitle: false,
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.black54),
+            icon: Icon(Icons.refresh, color: Colors.grey.shade600),
             tooltip: 'Recargar oficios',
             onPressed: _loading ? null : _cargarTodo,
           ),
         ],
       ),
       body: _loading
-          ? Center(child: CircularProgressIndicator(color: primaryColor))
+          ? const Center(child: CircularProgressIndicator(color: primaryColor))
           : ListView(
               padding: const EdgeInsets.all(20),
               children: [
                 TextFormField(
                   controller: _nombreComercialController,
-                  decoration: InputDecoration(
-                    labelText: 'Nombre comercial',
-                    hintText: 'Ej: Servicios Eléctricos López',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: _dec(
+                    'Nombre comercial',
+                    hint: 'Ej: Servicios Eléctricos López',
                   ),
                 ),
                 const SizedBox(height: 24),
                 const Text(
                   'Oficios / Especialidades',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: _textColor,
+                  ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'Podés elegir más de uno',
-                  style: TextStyle(fontSize: 13, color: Colors.grey),
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
                 ),
                 const SizedBox(height: 12),
                 InkWell(
-                  onTap: _oficiosDisponibles.isEmpty ? null : _mostrarSeleccionEspecialidades,
+                  onTap: _oficiosDisponibles.isEmpty
+                      ? null
+                      : _mostrarSeleccionEspecialidades,
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                      border: Border.all(color: Colors.grey.shade200),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.03),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Row(
                       children: [
@@ -270,19 +345,22 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
+                              Text(
                                 'Oficios / Especialidades',
-                                style: TextStyle(fontSize: 12, color: Colors.grey),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                ),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 _oficiosSeleccionados.isEmpty
-                                    ? 'Seleccionar Especialidades'
+                                    ? 'Seleccionar especialidades'
                                     : _oficiosSeleccionados.join(', '),
                                 style: const TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF1E293B),
+                                  color: _textColor,
                                 ),
                                 maxLines: 3,
                                 overflow: TextOverflow.ellipsis,
@@ -290,7 +368,10 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
                             ],
                           ),
                         ),
-                        const Icon(Icons.arrow_drop_down, color: Colors.grey),
+                        Icon(
+                          Icons.arrow_drop_down,
+                          color: Colors.grey.shade500,
+                        ),
                       ],
                     ),
                   ),
@@ -319,7 +400,10 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
                           const SizedBox(height: 8),
                           Text(
                             _errorCarga!,
-                            style: const TextStyle(fontSize: 12, color: Color(0xFF9A3412)),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF9A3412),
+                            ),
                           ),
                         ],
                         const SizedBox(height: 8),
@@ -327,6 +411,9 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
                           onPressed: _cargarTodo,
                           icon: const Icon(Icons.refresh, size: 18),
                           label: const Text('Reintentar'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: primaryColor,
+                          ),
                         ),
                       ],
                     ),
@@ -344,15 +431,21 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
                           onDeleted: () {
                             setState(() => _oficiosSeleccionados.remove(o));
                           },
-                          backgroundColor: primaryColor.withOpacity(0.1),
-                          labelStyle: TextStyle(color: primaryColor, fontWeight: FontWeight.w600),
+                          backgroundColor: primaryColor.withOpacity(0.12),
+                          side: BorderSide(
+                            color: primaryColor.withOpacity(0.25),
+                          ),
+                          labelStyle: const TextStyle(
+                            color: primaryColor,
+                            fontWeight: FontWeight.w600,
+                          ),
                         );
                       }).toList(),
                     ),
                   const SizedBox(height: 8),
                   Text(
                     '${_oficiosDisponibles.length} especialidades disponibles en catálogo',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                 ],
                 const SizedBox(height: 32),
@@ -365,17 +458,26 @@ class _EspecialidadesLaboralesFlotanteWidgetState extends State<EspecialidadesLa
                         ? const SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
                           )
                         : const Icon(Icons.save_outlined),
-                    label: Text(_saving ? 'Guardando...' : 'Actualizar los datos'),
+                    label: Text(
+                      _saving ? 'Guardando...' : 'Actualizar los datos',
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryColor,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                 ),
+                const SizedBox(height: 20),
               ],
             ),
     );
