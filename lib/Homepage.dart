@@ -12,6 +12,8 @@ import 'datosPersonalesflotante.dart';
 import 'ZonaDeTrabajoflotante.dart';
 import 'solicitar_validacion.dart';
 import 'scoring_service.dart';
+import 'config/app_env.dart';
+import 'theme/app_copy.dart';
 
 class HomePageWidget extends StatefulWidget {
   const HomePageWidget({super.key});
@@ -46,12 +48,15 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   Color get primaryColor => _modoPrestador ? _prestadorPrimary : _clientePrimary;
 
   static const Map<String, _ServicioMeta> _metaServicios = {
-    'electricidad': _ServicioMeta('Electricista', Icons.electrical_services_outlined),
+    'electricidad':
+        _ServicioMeta('Electricista', Icons.electrical_services_outlined),
     'plomeria': _ServicioMeta('Plomería', Icons.plumbing),
-    'gasista': _ServicioMeta('Gasista', Icons.local_fire_department_outlined),
+    'gasista':
+        _ServicioMeta('Gasista', Icons.local_fire_department_outlined),
     'carpinteria': _ServicioMeta('Carpintería', Icons.handyman_outlined),
     'pintura': _ServicioMeta('Pintura', Icons.format_paint_outlined),
-    'albanileria': _ServicioMeta('Construcción', Icons.construction_outlined),
+    'albanileria':
+        _ServicioMeta('Construcción', Icons.construction_outlined),
     'jardineria': _ServicioMeta('Jardinería', Icons.yard_outlined),
     'limpieza': _ServicioMeta('Limpieza', Icons.cleaning_services_outlined),
   };
@@ -196,7 +201,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       final meta = _metaServicios[clave];
       if (meta == null) continue;
       vistos.add(clave);
-      items.add(_ServicioItem(clave: clave, label: meta.label, icon: meta.icon));
+      items.add(
+        _ServicioItem(clave: clave, label: meta.label, icon: meta.icon),
+      );
     }
 
     if (mounted) {
@@ -243,10 +250,12 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         ));
       }
 
-      final docNumero =
-          (data['doc_numero'] ?? data['numero_documento'] ?? data['documento'] ?? '')
-              .toString()
-              .trim();
+      final docNumero = (data['doc_numero'] ??
+              data['numero_documento'] ??
+              data['documento'] ??
+              '')
+          .toString()
+          .trim();
       if (docNumero.isEmpty) {
         consejos.add(_ConsejoItem(
           title: 'Cargá tu número de documento',
@@ -283,7 +292,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       if (vals.isEmpty) {
         consejos.add(_ConsejoItem(
           title: 'Pedí validaciones de terceros',
-          body: 'Las referencias de vecinos o conocidos aumentan mucho la confianza.',
+          body:
+              'Las referencias de vecinos o conocidos aumentan mucho la confianza.',
           icon: Icons.verified_user_outlined,
           onTap: () {
             Navigator.push(
@@ -325,7 +335,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
       if (mounted) {
         setState(() {
-          _consejos = consejos;
+          _consejos = consejos.take(2).toList(); // máx 2 en UI
           _cargandoConsejos = false;
         });
       }
@@ -361,7 +371,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Scores actualizados: ${r.actualizados} de ${r.procesados} usuarios',
+            'Badges actualizados: ${r.actualizados} de ${r.procesados} usuarios',
           ),
           backgroundColor: Colors.green,
         ),
@@ -370,7 +380,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       if (!mounted) return;
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al recalcular scores: $e')),
+        SnackBar(content: Text('Error al recalcular: $e')),
       );
     } finally {
       if (mounted) setState(() => _corriendoBatch = false);
@@ -407,8 +417,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     );
 
     try {
-      final doc =
-          await FirebaseFirestore.instance.collection('usuarios').doc(userId).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(userId)
+          .get();
       if (context.mounted) Navigator.pop(context);
 
       if (doc.exists) {
@@ -416,7 +428,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         final profesiones = data['profesiones'] as List<dynamic>? ?? [];
         final zonasCobertura =
             data['zonas_cobertura'] as Map<String, dynamic>? ?? {};
-        final localidades = zonasCobertura['localidades'] as List<dynamic>? ?? [];
+        final localidades =
+            zonasCobertura['localidades'] as List<dynamic>? ?? [];
         final esTrabajador = data['es_trabajador'] == true;
 
         if (profesiones.isEmpty || localidades.isEmpty || !esTrabajador) {
@@ -430,7 +443,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             );
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const RegistroTrabajadorWidget()),
+              MaterialPageRoute(
+                builder: (_) => const RegistroTrabajadorWidget(),
+              ),
             );
           }
         } else {
@@ -460,7 +475,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   void _irAGuiaInstagram() {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Abriendo guía: Cómo promocionar tus trabajos en Instagram...'),
+        content: Text(
+          'Abriendo guía: Cómo promocionar tus trabajos en Instagram...',
+        ),
       ),
     );
   }
@@ -509,7 +526,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     if (index == 2) {
       setState(() => _currentIndex = 0);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mensajes próximamente')),
+        const SnackBar(
+          content: Text('${AppCopy.navMensajes}: ${AppCopy.ctaProximamente}'),
+        ),
       );
       return;
     }
@@ -530,6 +549,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -542,7 +562,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               ),
             ),
             Text(
-              _modoPrestador ? '¿Qué vas a ofrecer hoy?' : '¿Qué servicio necesitás?',
+              _modoPrestador
+                  ? AppCopy.homePrestadorHint
+                  : AppCopy.homeClienteHint,
               style: const TextStyle(color: Colors.grey, fontSize: 14),
             ),
           ],
@@ -556,7 +578,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                   setState(() {
                     _modoPrestador = !_modoPrestador;
                   });
-                  if (_modoPrestador && _consejos.isEmpty && !_cargandoConsejos) {
+                  if (_modoPrestador &&
+                      _consejos.isEmpty &&
+                      !_cargandoConsejos) {
                     _cargarConsejosPersonalizados();
                   }
                 },
@@ -572,7 +596,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        _modoPrestador ? Icons.engineering : Icons.person_search,
+                        _modoPrestador
+                            ? Icons.engineering
+                            : Icons.person_search,
                         size: 16,
                         color: primaryColor,
                       ),
@@ -689,7 +715,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Text(
-              'Servicios más buscados',
+              AppCopy.seccionServiciosBuscados,
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
           ),
@@ -714,8 +740,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: _topServicios.length,
-                gridDelegate: const
-                    SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 4,
                   mainAxisSpacing: 12,
                   crossAxisSpacing: 8,
@@ -772,22 +797,40 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Text(
-              'Últimos mensajes',
+              AppCopy.seccionActividad,
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
           const SizedBox(height: 12),
-          _buildProviderCard(
-            'Electricista',
-            'Nuestro electricista completó el trabajo en tiempo récord.',
-            'Hace 2h',
-            _clientePrimary,
-          ),
-          _buildProviderCard(
-            'Plomería',
-            'Se reparó la pérdida de agua en la cocina.',
-            'Ayer',
-            _prestadorPrimary,
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.schedule, color: Colors.grey.shade400),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    AppCopy.actividadVacia,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF64748B),
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 24),
         ],
@@ -921,7 +964,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Text(
-              'Consejos para crecer',
+              AppCopy.seccionConsejos,
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
@@ -947,40 +990,42 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           else
             ..._consejos.map((c) => _buildTipCard(c)),
 
-          // --- BOTÓN ADMIN TEMPORAL: batch scoring ---
-          const SizedBox(height: 24),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: OutlinedButton.icon(
-              onPressed: _corriendoBatch ? null : _ejecutarBatchScoring,
-              icon: _corriendoBatch
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.refresh),
-              label: Text(
-                _corriendoBatch
-                    ? 'Recalculando scores...'
-                    : 'Recalcular scores (admin)',
-              ),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: _dark,
-                side: BorderSide(color: _dark.withOpacity(0.4)),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                minimumSize: const Size(double.infinity, 48),
+          // Solo debug / staging — nunca en prod
+          if (AppEnv.showDevTools) ...[
+            const SizedBox(height: 24),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: OutlinedButton.icon(
+                onPressed: _corriendoBatch ? null : _ejecutarBatchScoring,
+                icon: _corriendoBatch
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh),
+                label: Text(
+                  _corriendoBatch
+                      ? 'Recalculando…'
+                      : 'Recalcular badges (solo dev)',
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _dark,
+                  side: BorderSide(color: _dark.withOpacity(0.4)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  minimumSize: const Size(double.infinity, 48),
+                ),
               ),
             ),
-          ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 6, 16, 24),
-            child: Text(
-              'Temporal: corre el batch de score_credito y badge_prestador. '
-              'Sacar cuando exista el Cloud Function diario.',
-              style: TextStyle(fontSize: 11, color: Colors.grey),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 6, 16, 24),
+              child: Text(
+                'Solo visible en debug/staging. No aparece en producción.',
+                style: TextStyle(fontSize: 11, color: Colors.grey),
+              ),
             ),
-          ),
+          ] else
+            const SizedBox(height: 24),
         ],
       ),
     );
@@ -1165,52 +1210,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             Icon(Icons.chevron_right, color: Colors.grey.shade400),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildProviderCard(
-    String title,
-    String description,
-    String time,
-    Color color,
-  ) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
-        ],
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            backgroundColor: color.withOpacity(0.15),
-            child: Text(
-              title[0],
-              style: TextStyle(color: color, fontWeight: FontWeight.bold),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text(
-                  description,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 13),
-                ),
-              ],
-            ),
-          ),
-          Text(time, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-        ],
       ),
     );
   }
