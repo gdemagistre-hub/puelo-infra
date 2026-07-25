@@ -20,7 +20,11 @@ class DatosPersonalesFlotanteWidget extends StatefulWidget {
 
 class _DatosPersonalesFlotanteWidgetState
     extends State<DatosPersonalesFlotanteWidget> {
-  final primaryColor = const Color(0xFF0F52BA);
+  // Look & feel Home / cliente
+  static const Color primaryColor = Color(0xFF734BE4);
+  static const Color _bg = Color(0xFFF8FAFC);
+  static const Color _textColor = Color(0xFF1E293B);
+
   final _formKey = GlobalKey<FormState>();
   final _scanner = DniOcrScanner();
 
@@ -123,12 +127,35 @@ class _DatosPersonalesFlotanteWidgetState
   String? _validarTelefono(String? v) {
     final t = (v ?? '').trim();
     if (t.isEmpty) return 'El celular es obligatorio';
-    // +549-XXXXX-XXXX (sin el 15). Área 2 a 4 dígitos, número 4 a 8.
     final re = RegExp(r'^\+549-\d{2,4}-\d{4,8}$');
     if (!re.hasMatch(t)) {
       return 'Formato: +549-11444-5555 (sin el 15)';
     }
     return null;
+  }
+
+  InputDecoration _dec(String label, {String? hint, String? helper}) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      helperText: helper,
+      filled: true,
+      fillColor: Colors.white,
+      labelStyle: TextStyle(color: Colors.grey.shade600),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade200),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade200),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: primaryColor, width: 1.5),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    );
   }
 
   Future<void> _seleccionarFecha() async {
@@ -142,11 +169,10 @@ class _DatosPersonalesFlotanteWidgetState
         helpText: 'Fecha de nacimiento',
         cancelText: 'Cancelar',
         confirmText: 'Aceptar',
-        fieldLabelText: 'Fecha',
         builder: (context, child) {
           return Theme(
             data: Theme.of(context).copyWith(
-              colorScheme: ColorScheme.light(
+              colorScheme: const ColorScheme.light(
                 primary: primaryColor,
                 onPrimary: Colors.white,
                 onSurface: Colors.black87,
@@ -167,10 +193,6 @@ class _DatosPersonalesFlotanteWidgetState
       }
     }
   }
-
-  // ---------------------------------------------------------------------------
-  // OCR + popup + validación + hash + imagen comprimida
-  // ---------------------------------------------------------------------------
 
   Future<void> _iniciarEscaneoDocumento({required bool camara}) async {
     if (kIsWeb || !_scanner.isSupported) {
@@ -259,7 +281,10 @@ class _DatosPersonalesFlotanteWidgetState
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
-                  child: Text('Entendido', style: TextStyle(color: primaryColor)),
+                  child: const Text(
+                    'Entendido',
+                    style: TextStyle(color: primaryColor),
+                  ),
                 ),
               ],
             ),
@@ -344,7 +369,7 @@ class _DatosPersonalesFlotanteWidgetState
       builder: (ctx) {
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text(
+          title: const Text(
             'Datos detectados del documento',
             style: TextStyle(
               color: primaryColor,
@@ -421,7 +446,7 @@ class _DatosPersonalesFlotanteWidgetState
               style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF1E293B),
+                color: _textColor,
               ),
             ),
           ),
@@ -429,10 +454,6 @@ class _DatosPersonalesFlotanteWidgetState
       ),
     );
   }
-
-  // ---------------------------------------------------------------------------
-  // Guardar datos
-  // ---------------------------------------------------------------------------
 
   Future<void> _actualizarDatos() async {
     if (!_formKey.currentState!.validate()) return;
@@ -491,7 +512,6 @@ class _DatosPersonalesFlotanteWidgetState
           .doc(uid)
           .set(payload, SetOptions(merge: true));
 
-      // Refrescar sesión en memoria
       final session = UserSession();
       session.nombre = _nombreController.text.trim();
       session.apellido = _apellidoController.text.trim();
@@ -530,29 +550,31 @@ class _DatosPersonalesFlotanteWidgetState
     if (mounted) setState(() => _saving = false);
   }
 
-  // ---------------------------------------------------------------------------
-  // UI
-  // ---------------------------------------------------------------------------
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: _bg,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+          color: _textColor,
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Datos personales',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: _textColor,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
         ),
-        centerTitle: true,
+        centerTitle: false,
       ),
       body: _loading
-          ? Center(child: CircularProgressIndicator(color: primaryColor))
+          ? const Center(child: CircularProgressIndicator(color: primaryColor))
           : Stack(
               children: [
                 Form(
@@ -566,8 +588,6 @@ class _DatosPersonalesFlotanteWidgetState
                         _apellidoController,
                         required: true,
                       ),
-
-                      // Celular + WhatsApp
                       Padding(
                         padding: const EdgeInsets.only(bottom: 16),
                         child: Row(
@@ -577,18 +597,11 @@ class _DatosPersonalesFlotanteWidgetState
                               child: TextFormField(
                                 controller: _telefonoController,
                                 keyboardType: TextInputType.phone,
-                                decoration: InputDecoration(
-                                  labelText: 'Celular *',
-                                  hintText: '+549-11444-5555',
-                                  helperText:
+                                decoration: _dec(
+                                  'Celular *',
+                                  hint: '+549-11444-5555',
+                                  helper:
                                       'Código AR +549, sin el 15. Ej: +549-11-44445555',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 14,
-                                  ),
                                 ),
                                 validator: _validarTelefono,
                               ),
@@ -603,8 +616,9 @@ class _DatosPersonalesFlotanteWidgetState
                                     vertical: 2,
                                   ),
                                   decoration: BoxDecoration(
+                                    color: Colors.white,
                                     border: Border.all(
-                                      color: Colors.grey.shade300,
+                                      color: Colors.grey.shade200,
                                     ),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
@@ -629,7 +643,6 @@ class _DatosPersonalesFlotanteWidgetState
                           ],
                         ),
                       ),
-
                       _buildDropdown(
                         'Tipo de documento',
                         _tipoDoc,
@@ -642,10 +655,7 @@ class _DatosPersonalesFlotanteWidgetState
                         _paises,
                         (v) => setState(() => _paisDoc = v),
                       ),
-                      _buildField(
-                        'Número de documento',
-                        _docNumeroController,
-                      ),
+                      _buildField('Número de documento', _docNumeroController),
                       _buildFechaNacimiento(),
                       _buildFotoDocumento(),
                       _buildField(
@@ -658,16 +668,7 @@ class _DatosPersonalesFlotanteWidgetState
                         child: TextFormField(
                           controller: _emailConfirmController,
                           keyboardType: TextInputType.emailAddress,
-                          decoration: InputDecoration(
-                            labelText: 'Confirmar email',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 14,
-                            ),
-                          ),
+                          decoration: _dec('Confirmar email'),
                           validator: (v) {
                             final e1 = _emailController.text.trim();
                             final e2 = (v ?? '').trim();
@@ -704,6 +705,7 @@ class _DatosPersonalesFlotanteWidgetState
                           style: ElevatedButton.styleFrom(
                             backgroundColor: primaryColor,
                             foregroundColor: Colors.white,
+                            elevation: 0,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -722,14 +724,14 @@ class _DatosPersonalesFlotanteWidgetState
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
+                        child: const Padding(
+                          padding: EdgeInsets.all(24),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               CircularProgressIndicator(color: primaryColor),
-                              const SizedBox(height: 16),
-                              const Text(
+                              SizedBox(height: 16),
+                              Text(
                                 'Procesando documento...',
                                 style: TextStyle(fontWeight: FontWeight.w600),
                               ),
@@ -756,13 +758,7 @@ class _DatosPersonalesFlotanteWidgetState
       child: TextFormField(
         controller: controller,
         keyboardType: keyboard,
-        decoration: InputDecoration(
-          labelText: label,
-          hintText: hint,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        ),
+        decoration: _dec(label, hint: hint),
         validator: required
             ? (v) =>
                 (v == null || v.trim().isEmpty) ? 'Campo obligatorio' : null
@@ -781,12 +777,7 @@ class _DatosPersonalesFlotanteWidgetState
       padding: const EdgeInsets.only(bottom: 16),
       child: DropdownButtonFormField<String>(
         value: value != null && items.contains(value) ? value : null,
-        decoration: InputDecoration(
-          labelText: label,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        ),
+        decoration: _dec(label),
         items:
             items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
         onChanged: onChanged,
@@ -801,11 +792,7 @@ class _DatosPersonalesFlotanteWidgetState
         onTap: _seleccionarFecha,
         borderRadius: BorderRadius.circular(12),
         child: InputDecorator(
-          decoration: InputDecoration(
-            labelText: 'Fecha de nacimiento',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: _dec('Fecha de nacimiento').copyWith(
             suffixIcon: const Icon(Icons.calendar_today_outlined),
           ),
           child: Text(
@@ -813,7 +800,7 @@ class _DatosPersonalesFlotanteWidgetState
                 ? DateFormat('dd/MM/yyyy').format(_fechaNacimiento!)
                 : 'Seleccionar fecha',
             style: TextStyle(
-              color: _fechaNacimiento != null ? Colors.black87 : Colors.grey,
+              color: _fechaNacimiento != null ? _textColor : Colors.grey,
               fontSize: 16,
             ),
           ),
@@ -860,9 +847,9 @@ class _DatosPersonalesFlotanteWidgetState
             height: 140,
             width: double.infinity,
             decoration: BoxDecoration(
-              color: Colors.grey.shade100,
+              color: Colors.white,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade300),
+              border: Border.all(color: Colors.grey.shade200),
               image: _urlFotoDocumento != null && _urlFotoDocumento!.isNotEmpty
                   ? DecorationImage(
                       image: NetworkImage(_urlFotoDocumento!),
@@ -899,12 +886,12 @@ class _DatosPersonalesFlotanteWidgetState
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFE8F0FE),
+                color: primaryColor.withOpacity(0.08),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Text(
                 'El escaneo del documento con OCR solo está disponible desde el celular (Android/iOS).',
-                style: TextStyle(fontSize: 13, color: Color(0xFF1E293B)),
+                style: TextStyle(fontSize: 13, color: _textColor),
               ),
             )
           else
@@ -919,7 +906,7 @@ class _DatosPersonalesFlotanteWidgetState
                     label: const Text('Escanear'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: primaryColor,
-                      side: BorderSide(color: primaryColor),
+                      side: const BorderSide(color: primaryColor),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
