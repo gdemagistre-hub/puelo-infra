@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'theme/app_colors.dart';
+import 'theme/app_copy.dart';
 
 class ProximamenteWidget extends StatelessWidget {
   const ProximamenteWidget({super.key});
@@ -6,11 +8,13 @@ class ProximamenteWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0F52BA),
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.text,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        iconTheme: const IconThemeData(color: AppColors.text),
       ),
       body: Center(
         child: Padding(
@@ -18,37 +22,47 @@ class ProximamenteWidget extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.construction_rounded, size: 80, color: Colors.grey.shade400),
+              Icon(
+                Icons.construction_rounded,
+                size: 80,
+                color: Colors.grey.shade400,
+              ),
               const SizedBox(height: 24),
               const Text(
-                'Próximamente',
+                AppCopy.ctaProximamente,
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
+                  color: AppColors.text,
                 ),
               ),
               const SizedBox(height: 12),
               const Text(
-                'Estamos trabajando en esta funcionalidad para que pronto puedas utilizarla.',
+                'Estamos armando esta parte. Mientras tanto podés buscar prestadores, '
+                'calificar y armar tu perfil.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 16,
-                  color: Color(0xFF64748B),
+                  color: AppColors.textMuted,
+                  height: 1.4,
                 ),
               ),
               const SizedBox(height: 32),
               ElevatedButton(
                 onPressed: () => Navigator.pop(context),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0F52BA),
+                  backgroundColor: AppColors.cliente,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text('Volver atrás'),
+                child: const Text('Volver'),
               ),
             ],
           ),
