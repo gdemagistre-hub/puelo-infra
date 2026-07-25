@@ -5,6 +5,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import 'user_session.dart';
 import 'email_service.dart';
+import 'theme/app_colors.dart';
+import 'theme/app_copy.dart';
 
 class RegistroCuentaWidget extends StatefulWidget {
   const RegistroCuentaWidget({super.key});
@@ -34,8 +36,8 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
   final db = FirebaseFirestore.instance;
   final uuid = const Uuid();
 
-  final primaryColor = const Color(0xFF0F52BA);
-  final inputBgColor = const Color(0xFFF8FAFC);
+  static const Color primaryColor = AppColors.cliente;
+  static const Color inputBgColor = AppColors.bg;
 
   @override
   void dispose() {
@@ -51,20 +53,24 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
     if (!_formKey.currentState!.validate()) return;
     if (_tipoDocSeleccionado == null || _paisSeleccionado == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor completá el tipo y país de documento.')),
+        const SnackBar(
+          content: Text('Completá el tipo y el país del documento.'),
+        ),
       );
       return;
     }
 
-    if (_metodoValidacion == 'whatsapp' && _whatsappController.text.trim().isEmpty) {
+    if (_metodoValidacion == 'whatsapp' &&
+        _whatsappController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ingresá un número de WhatsApp válido.')),
+        const SnackBar(content: Text('Ingresá un número de WhatsApp.')),
       );
       return;
     }
-    if (_metodoValidacion == 'email' && _emailController.text.trim().isEmpty) {
+    if (_metodoValidacion == 'email' &&
+        _emailController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ingresá un email válido.')),
+        const SnackBar(content: Text('Ingresá un email.')),
       );
       return;
     }
@@ -89,7 +95,8 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
       };
 
       if (UserSession().pendingValidacionToken != null) {
-        dataUsuario['pending_domicilio_token'] = UserSession().pendingValidacionToken;
+        dataUsuario['pending_domicilio_token'] =
+            UserSession().pendingValidacionToken;
       }
 
       await db.collection('usuarios').add(dataUsuario);
@@ -101,16 +108,14 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
         final String numero =
             _whatsappController.text.trim().replaceAll(RegExp(r'[^0-9+]'), '');
         final String mensaje = Uri.encodeComponent(
-          '¡Hola ${_nombreController.text.trim()}! 🚀\n\n'
-          'Este es tu enlace para validar y activar tu cuenta en la plataforma Puelo.\n\n'
-          'Por favor haz click aquí para confirmar tu identidad:\n\n'
+          'Hola ${_nombreController.text.trim()}!\n\n'
+          'Este es tu enlace para activar tu cuenta en Puelo:\n\n'
           '$_linkValidacion',
         );
         _invitacionLink = 'https://wa.me/$numero?text=$mensaje';
 
         if (mounted) _mostrarPopupWhatsApp();
       } else {
-        // Email: se envía solo vía EmailJS
         final ok = await EmailService.enviarValidacionCuenta(
           toEmail: _emailController.text.trim(),
           toName: _nombreController.text.trim(),
@@ -118,7 +123,7 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
         );
 
         if (!ok) {
-          throw Exception('EmailJS no aceptó el envío. Revisá la configuración.');
+          throw Exception('No se pudo enviar el email. Revisá la configuración.');
         }
 
         if (mounted) _mostrarPopupEmailEnviado();
@@ -126,7 +131,7 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al procesar el registro: $e')),
+          SnackBar(content: Text('${AppCopy.errorGenerico} ($e)')),
         );
       }
     } finally {
@@ -140,15 +145,15 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          '¡Cuenta creada!',
+        title: const Text(
+          'Cuenta creada',
           style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              'Enviate el enlace de activación por WhatsApp para validar tu dispositivo y activar la cuenta.',
+              'Enviate el enlace de activación por WhatsApp para confirmar y activar la cuenta.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 14),
             ),
@@ -163,7 +168,7 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
                 _linkValidacion ?? '',
                 style: const TextStyle(
                   fontWeight: FontWeight.w600,
-                  color: Colors.blue,
+                  color: primaryColor,
                   fontSize: 12,
                 ),
               ),
@@ -174,14 +179,19 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
           TextButton(
             onPressed: () async {
               if (_linkValidacion != null) {
-                await Clipboard.setData(ClipboardData(text: _linkValidacion!));
+                await Clipboard.setData(
+                  ClipboardData(text: _linkValidacion!),
+                );
               }
               if (context.mounted) {
                 Navigator.pop(context);
                 Navigator.pop(context);
               }
             },
-            child: const Text('Copiar link y cerrar', style: TextStyle(color: Colors.grey)),
+            child: const Text(
+              'Copiar link y cerrar',
+              style: TextStyle(color: Colors.grey),
+            ),
           ),
           ElevatedButton.icon(
             onPressed: () async {
@@ -197,9 +207,12 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
             icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
             label: const Text('Validar por WhatsApp'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF25D366),
+              backgroundColor: AppColors.whatsapp,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
         ],
@@ -213,18 +226,22 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          '¡Email enviado!',
+        title: const Text(
+          'Email enviado',
           style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.mark_email_read_outlined, size: 48, color: Color(0xFF0F52BA)),
+            const Icon(
+              Icons.mark_email_read_outlined,
+              size: 48,
+              color: primaryColor,
+            ),
             const SizedBox(height: 16),
             Text(
               'Enviamos un correo a\n${_emailController.text.trim()}\n\n'
-              'Abrí el email y hacé click en el enlace para activar tu cuenta.',
+              'Abrí el email y tocá el enlace para activar tu cuenta.',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 14),
             ),
@@ -232,7 +249,7 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
             const Text(
               'Si no lo ves, revisá la carpeta de spam.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+              style: TextStyle(fontSize: 12, color: AppColors.textMuted),
             ),
           ],
         ),
@@ -245,7 +262,10 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryColor,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             child: const Text('Entendido'),
           ),
@@ -257,12 +277,13 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
-        title: const Text('Crear nueva cuenta'),
-        backgroundColor: primaryColor,
-        foregroundColor: Colors.white,
+        title: const Text('Crear cuenta'),
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.text,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -273,17 +294,17 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const Text(
-                  'Datos Personales',
+                  'Datos personales',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E293B),
+                    color: AppColors.text,
                   ),
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Completá tus datos reales para validar tu identidad en la comunidad.',
-                  style: TextStyle(color: Colors.grey, fontSize: 14),
+                  AppCopy.datoSensibleHint,
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 14),
                 ),
                 const SizedBox(height: 24),
                 _buildTextField(
@@ -305,20 +326,26 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
                         value: _tipoDocSeleccionado,
                         decoration: _inputDeco('Tipo Doc.', true),
                         items: ['DNI', 'Pasaporte', 'Cédula']
-                            .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                            .map(
+                              (t) => DropdownMenuItem(value: t, child: Text(t)),
+                            )
                             .toList(),
-                        onChanged: (val) => setState(() => _tipoDocSeleccionado = val),
+                        onChanged: (val) =>
+                            setState(() => _tipoDocSeleccionado = val),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: DropdownButtonFormField<String>(
                         value: _paisSeleccionado,
-                        decoration: _inputDeco('País Emisor', true),
+                        decoration: _inputDeco('País emisor', true),
                         items: ['Argentina', 'Uruguay', 'Chile', 'Otro']
-                            .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+                            .map(
+                              (p) => DropdownMenuItem(value: p, child: Text(p)),
+                            )
                             .toList(),
-                        onChanged: (val) => setState(() => _paisSeleccionado = val),
+                        onChanged: (val) =>
+                            setState(() => _paisSeleccionado = val),
                       ),
                     ),
                   ],
@@ -326,7 +353,7 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
                 const SizedBox(height: 12),
                 _buildTextField(
                   controller: _docNumeroController,
-                  labelText: 'Número de Documento',
+                  labelText: 'Número de documento',
                   icon: Icons.badge_outlined,
                   keyboardType: TextInputType.number,
                   obligatorio: true,
@@ -334,7 +361,10 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
                 const SizedBox(height: 16),
                 const Text(
                   'Método de validación',
-                  style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.text,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -344,7 +374,8 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
                         label: const Text('WhatsApp'),
                         selected: _metodoValidacion == 'whatsapp',
                         selectedColor: primaryColor.withOpacity(0.2),
-                        onSelected: (_) => setState(() => _metodoValidacion = 'whatsapp'),
+                        onSelected: (_) =>
+                            setState(() => _metodoValidacion = 'whatsapp'),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -353,7 +384,8 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
                         label: const Text('Email'),
                         selected: _metodoValidacion == 'email',
                         selectedColor: primaryColor.withOpacity(0.2),
-                        onSelected: (_) => setState(() => _metodoValidacion = 'email'),
+                        onSelected: (_) =>
+                            setState(() => _metodoValidacion = 'email'),
                       ),
                     ),
                   ],
@@ -362,7 +394,7 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
                 if (_metodoValidacion == 'whatsapp')
                   _buildTextField(
                     controller: _whatsappController,
-                    labelText: 'Número de WhatsApp (ej: +54911...)',
+                    labelText: 'WhatsApp (ej: +54911...)',
                     icon: Icons.phone_outlined,
                     keyboardType: TextInputType.phone,
                     obligatorio: true,
@@ -376,24 +408,35 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
                     obligatorio: true,
                   ),
                 const SizedBox(height: 32),
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _generarRegistro,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                SizedBox(
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _generarRegistro,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text(
+                            'Registrarme y validar',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                   ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                        )
-                      : const Text(
-                          'Registrarme y Validar',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
                 ),
               ],
             ),
@@ -425,22 +468,34 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
                   ? const [
                       TextSpan(
                         text: ' *',
-                        style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ]
                   : [],
             ),
           ),
           filled: true,
-          fillColor: inputBgColor,
+          fillColor: Colors.white,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
+            borderSide: BorderSide(color: Colors.grey.shade200),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade200),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: primaryColor, width: 1.5),
           ),
         ),
         validator: obligatorio
-            ? (value) =>
-                value == null || value.trim().isEmpty ? 'Este campo es obligatorio' : null
+            ? (value) => value == null || value.trim().isEmpty
+                ? 'Este campo es obligatorio'
+                : null
             : null,
       ),
     );
@@ -456,17 +511,28 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
               ? const [
                   TextSpan(
                     text: ' *',
-                    style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ]
               : [],
         ),
       ),
       filled: true,
-      fillColor: inputBgColor,
+      fillColor: Colors.white,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
+        borderSide: BorderSide(color: Colors.grey.shade200),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade200),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: primaryColor, width: 1.5),
       ),
     );
   }
