@@ -4,6 +4,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
 import 'Homepage.dart';
 import 'scoring_service.dart';
+import 'theme/app_colors.dart';
+import 'theme/app_copy.dart';
 
 class TarjetaDigitalWidget extends StatefulWidget {
   const TarjetaDigitalWidget({
@@ -25,10 +27,25 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
   DocumentReference? _resolvedRef;
   bool _loading = true;
 
-  final primaryColor = const Color(0xFF0F52BA);
-  final accentColor = const Color(0xFFE8F0FE);
-  final textColor = const Color(0xFF1E293B);
-  final cardBgColor = Colors.white;
+  static const Color primaryColor = AppColors.prestador;
+  static const Color accentColor = Color(0xFFE6F7FA);
+  static const Color textColor = AppColors.text;
+
+  static const Map<String, String> _labelOficio = {
+    'electricidad': 'Electricista',
+    'plomeria': 'Plomería',
+    'gasista': 'Gasista',
+    'carpinteria': 'Carpintería',
+    'pintura': 'Pintura',
+    'albanileria': 'Construcción',
+    'jardineria': 'Jardinería',
+    'limpieza': 'Limpieza',
+  };
+
+  String _labelProf(dynamic p) {
+    final k = p.toString().toLowerCase().trim();
+    return _labelOficio[k] ?? p.toString();
+  }
 
   @override
   void initState() {
@@ -45,7 +62,6 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
 
     try {
       final uri = Uri.base;
-
       String? id;
       if (uri.queryParameters.containsKey('id')) {
         id = uri.queryParameters['id'];
@@ -66,15 +82,13 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
       debugPrint('Error al intentar leer la URL nativa: $e');
     }
 
-    setState(() {
-      _loading = false;
-    });
+    setState(() => _loading = false);
   }
 
   Future<void> _contactarWhatsApp(String telefono, String nombre) async {
     final tel = telefono.replaceAll(RegExp(r'[^\d+]'), '');
     final mensaje = Uri.encodeComponent(
-      'Hola $nombre, vi tu Tarjeta Digital en Puelo y me gustaría hacerte una consulta.',
+      'Hola $nombre, vi tu tarjeta en Puelo y me gustaría hacerte una consulta.',
     );
     final url = Uri.parse('https://wa.me/$tel?text=$mensaje');
 
@@ -99,7 +113,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
     final linkTarjeta =
         'https://lifewalletpuelo.web.app/#/tarjetaDigital?id=$idDocumento';
     final mensajeShared = Uri.encodeComponent(
-      '¡Hola! Te comparto mi Tarjeta Profesional Digital de Puelo con mi contacto y especialidades:\n\n$linkTarjeta',
+      '¡Hola! Te comparto mi tarjeta profesional en Puelo:\n\n$linkTarjeta',
     );
     final url = Uri.parse('https://wa.me/?text=$mensajeShared');
 
@@ -123,29 +137,100 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
         SnackBar(
           content: Text(mensaje),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
     }
+  }
+
+  void _mostrarExplicacionBadge(String? badge) {
+    final label = ScoringService.labelBadge(badge);
+    final texto = ScoringService.explicacionBadge(badge);
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                label.isEmpty ? 'Sin identificador' : label,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: textColor,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                texto,
+                style: const TextStyle(
+                  fontSize: 15,
+                  color: AppColors.textMuted,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                AppCopy.badgeTapHint,
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildBadgeChip(String? badge) {
     final label = ScoringService.labelBadge(badge);
     if (label.isEmpty) return const SizedBox.shrink();
     final c = ScoringService.coloresBadge(badge);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: Color(c.background),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Color(c.foreground).withOpacity(0.35)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w800,
-          color: Color(c.foreground),
+    return InkWell(
+      onTap: () => _mostrarExplicacionBadge(badge),
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: Color(c.background),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Color(c.foreground).withOpacity(0.35)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: Color(c.foreground),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.info_outline,
+              size: 14,
+              color: Color(c.foreground).withOpacity(0.8),
+            ),
+          ],
         ),
       ),
     );
@@ -154,26 +239,25 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return Scaffold(
-        backgroundColor: const Color(0xFFF8FAFC),
-        body: Center(
-          child: CircularProgressIndicator(color: primaryColor),
-        ),
+      return const Scaffold(
+        backgroundColor: AppColors.bg,
+        body: Center(child: CircularProgressIndicator(color: primaryColor)),
       );
     }
 
     if (_resolvedRef == null) {
       return Scaffold(
-        backgroundColor: const Color(0xFFF8FAFC),
+        backgroundColor: AppColors.bg,
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24.0),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.error_outline_rounded, size: 64, color: Colors.red[400]),
+                Icon(Icons.error_outline_rounded,
+                    size: 64, color: Colors.red[400]),
                 const SizedBox(height: 16),
-                Text(
+                const Text(
                   'No se encontró la tarjeta',
                   style: TextStyle(
                     fontSize: 18,
@@ -185,7 +269,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                 const Text(
                   'El enlace parece no ser válido o la tarjeta ya no está disponible.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Color(0xFF64748B)),
+                  style: TextStyle(color: AppColors.textMuted),
                 ),
               ],
             ),
@@ -204,8 +288,8 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
         }
 
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Scaffold(
-            backgroundColor: const Color(0xFFF8FAFC),
+          return const Scaffold(
+            backgroundColor: AppColors.bg,
             body: Center(
               child: CircularProgressIndicator(color: primaryColor),
             ),
@@ -222,10 +306,12 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
         final String nombre = datos['nombre'] ?? '';
         final String apellido = datos['apellido'] ?? '';
         final String nombreComercial = datos['nombre_comercial'] ?? '';
-        final String telefono = datos['telefono'] ?? '';
+        final String telefono = (datos['telefono'] ?? '').toString();
         final List<dynamic> profesiones = datos['profesiones'] ?? [];
         final String docId = snapshot.data!.id;
         final String? badge = datos['badge_prestador'] as String?;
+        final String? urlFoto =
+            (datos['url_foto_perfil'] ?? datos['foto_perfil'])?.toString();
 
         final Map<String, dynamic>? zonasCoberturaMap =
             datos['zonas_cobertura'];
@@ -241,12 +327,14 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
           }).where((s) => s.isNotEmpty).toList();
         }
 
-        final double promedio = (datos['promedioEstrellas'] ?? 0.0).toDouble();
-        final int cantidadEvaluadores = datos['cantidadEvaluadores'] ?? 0;
+        final double promedio =
+            (datos['promedioEstrellas'] as num?)?.toDouble() ?? 0.0;
+        final int cantidadEvaluadores =
+            (datos['cantidadEvaluadores'] as num?)?.toInt() ?? 0;
 
         return Scaffold(
           key: scaffoldKey,
-          backgroundColor: const Color(0xFFF8FAFC),
+          backgroundColor: AppColors.bg,
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
@@ -256,7 +344,8 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
               onPressed: () {
                 Navigator.pushAndRemoveUntil(
                   context,
-                  MaterialPageRoute(builder: (context) => const HomePageWidget()),
+                  MaterialPageRoute(
+                      builder: (context) => const HomePageWidget()),
                   (route) => false,
                 );
               },
@@ -274,7 +363,6 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Panel de compartido
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -283,8 +371,8 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                         ),
                         child: Column(
                           children: [
-                            Text(
-                              'Tu Tarjeta Digital está activa',
+                            const Text(
+                              'Tarjeta profesional activa',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: primaryColor,
@@ -293,7 +381,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                             ),
                             const SizedBox(height: 4),
                             const Text(
-                              'Usa estos accesos directos para presentarte con nuevos clientes.',
+                              'Compartila para presentarte con nuevos clientes.',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: Color(0xFF475569),
@@ -309,8 +397,9 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                                       '$nombre $apellido',
                                       docId,
                                     ),
-                                    icon: const Icon(Icons.share_rounded, size: 16),
-                                    label: const Text('Enviar WhatsApp'),
+                                    icon: const Icon(Icons.share_rounded,
+                                        size: 16),
+                                    label: const Text(AppCopy.ctaCompartirTarjeta),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: primaryColor,
                                       foregroundColor: Colors.white,
@@ -319,7 +408,8 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                                         vertical: 12,
                                       ),
                                       shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
+                                        borderRadius:
+                                            BorderRadius.circular(12),
                                       ),
                                     ),
                                   ),
@@ -329,11 +419,12 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                                   child: OutlinedButton.icon(
                                     onPressed: () =>
                                         _copiarEnlaceAlPortapapeles(docId),
-                                    icon: const Icon(Icons.copy_rounded, size: 16),
-                                    label: const Text('Copiar Enlace'),
+                                    icon: const Icon(Icons.copy_rounded,
+                                        size: 16),
+                                    label: const Text('Copiar enlace'),
                                     style: OutlinedButton.styleFrom(
                                       foregroundColor: primaryColor,
-                                      side: BorderSide(
+                                      side: const BorderSide(
                                         color: primaryColor,
                                         width: 1.5,
                                       ),
@@ -341,7 +432,8 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                                         vertical: 12,
                                       ),
                                       shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
+                                        borderRadius:
+                                            BorderRadius.circular(12),
                                       ),
                                     ),
                                   ),
@@ -353,10 +445,9 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                       ),
                       const SizedBox(height: 24),
 
-                      // Tarjeta de presentación
                       Container(
                         decoration: BoxDecoration(
-                          color: cardBgColor,
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(24),
                           boxShadow: [
                             BoxShadow(
@@ -375,16 +466,22 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                                 CircleAvatar(
                                   radius: 36,
                                   backgroundColor: primaryColor,
-                                  child: Text(
-                                    nombre.isNotEmpty
-                                        ? nombre[0].toUpperCase()
-                                        : 'P',
-                                    style: const TextStyle(
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
+                                  backgroundImage:
+                                      (urlFoto != null && urlFoto.isNotEmpty)
+                                          ? NetworkImage(urlFoto)
+                                          : null,
+                                  child: (urlFoto == null || urlFoto.isEmpty)
+                                      ? Text(
+                                          nombre.isNotEmpty
+                                              ? nombre[0].toUpperCase()
+                                              : 'P',
+                                          style: const TextStyle(
+                                            fontSize: 28,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : null,
                                 ),
                                 const SizedBox(width: 16),
                                 Expanded(
@@ -396,7 +493,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                                         nombreComercial.isNotEmpty
                                             ? nombreComercial
                                             : '$nombre $apellido',
-                                        style: TextStyle(
+                                        style: const TextStyle(
                                           fontSize: 20,
                                           fontWeight: FontWeight.w800,
                                           color: textColor,
@@ -408,7 +505,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                                           '$nombre $apellido',
                                           style: const TextStyle(
                                             fontSize: 14,
-                                            color: Color(0xFF64748B),
+                                            color: AppColors.textMuted,
                                           ),
                                         ),
                                       ],
@@ -426,7 +523,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                                               cantidadEvaluadores > 0
                                                   ? '${promedio.toStringAsFixed(1)} ($cantidadEvaluadores evaluaciones)'
                                                   : 'Sin evaluaciones aún',
-                                              style: TextStyle(
+                                              style: const TextStyle(
                                                 fontSize: 13,
                                                 fontWeight: FontWeight.w600,
                                                 color: textColor,
@@ -454,7 +551,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF64748B),
+                                  color: AppColors.textMuted,
                                   letterSpacing: 0.8,
                                 ),
                               ),
@@ -473,8 +570,8 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(
-                                      prof.toString(),
-                                      style: TextStyle(
+                                      _labelProf(prof),
+                                      style: const TextStyle(
                                         fontSize: 13,
                                         color: primaryColor,
                                         fontWeight: FontWeight.w600,
@@ -492,7 +589,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF64748B),
+                                  color: AppColors.textMuted,
                                   letterSpacing: 0.8,
                                 ),
                               ),
@@ -500,7 +597,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Icon(
+                                  const Icon(
                                     Icons.location_on_outlined,
                                     size: 16,
                                     color: primaryColor,
@@ -509,7 +606,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                                   Expanded(
                                     child: Text(
                                       zonasLista.join(', '),
-                                      style: TextStyle(
+                                      style: const TextStyle(
                                         fontSize: 14,
                                         color: textColor,
                                       ),
@@ -523,21 +620,21 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Contacto
                       Row(
                         children: [
                           Expanded(
                             child: ElevatedButton.icon(
                               onPressed: telefono.isEmpty
                                   ? null
-                                  : () => _contactarWhatsApp(telefono, nombre),
+                                  : () =>
+                                      _contactarWhatsApp(telefono, nombre),
                               icon: const Icon(
                                 Icons.chat_bubble_outline_rounded,
                                 size: 18,
                               ),
-                              label: const Text('Escribir por WhatsApp'),
+                              label: const Text(AppCopy.ctaWhatsApp),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF25D366),
+                                backgroundColor: AppColors.whatsapp,
                                 foregroundColor: Colors.white,
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 16),
@@ -554,7 +651,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: const Color(0xFFE2E8F0),
+                                color: AppColors.border,
                                 width: 1.5,
                               ),
                             ),
@@ -562,56 +659,41 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                               onPressed: telefono.isEmpty
                                   ? null
                                   : () => _realizarLlamada(telefono),
-                              icon: Icon(
+                              icon: const Icon(
                                 Icons.phone_enabled_rounded,
                                 color: primaryColor,
                                 size: 22,
                               ),
                               padding: const EdgeInsets.all(16),
+                              tooltip: AppCopy.ctaLlamar,
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 28),
 
-                      // Trabajos / portfolio
                       FutureBuilder<QuerySnapshot>(
                         future: FirebaseFirestore.instance
                             .collection('trabajos')
+                            .where('usuario_id', isEqualTo: _resolvedRef!.id)
                             .get(),
                         builder: (context, trabajosSnapshot) {
                           if (trabajosSnapshot.connectionState ==
                               ConnectionState.waiting) {
                             return const Center(
-                              child: CircularProgressIndicator(),
+                              child: CircularProgressIndicator(
+                                color: primaryColor,
+                              ),
                             );
                           }
 
                           final List<String> todasLasImagenes = [];
 
                           if (trabajosSnapshot.hasData) {
-                            final currentId = _resolvedRef!.id;
-                            final currentPath = _resolvedRef!.path;
-
                             for (final doc in trabajosSnapshot.data!.docs) {
                               final data =
                                   doc.data() as Map<String, dynamic>;
-                              final rawRef = data['trabajadorRef'];
-                              final uidCampo =
-                                  data['usuario_id']?.toString();
-                              bool coincide = false;
-
-                              if (uidCampo != null &&
-                                  uidCampo == currentId) {
-                                coincide = true;
-                              } else if (rawRef is DocumentReference) {
-                                coincide = rawRef.id == currentId;
-                              } else if (rawRef is String) {
-                                coincide = rawRef == currentId ||
-                                    rawRef == currentPath;
-                              }
-
-                              if (coincide && data['imagenes'] != null) {
+                              if (data['imagenes'] != null) {
                                 final imgs =
                                     data['imagenes'] as List<dynamic>;
                                 todasLasImagenes.addAll(
@@ -621,114 +703,135 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                             }
                           }
 
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
+                          // Fallback: sin índice usuario_id, buscar por ref (limitado)
+                          return FutureBuilder<QuerySnapshot?>(
+                            future: todasLasImagenes.isNotEmpty
+                                ? Future.value(null)
+                                : FirebaseFirestore.instance
+                                    .collection('trabajos')
+                                    .limit(80)
+                                    .get(),
+                            builder: (context, fallbackSnap) {
+                              if (todasLasImagenes.isEmpty &&
+                                  fallbackSnap.hasData) {
+                                final currentId = _resolvedRef!.id;
+                                for (final doc
+                                    in fallbackSnap.data!.docs) {
+                                  final data =
+                                      doc.data() as Map<String, dynamic>;
+                                  final rawRef = data['trabajadorRef'];
+                                  final uidCampo =
+                                      data['usuario_id']?.toString();
+                                  bool coincide = false;
+                                  if (uidCampo != null &&
+                                      uidCampo == currentId) {
+                                    coincide = true;
+                                  } else if (rawRef is DocumentReference) {
+                                    coincide = rawRef.id == currentId;
+                                  } else if (rawRef is String) {
+                                    coincide = rawRef == currentId ||
+                                        rawRef.endsWith('/$currentId');
+                                  }
+                                  if (coincide &&
+                                      data['imagenes'] != null) {
+                                    final imgs =
+                                        data['imagenes'] as List<dynamic>;
+                                    todasLasImagenes.addAll(
+                                      imgs.map((e) => e.toString()),
+                                    );
+                                  }
+                                }
+                              }
+
+                              return Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.stretch,
                                 children: [
-                                  Text(
-                                    'Trabajos realizados',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: textColor,
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: accentColor,
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      '${todasLasImagenes.length} FOTOS',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w800,
-                                        color: primaryColor,
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text(
+                                        'Trabajos mostrados',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: textColor,
+                                        ),
                                       ),
-                                    ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: accentColor,
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          '${todasLasImagenes.length} FOTOS',
+                                          style: const TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w800,
+                                            color: primaryColor,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              if (todasLasImagenes.isEmpty)
-                                Container(
-                                  padding: const EdgeInsets.all(32),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[100],
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: const Text(
-                                    'Este proveedor todavía no cargó imágenes de sus trabajos.',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(color: Colors.grey),
-                                  ),
-                                )
-                              else
-                                GridView.builder(
-                                  shrinkWrap: true,
-                                  physics:
-                                      const NeverScrollableScrollPhysics(),
-                                  gridDelegate:
-                                      const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 2,
-                                    crossAxisSpacing: 12,
-                                    mainAxisSpacing: 12,
-                                    childAspectRatio: 1.1,
-                                  ),
-                                  itemCount: todasLasImagenes.length,
-                                  itemBuilder: (context, index) {
-                                    return ClipRRect(
-                                      borderRadius: BorderRadius.circular(16),
-                                      child: Stack(
-                                        fit: StackFit.expand,
-                                        children: [
-                                          Image.network(
+                                  const SizedBox(height: 12),
+                                  if (todasLasImagenes.isEmpty)
+                                    Container(
+                                      padding: const EdgeInsets.all(32),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey[100],
+                                        borderRadius:
+                                            BorderRadius.circular(16),
+                                      ),
+                                      child: const Text(
+                                        'Todavía no hay fotos de trabajos en el portfolio.',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(color: Colors.grey),
+                                      ),
+                                    )
+                                  else
+                                    GridView.builder(
+                                      shrinkWrap: true,
+                                      physics:
+                                          const NeverScrollableScrollPhysics(),
+                                      gridDelegate:
+                                          const
+                                             
+SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: 2,
+                                        crossAxisSpacing: 12,
+                                        mainAxisSpacing: 12,
+                                        childAspectRatio: 1.1,
+                                      ),
+                                      itemCount: todasLasImagenes.length,
+                                      itemBuilder: (context, index) {
+                                        return ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(16),
+                                          child: Image.network(
                                             todasLasImagenes[index],
                                             fit: BoxFit.cover,
-                                            loadingBuilder: (
-                                              context,
-                                              child,
-                                              loadingProgress,
-                                            ) {
-                                              if (loadingProgress == null) {
-                                                return child;
-                                              }
-                                              return const Center(
-                                                child:
-                                                    CircularProgressIndicator(),
-                                              );
-                                            },
-                                            errorBuilder: (
-                                              context,
-                                              error,
-                                              stackTrace,
-                                            ) {
-                                              return Container(
-                                                color: Colors.grey[300],
-                                                child: const Icon(
-                                                  Icons.broken_image,
-                                                  color: Colors.grey,
-                                                ),
-                                              );
-                                            },
+                                            errorBuilder: (_, __, ___) =>
+                                                Container(
+                                              color: Colors.grey[300],
+                                              child: const Icon(
+                                                Icons.broken_image,
+                                                color: Colors.grey,
+                                              ),
+                                            ),
                                           ),
-                                          Container(
-                                            color:
-                                                Colors.black.withOpacity(0.05),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
-                                ),
-                            ],
+                                        );
+                                      },
+                                    ),
+                                ],
+                              );
+                            },
                           );
                         },
                       ),
