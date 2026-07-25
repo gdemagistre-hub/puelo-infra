@@ -4,6 +4,9 @@ import 'Homepage.dart';
 import 'user_session.dart';
 import 'registroCuenta.dart';
 import 'pantalla_gracias_validacion.dart';
+import 'config/app_env.dart';
+import 'theme/app_colors.dart';
+import 'theme/app_copy.dart';
 
 class LoginScreenWidget extends StatefulWidget {
   const LoginScreenWidget({super.key});
@@ -19,26 +22,42 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
   String? _selectedUserId;
   Map<String, dynamic>? _selectedUserData;
 
-  final primaryColor = const Color(0xFF0F52BA);
-  final textColor = const Color(0xFF1E293B);
-  final subTextColor = const Color(0xFF64748B);
+  static const Color primaryColor = AppColors.cliente;
+  static const Color textColor = AppColors.text;
+  static const Color subTextColor = AppColors.textMuted;
 
   void _irAHome() {
+    // Hasta tener Auth real: en prod no hay dropdown → guiar a crear cuenta.
     if (_selectedUserId == null || _selectedUserData == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, seleccioná un usuario del listado superior para simular el ingreso.')),
-      );
+      if (AppEnv.showDevTools) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Seleccioná un usuario del listado de desarrollo para ingresar.',
+            ),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'El ingreso con Google / Facebook / email se activa en el próximo paso. '
+              'Por ahora podés crear usuario.',
+            ),
+          ),
+        );
+      }
       return;
     }
 
-    // Guardamos los datos en la memoria persistente
     UserSession().iniciarSesion(_selectedUserId!, _selectedUserData!);
 
-    // Si venimos de una validación de domicilio pendiente → mostrar pantalla de gracias
     if (UserSession().pendingValidacionToken != null) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const PantallaGraciasValidacionWidget()),
+        MaterialPageRoute(
+          builder: (context) => const PantallaGraciasValidacionWidget(),
+        ),
       );
     } else {
       Navigator.pushReplacement(
@@ -48,69 +67,127 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
     }
   }
 
+  void _authProximamente(String proveedor) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          AppEnv.showDevTools
+              ? 'Dev: elegí un usuario arriba y volvé a tocar $proveedor.'
+              : 'Ingreso con $proveedor: próximamente. Mientras tanto usá “Crear usuario”.',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: AppColors.bg,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 24.0),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 28.0, vertical: 24.0),
             child: Container(
               constraints: const BoxConstraints(maxWidth: 420),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // PULL-DOWN TEMPORAL PARA SIMULAR LOGIN
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: primaryColor.withOpacity(0.3)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Modo Desarrollador: Elegir Usuario', style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 12)),
-                        const SizedBox(height: 8),
-                        StreamBuilder<QuerySnapshot>(
-                          stream: FirebaseFirestore.instance.collection('usuarios').snapshots(),
-                          builder: (context, snapshot) {
-                            if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-                            
-                            var items = snapshot.data!.docs;
-                            return DropdownButtonFormField<String>(
-                              decoration: const InputDecoration(
-                                border: OutlineInputBorder(),
-                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              ),
-                              hint: const Text('Seleccionar...'),
-                              value: _selectedUserId,
-                              items: items.map((doc) {
-                                Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-                                String displayName = '${data['nombre'] ?? ''} ${data['apellido'] ?? ''}'.trim();
-                                return DropdownMenuItem<String>(
-                                  value: doc.id,
-                                  child: Text(displayName.isNotEmpty ? displayName : 'Sin nombre'),
-                                );
-                              }).toList(),
-                              onChanged: (val) {
-                                setState(() {
-                                  _selectedUserId = val;
-                                  _selectedUserData = items.firstWhere((doc) => doc.id == val).data() as Map<String, dynamic>;
-                                });
-                              },
-                            );
-                          },
+                  // Solo desarrollo / staging — nunca en prod release
+                  if (AppEnv.showDevTools) ...[
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: primaryColor.withOpacity(0.3),
                         ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 40),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Solo desarrollo (${AppEnv.label})',
+                            style: const TextStyle(
+                              color: primaryColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          StreamBuilder<QuerySnapshot>(
+                            // No bajar toda la colección
+                            stream: FirebaseFirestore.instance
+                                .collection('usuarios')
+                                .limit(40)
+                                .snapshots(),
+                            builder: (context, snapshot) {
+                              if (!snapshot.hasData) {
+                                return const Center(
+                                  child: CircularProgressIndicator(
+                                    color: primaryColor,
+                                  ),
+                                );
+                              }
 
-                  // Isotipo o Logo de la App
+                              final items = snapshot.data!.docs;
+                              return DropdownButtonFormField<String>(
+                                decoration: const InputDecoration(
+                                  border: OutlineInputBorder(),
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
+                                ),
+                                hint: const Text('Seleccionar usuario…'),
+                                value: _selectedUserId,
+                                items: items.map((doc) {
+                                  final data =
+                                      doc.data() as Map<String, dynamic>;
+                                  final displayName =
+                                      '${data['nombre'] ?? ''} ${data['apellido'] ?? ''}'
+                                          .trim();
+                                  return DropdownMenuItem<String>(
+                                    value: doc.id,
+                                    child: Text(
+                                      displayName.isNotEmpty
+                                          ? displayName
+                                          : 'Sin nombre',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  setState(() {
+                                    _selectedUserId = val;
+                                    _selectedUserData = items
+                                        .firstWhere((doc) => doc.id == val)
+                                        .data() as Map<String, dynamic>;
+                                  });
+                                },
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: _irAHome,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: primaryColor,
+                                foregroundColor: Colors.white,
+                              ),
+                              child: const Text('Ingresar (dev)'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                  ],
+
                   Center(
                     child: Container(
                       height: 80,
@@ -126,55 +203,128 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                           ),
                         ],
                       ),
-                      child: const Icon(Icons.wallet_rounded, color: Colors.white, size: 42),
+                      child: const Icon(
+                        Icons.handyman_rounded,
+                        color: Colors.white,
+                        size: 42,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 24),
-                  
-                  Text('Te damos la bienvenida', textAlign: TextAlign.center, style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: textColor, letterSpacing: -0.5)),
+
+                  Text(
+                    AppCopy.welcomeTitle,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      color: textColor,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
                   const SizedBox(height: 8),
-                  Text('Ingresá para gestionar tus prestadores y servicios en un solo lugar.', textAlign: TextAlign.center, style: TextStyle(fontSize: 15, color: subTextColor, height: 1.4)),
+                  Text(
+                    AppCopy.welcomeSubtitle,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      color: subTextColor,
+                      height: 1.4,
+                    ),
+                  ),
                   const SizedBox(height: 36),
 
                   _buildLoginButton(
-                    onPressed: _irAHome,
-                    icon: _buildIconCircle(backgroundColor: const Color(0xFFF1F5F9), child: const Text('G', style: TextStyle(color: Color(0xFFDB4437), fontWeight: FontWeight.w900, fontSize: 16))),
-                    label: 'Continuar con Google', backgroundColor: Colors.white, textColor: textColor, hasBorder: true,
+                    onPressed: () => AppEnv.showDevTools
+                        ? _irAHome()
+                        : _authProximamente('Google'),
+                    icon: _buildIconCircle(
+                      backgroundColor: const Color(0xFFF1F5F9),
+                      child: const Text(
+                        'G',
+                        style: TextStyle(
+                          color: Color(0xFFDB4437),
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                    label: 'Continuar con Google',
+                    backgroundColor: Colors.white,
+                    textColor: textColor,
+                    hasBorder: true,
                   ),
                   const SizedBox(height: 14),
 
                   _buildLoginButton(
-                    onPressed: _irAHome,
-                    icon: _buildIconCircle(backgroundColor: Colors.white.withOpacity(0.15), child: const Icon(Icons.apple, color: Colors.white, size: 18)),
-                    label: 'Continuar con Apple', backgroundColor: Colors.black, textColor: Colors.white,
+                    onPressed: () => AppEnv.showDevTools
+                        ? _irAHome()
+                        : _authProximamente('Apple'),
+                    icon: _buildIconCircle(
+                      backgroundColor: Colors.white.withOpacity(0.15),
+                      child: const Icon(
+                        Icons.apple,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                    ),
+                    label: 'Continuar con Apple',
+                    backgroundColor: Colors.black,
+                    textColor: Colors.white,
                   ),
                   const SizedBox(height: 14),
 
                   _buildLoginButton(
-                    onPressed: _irAHome,
-                    icon: _buildIconCircle(backgroundColor: Colors.white.withOpacity(0.2), child: const Text('f', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18))),
-                    label: 'Continuar con Facebook', backgroundColor: const Color(0xFF1877F2), textColor: Colors.white,
+                    onPressed: () => AppEnv.showDevTools
+                        ? _irAHome()
+                        : _authProximamente('Facebook'),
+                    icon: _buildIconCircle(
+                      backgroundColor: Colors.white.withOpacity(0.2),
+                      child: const Text(
+                        'f',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ),
+                    label: 'Continuar con Facebook',
+                    backgroundColor: const Color(0xFF1877F2),
+                    textColor: Colors.white,
                   ),
                   const SizedBox(height: 20),
 
-                  // Divisor estético
                   Row(
                     children: [
-                      Expanded(child: Divider(color: Colors.grey[300], thickness: 1)),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                        child: Text('o con tu cuenta', style: TextStyle(color: subTextColor, fontSize: 13)),
+                      Expanded(
+                        child: Divider(color: Colors.grey[300], thickness: 1),
                       ),
-                      Expanded(child: Divider(color: Colors.grey[300], thickness: 1)),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12.0),
+                        child: Text(
+                          'o con tu cuenta',
+                          style: TextStyle(color: subTextColor, fontSize: 13),
+                        ),
+                      ),
+                      Expanded(
+                        child: Divider(color: Colors.grey[300], thickness: 1),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 20),
 
                   _buildLoginButton(
-                    onPressed: _irAHome,
+                    onPressed: () => AppEnv.showDevTools
+                        ? _irAHome()
+                        : _authProximamente('Email'),
                     icon: _buildIconCircle(
                       backgroundColor: primaryColor.withOpacity(0.1),
-                      child: Icon(Icons.mail_outline_rounded, color: primaryColor, size: 16),
+                      child: const Icon(
+                        Icons.mail_outline_rounded,
+                        color: primaryColor,
+                        size: 16,
+                      ),
                     ),
                     label: 'Ingresar con Email',
                     backgroundColor: Colors.white,
@@ -184,11 +334,10 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                   ),
                   const SizedBox(height: 32),
 
-                  // Enlace inferior: Registrar nuevo usuario redirigiendo a la pantalla correspondiente
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
+                      const Text(
                         '¿Sos nuevo en Puelo? ',
                         style: TextStyle(color: subTextColor, fontSize: 14),
                       ),
@@ -196,10 +345,13 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                         onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => const RegistroCuentaWidget()),
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const RegistroCuentaWidget(),
+                            ),
                           );
                         },
-                        child: Text(
+                        child: const Text(
                           'Crear usuario',
                           style: TextStyle(
                             color: primaryColor,
@@ -220,18 +372,68 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
     );
   }
 
-  Widget _buildIconCircle({required Color backgroundColor, required Widget child}) {
-    return Container(width: 28, height: 28, decoration: BoxDecoration(color: backgroundColor, shape: BoxShape.circle), alignment: Alignment.center, child: child);
+  Widget _buildIconCircle({
+    required Color backgroundColor,
+    required Widget child,
+  }) {
+    return Container(
+      width: 28,
+      height: 28,
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        shape: BoxShape.circle,
+      ),
+      alignment: Alignment.center,
+      child: child,
+    );
   }
 
-  Widget _buildLoginButton({required VoidCallback onPressed, required Widget icon, required String label, required Color backgroundColor, required Color textColor, bool hasBorder = false, Color? borderColor}) {
+  Widget _buildLoginButton({
+    required VoidCallback onPressed,
+    required Widget icon,
+    required String label,
+    required Color backgroundColor,
+    required Color textColor,
+    bool hasBorder = false,
+    Color? borderColor,
+  }) {
     return ElevatedButton(
       onPressed: onPressed,
-      style: ElevatedButton.styleFrom(backgroundColor: backgroundColor, foregroundColor: textColor, elevation: backgroundColor == Colors.white ? 1 : 0, padding: const EdgeInsets.symmetric(vertical: 15), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: hasBorder ? BorderSide(color: borderColor ?? const Color(0xFFE2E8F0), width: 1.5) : BorderSide.none)),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: backgroundColor,
+        foregroundColor: textColor,
+        elevation: backgroundColor == Colors.white ? 1 : 0,
+        padding: const EdgeInsets.symmetric(vertical: 15),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: hasBorder
+              ? BorderSide(
+                  color: borderColor ?? AppColors.border,
+                  width: 1.5,
+                )
+              : BorderSide.none,
+        ),
+      ),
       child: Stack(
         children: [
-          Align(alignment: Alignment.centerLeft, child: Padding(padding: const EdgeInsets.only(left: 16.0), child: icon)),
-          Align(alignment: Alignment.center, child: Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: 0.2))),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 16.0),
+              child: icon,
+            ),
+          ),
+          Align(
+            alignment: Alignment.center,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ),
         ],
       ),
     );
