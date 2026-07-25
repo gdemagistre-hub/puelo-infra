@@ -62,7 +62,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     'Limpieza': 'limpieza',
   };
 
-  /// Labels humanos para claves de oficio
   static const Map<String, String> _labelOficio = {
     'electricidad': 'Electricista',
     'plomeria': 'Plomería',
@@ -92,7 +91,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     final initial = widget.initialQuery?.trim() ?? '';
     _searchQuery = initial.toLowerCase();
     _searchController.text = initial;
-    // Si viene con query de Home, mostrar filtros colapsados (result-first)
     _filtrosAbiertos = initial.isEmpty;
     _loadProvincias();
   }
@@ -190,7 +188,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
   bool _tieneWhatsApp(Map<String, dynamic> data) {
     final tel = _telefonoDe(data);
     if (tel.isEmpty) return false;
-    // Si el campo existe, respetarlo; si no, asumir que con teléfono se puede escribir
     if (data.containsKey('tiene_whatsapp')) {
       return data['tiene_whatsapp'] == true;
     }
@@ -231,7 +228,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     }
   }
 
-  /// Orden UX: zona match → WhatsApp → estrellas → badge
   int _scoreOrden(Map<String, dynamic> data) {
     int s = 0;
     final cobertura = data['zonas_cobertura'] as Map<String, dynamic>?;
@@ -248,9 +244,12 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
       if (pid == selectedProvinciaId) s += 40;
     }
     if (_tieneWhatsApp(data) && _telefonoDe(data).isNotEmpty) s += 30;
-    final evals = (data['cantidadEvaluadores'] ?? 0) as int;
-    final prom = (data['promedioEstrellas'] ?? 0.0).toDouble();
-    s += (prom * 2).round() + (evals > 0 ? 5 : 0);
+
+    final evals = (data['cantidadEvaluadores'] as num?)?.toInt() ?? 0;
+    final prom = (data['promedioEstrellas'] as num?)?.toDouble() ?? 0.0;
+    s += (prom * 2).round().toInt();
+    if (evals > 0) s += 5;
+
     final badge = (data['badge_prestador'] ?? '').toString();
     if (badge == 'plata') s += 15;
     if (badge == 'bronce_plus' || badge == 'bronce+') s += 10;
@@ -305,7 +304,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
   bool _pasaFiltrosZona(Map<String, dynamic> data) {
     final cobertura = data['zonas_cobertura'] as Map<String, dynamic>?;
     if (cobertura == null) {
-      // Sin zona cargada: solo si el usuario no filtró zona
       return selectedProvinciaId == null &&
           selectedPartidoId == null &&
           selectedLocalidadId == null;
@@ -415,9 +413,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
               onPressed: () =>
                   setState(() => _filtrosAbiertos = !_filtrosAbiertos),
               icon: Icon(
-                _filtrosAbiertos
-                    ? Icons.expand_less
-                    : Icons.tune_rounded,
+                _filtrosAbiertos ? Icons.expand_less : Icons.tune_rounded,
                 color: _clientePrimary,
                 size: 20,
               ),
@@ -434,7 +430,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
         body: SafeArea(
           child: Column(
             children: [
-              // Buscador siempre visible
               Container(
                 width: double.infinity,
                 color: Colors.white,
@@ -461,8 +456,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                       setState(() => _searchQuery = value.toLowerCase()),
                 ),
               ),
-
-              // Chips de oficio (siempre, poco espacio)
               Container(
                 color: Colors.white,
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
@@ -507,8 +500,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                   ),
                 ),
               ),
-
-              // Filtros de zona colapsables
               AnimatedCrossFade(
                 firstChild: const SizedBox(width: double.infinity),
                 secondChild: Container(
@@ -574,9 +565,8 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                               dropdownMenuEntries: localidades
                                   .map(
                                     (l) => DropdownMenuEntry<String>(
-                                      value:
-                                          (l['localidad_id'] ?? l['id'])
-                                              .toString(),
+                                      value: (l['localidad_id'] ?? l['id'])
+                                          .toString(),
                                       label: (l['localidad_nombre'] ??
                                               l['nombre'])
                                           .toString(),
@@ -605,10 +595,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                     : CrossFadeState.showFirst,
                 duration: const Duration(milliseconds: 200),
               ),
-
               const Divider(height: 1),
-
-              // Lista — query acotada en servidor
               Expanded(
                 child: StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
@@ -661,12 +648,10 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                           (data['nombre'] ?? '').toString().toLowerCase();
                       final apellido =
                           (data['apellido'] ?? '').toString().toLowerCase();
-                      final nombreComercial =
-                          (data['nombre_comercial'] ?? '')
-                              .toString()
-                              .toLowerCase();
+                      final nombreComercial = (data['nombre_comercial'] ?? '')
+                          .toString()
+                          .toLowerCase();
                       final profesionesStr = profesionesNorm.join(' ');
-                      // También match por label humano (ej. "plomería")
                       final labels = profesionesNorm
                           .map((k) => _labelOficio[k] ?? k)
                           .join(' ')
@@ -722,7 +707,9 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                                 },
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: _clientePrimary,
-                                  side: const BorderSide(color: _clientePrimary),
+                                  side: const BorderSide(
+                                    color: _clientePrimary,
+                                  ),
                                 ),
                                 child: const Text('Ampliar búsqueda'),
                               ),
@@ -740,9 +727,11 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                         final data = doc.data() as Map<String, dynamic>;
 
                         final double promedio =
-                            (data['promedioEstrellas'] ?? 0.0).toDouble();
+                            (data['promedioEstrellas'] as num?)?.toDouble() ??
+                                0.0;
                         final int cantidadEvaluadores =
-                            data['cantidadEvaluadores'] ?? 0;
+                            (data['cantidadEvaluadores'] as num?)?.toInt() ??
+                                0;
                         final List<dynamic> profesiones =
                             data['profesiones'] ?? [];
                         final String? badge =
@@ -882,7 +871,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                                             ),
                                           ),
                                         const SizedBox(height: 6),
-                                        // CTA principal: WhatsApp
                                         Material(
                                           color: puedeWa
                                               ? _whatsapp
@@ -893,10 +881,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                                             borderRadius:
                                                 BorderRadius.circular(20),
                                             onTap: puedeWa
-                                                ? () {
-                                                    // No abrir tarjeta; contactar directo
-                                                    _abrirWhatsApp(data);
-                                                  }
+                                                ? () => _abrirWhatsApp(data)
                                                 : null,
                                             child: const Padding(
                                               padding: EdgeInsets.symmetric(
