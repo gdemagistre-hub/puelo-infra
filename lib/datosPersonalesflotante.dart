@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import 'dni_ocr_parser.dart';
@@ -124,12 +125,13 @@ class _DatosPersonalesFlotanteWidgetState
     if (mounted) setState(() => _loading = false);
   }
 
+  /// + seguido de exactamente 13 dígitos. Sin espacios, guiones ni letras.
   String? _validarTelefono(String? v) {
     final t = (v ?? '').trim();
     if (t.isEmpty) return 'El celular es obligatorio';
-    final re = RegExp(r'^\+549-\d{2,4}-\d{4,8}$');
+    final re = RegExp(r'^\+\d{13}$');
     if (!re.hasMatch(t)) {
-      return 'Formato: +549-11444-5555 (sin el 15)';
+      return 'Formato: + y 13 números (ej: +5491112345678)';
     }
     return null;
   }
@@ -588,6 +590,8 @@ class _DatosPersonalesFlotanteWidgetState
                         _apellidoController,
                         required: true,
                       ),
+
+                      // Celular + WhatsApp
                       Padding(
                         padding: const EdgeInsets.only(bottom: 16),
                         child: Row(
@@ -597,11 +601,18 @@ class _DatosPersonalesFlotanteWidgetState
                               child: TextFormField(
                                 controller: _telefonoController,
                                 keyboardType: TextInputType.phone,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.allow(
+                                    RegExp(r'[+\d]'),
+                                  ),
+                                  LengthLimitingTextInputFormatter(14),
+                                  _TelefonoInputFormatter(),
+                                ],
                                 decoration: _dec(
                                   'Celular *',
-                                  hint: '+549-11444-5555',
+                                  hint: '+5491112345678',
                                   helper:
-                                      'Código AR +549, sin el 15. Ej: +549-11-44445555',
+                                      'Empezá con + y 13 dígitos, sin espacios ni guiones',
                                 ),
                                 validator: _validarTelefono,
                               ),
@@ -643,6 +654,7 @@ class _DatosPersonalesFlotanteWidgetState
                           ],
                         ),
                       ),
+
                       _buildDropdown(
                         'Tipo de documento',
                         _tipoDoc,
@@ -936,6 +948,41 @@ class _DatosPersonalesFlotanteWidgetState
             ),
         ],
       ),
+    );
+  }
+}
+
+/// Primer carácter "+", el resto solo dígitos (máximo 13).
+class _TelefonoInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text;
+
+    if (text.isEmpty) {
+      return newValue;
+    }
+
+    if (!text.startsWith('+')) {
+      final onlyDigits = text.replaceAll(RegExp(r'\D'), '');
+      final limited =
+          onlyDigits.length > 13 ? onlyDigits.substring(0, 13) : onlyDigits;
+      final result = '+$limited';
+      return TextEditingValue(
+        text: result,
+        selection: TextSelection.collapsed(offset: result.length),
+      );
+    }
+
+    final after = text.substring(1).replaceAll(RegExp(r'\D'), '');
+    final limited = after.length > 13 ? after.substring(0, 13) : after;
+    final result = '+$limited';
+
+    return TextEditingValue(
+      text: result,
+      selection: TextSelection.collapsed(offset: result.length),
     );
   }
 }
