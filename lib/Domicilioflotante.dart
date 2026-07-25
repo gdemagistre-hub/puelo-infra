@@ -11,7 +11,10 @@ class DomicilioFlotanteWidget extends StatefulWidget {
 }
 
 class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
-  final primaryColor = const Color(0xFF0F52BA);
+  static const Color primaryColor = Color(0xFF734BE4);
+  static const Color _bg = Color(0xFFF8FAFC);
+  static const Color _textColor = Color(0xFF1E293B);
+
   final db = FirebaseFirestore.instance;
   final _formKey = GlobalKey<FormState>();
 
@@ -44,6 +47,28 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
     _pisoController.dispose();
     _cpController.dispose();
     super.dispose();
+  }
+
+  InputDecoration _dec(String label) {
+    return InputDecoration(
+      labelText: label,
+      filled: true,
+      fillColor: Colors.white,
+      labelStyle: TextStyle(color: Colors.grey.shade600),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade200),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade200),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: primaryColor, width: 1.5),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    );
   }
 
   Future<void> _cargarDatos() async {
@@ -137,7 +162,6 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
     final tieneCalle = _calleController.text.trim().isNotEmpty;
     final tieneNumero = _numeroController.text.trim().isNotEmpty;
 
-    // Si cargó calle o número → provincia, partido y localidad obligatorios
     if (tieneCalle || tieneNumero) {
       if (selectedProvinciaId == null ||
           selectedPartidoId == null ||
@@ -235,22 +259,28 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: _bg,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+          color: _textColor,
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Domicilio',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: _textColor,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
         ),
-        centerTitle: true,
+        centerTitle: false,
       ),
       body: _loading
-          ? Center(child: CircularProgressIndicator(color: primaryColor))
+          ? const Center(child: CircularProgressIndicator(color: primaryColor))
           : Form(
               key: _formKey,
               child: ListView(
@@ -331,6 +361,7 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryColor,
                         foregroundColor: Colors.white,
+                        elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -354,12 +385,7 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
       child: TextFormField(
         controller: controller,
         keyboardType: keyboard,
-        decoration: InputDecoration(
-          labelText: label,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        ),
+        decoration: _dec(label),
       ),
     );
   }
@@ -374,12 +400,7 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
       padding: const EdgeInsets.only(bottom: 16),
       child: DropdownButtonFormField<String>(
         value: value != null && items.any((e) => e.key == value) ? value : null,
-        decoration: InputDecoration(
-          labelText: label,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        ),
+        decoration: _dec(label),
         items: items
             .map(
               (e) => DropdownMenuItem(
