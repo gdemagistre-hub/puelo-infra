@@ -20,6 +20,14 @@ class BuscadorPrestadoresWidget extends StatefulWidget {
 }
 
 class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
+  // Paleta CLIENTE (alineada a Homepage)
+  static const Color _clientePrimary = Color(0xFF734BE4);
+  static const Color _accentCoral = Color(0xFFF75A6D);
+  static const Color _accentLightBlue = Color(0xFF7AAFFF);
+  static const Color _dark = Color(0xFF3D4756);
+  static const Color _bg = Color(0xFFF8FAFC);
+  static const Color _textColor = Color(0xFF1E293B);
+
   final scaffoldKey = GlobalKey<ScaffoldState>();
   final db = FirebaseFirestore.instance;
 
@@ -144,6 +152,25 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     return '${n[0]}${a[0]}'.toUpperCase();
   }
 
+  InputDecorationTheme get _dropdownDecoration => InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade200),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade200),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: _clientePrimary, width: 1.5),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        labelStyle: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+      );
+
   Widget _badgeChip(String? badge) {
     final label = ScoringService.labelBadge(badge);
     if (label.isEmpty) return const SizedBox.shrink();
@@ -169,66 +196,85 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = const Color(0xFF0F52BA);
-    final textColor = const Color(0xFF1E293B);
-
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
         key: scaffoldKey,
-        backgroundColor: const Color(0xFFF8FAFC),
+        backgroundColor: _bg,
         appBar: AppBar(
-          title: const Text('Buscar Prestadores'),
-          backgroundColor: primaryColor,
-          foregroundColor: Colors.white,
+          backgroundColor: Colors.white,
           elevation: 0,
+          surfaceTintColor: Colors.transparent,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+            color: _textColor,
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: const Text(
+            'Buscar prestadores',
+            style: TextStyle(
+              color: _textColor,
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+            ),
+          ),
+          centerTitle: false,
         ),
         body: SafeArea(
           child: Column(
             children: [
+              // Filtros
               Container(
+                width: double.infinity,
                 color: Colors.white,
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // Buscador estilo Home cliente
                     TextField(
                       controller: _searchController,
+                      textInputAction: TextInputAction.search,
                       decoration: InputDecoration(
-                        hintText: 'Buscar por nombre o especialidad...',
-                        prefixIcon: const Icon(Icons.search),
+                        hintText: '¿Qué servicio buscas?',
+                        hintStyle: TextStyle(color: Colors.grey.shade500),
+                        prefixIcon: Icon(
+                          Icons.search,
+                          color: Colors.grey.shade500,
+                        ),
+                        filled: true,
+                        fillColor: _bg,
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12.0),
+                          borderRadius: BorderRadius.circular(30),
+                          borderSide: BorderSide.none,
                         ),
                         contentPadding:
-                            const EdgeInsets.symmetric(vertical: 12.0),
+                            const EdgeInsets.symmetric(vertical: 14),
                       ),
                       onChanged: (value) =>
                           setState(() => _searchQuery = value.toLowerCase()),
                     ),
-                    const SizedBox(height: 12.0),
+                    const SizedBox(height: 14),
+
                     DropdownMenu<String>(
                       controller: _provinciaController,
                       expandedInsets: EdgeInsets.zero,
                       enableFilter: true,
                       requestFocusOnTap: true,
                       label: const Text('Provincia'),
-                      inputDecorationTheme: InputDecorationTheme(
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12.0),
-                        ),
-                        contentPadding:
-                            const EdgeInsets.symmetric(horizontal: 16.0),
-                      ),
-                      dropdownMenuEntries: provincias.map((p) {
-                        return DropdownMenuEntry<String>(
-                          value: p['id'].toString(),
-                          label: p['nombre'].toString(),
-                        );
-                      }).toList(),
+                      inputDecorationTheme: _dropdownDecoration,
                       onSelected: _onProvinciaSelected,
+                      dropdownMenuEntries: provincias
+                          .map(
+                            (p) => DropdownMenuEntry<String>(
+                              value: p['id'].toString(),
+                              label: p['nombre'].toString(),
+                            ),
+                          )
+                          .toList(),
                     ),
-                    const SizedBox(height: 12.0),
+                    const SizedBox(height: 12),
+
                     Row(
                       children: [
                         Expanded(
@@ -238,26 +284,22 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                             enableFilter: true,
                             requestFocusOnTap: true,
                             label: const Text('Partido'),
-                            inputDecorationTheme: InputDecorationTheme(
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12.0),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16.0,
-                              ),
-                            ),
-                            dropdownMenuEntries: partidos.map((p) {
-                              return DropdownMenuEntry<String>(
-                                value: (p['departamento_id'] ?? p['id'])
-                                    .toString(),
-                                label: (p['departamento_nombre'] ?? p['nombre'])
-                                    .toString(),
-                              );
-                            }).toList(),
+                            inputDecorationTheme: _dropdownDecoration,
                             onSelected: _onPartidoSelected,
+                            dropdownMenuEntries: partidos
+                                .map(
+                                  (p) => DropdownMenuEntry<String>(
+                                    value: (p['departamento_id'] ?? p['id'])
+                                        .toString(),
+                                    label: (p['departamento_nombre'] ??
+                                            p['nombre'])
+                                        .toString(),
+                                  ),
+                                )
+                                .toList(),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: DropdownMenu<String>(
                             controller: _localidadController,
@@ -265,29 +307,27 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                             enableFilter: true,
                             requestFocusOnTap: true,
                             label: const Text('Localidad'),
-                            inputDecorationTheme: InputDecorationTheme(
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12.0),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16.0,
-                              ),
-                            ),
-                            dropdownMenuEntries: localidades.map((l) {
-                              return DropdownMenuEntry<String>(
-                                value:
-                                    (l['localidad_id'] ?? l['id']).toString(),
-                                label: (l['localidad_nombre'] ?? l['nombre'])
-                                    .toString(),
-                              );
-                            }).toList(),
+                            inputDecorationTheme: _dropdownDecoration,
                             onSelected: (val) =>
                                 setState(() => selectedLocalidadId = val),
+                            dropdownMenuEntries: localidades
+                                .map(
+                                  (l) => DropdownMenuEntry<String>(
+                                    value: (l['localidad_id'] ?? l['id'])
+                                        .toString(),
+                                    label: (l['localidad_nombre'] ??
+                                            l['nombre'])
+                                        .toString(),
+                                  ),
+                                )
+                                .toList(),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12.0),
+                    const SizedBox(height: 14),
+
+                    // Chips de rubro
                     SizedBox(
                       height: 40,
                       child: ListView.builder(
@@ -297,13 +337,34 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                           final rubro = _rubros[index];
                           final isSelected = _selectedRubro == rubro;
                           return Padding(
-                            padding: const EdgeInsets.only(right: 8.0),
+                            padding: const EdgeInsets.only(right: 8),
                             child: FilterChip(
-                              label: Text(rubro),
+                              label: Text(
+                                rubro,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w600
+                                      : FontWeight.w500,
+                                  color: isSelected
+                                      ? _clientePrimary
+                                      : _dark,
+                                ),
+                              ),
                               selected: isSelected,
-                              selectedColor: primaryColor.withOpacity(0.2),
-                              checkmarkColor: primaryColor,
-                              onSelected: (selected) =>
+                              selectedColor:
+                                  _clientePrimary.withOpacity(0.14),
+                              backgroundColor: _bg,
+                              checkmarkColor: _clientePrimary,
+                              side: BorderSide(
+                                color: isSelected
+                                    ? _clientePrimary.withOpacity(0.4)
+                                    : Colors.grey.shade300,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              onSelected: (_) =>
                                   setState(() => _selectedRubro = rubro),
                             ),
                           );
@@ -313,6 +374,8 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                   ],
                 ),
               ),
+
+              // Lista
               Expanded(
                 child: StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
@@ -320,7 +383,11 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                       .snapshots(),
                   builder: (context, snapshot) {
                     if (!snapshot.hasData) {
-                      return const Center(child: CircularProgressIndicator());
+                      return const Center(
+                        child: CircularProgressIndicator(
+                          color: _clientePrimary,
+                        ),
+                      );
                     }
 
                     final docs = snapshot.data!.docs;
@@ -349,7 +416,8 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                         final selectedNombre = provincias
                             .where((p) =>
                                 p['id'].toString() == selectedProvinciaId)
-                            .map((p) => p['nombre'].toString().toLowerCase())
+                            .map((p) =>
+                                p['nombre'].toString().toLowerCase())
                             .cast<String>()
                             .toList();
                         final providerNombre =
@@ -435,10 +503,9 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                           (data['nombre'] ?? '').toString().toLowerCase();
                       final apellido =
                           (data['apellido'] ?? '').toString().toLowerCase();
-                      final nombreComercial =
-                          (data['nombre_comercial'] ?? '')
-                              .toString()
-                              .toLowerCase();
+                      final nombreComercial = (data['nombre_comercial'] ?? '')
+                          .toString()
+                          .toLowerCase();
                       final profesionesStr = profesionesNorm.join(' ');
 
                       if (_searchQuery.isEmpty) return true;
@@ -450,15 +517,35 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                     }).toList();
 
                     if (filteredDocs.isEmpty) {
-                      return const Center(
-                        child: Text(
-                          'No se encontraron prestadores con estos filtros.',
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.search_off_rounded,
+                                size: 48,
+                                color: Colors.grey.shade400,
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'No se encontraron prestadores\ncon estos filtros.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.grey.shade600,
+                                  fontSize: 15,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       );
                     }
 
                     return ListView.builder(
-                      padding: const EdgeInsets.all(16.0),
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                       itemCount: filteredDocs.length,
                       itemBuilder: (context, index) {
                         final doc = filteredDocs[index];
@@ -472,81 +559,153 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                             data['profesiones'] ?? [];
                         final String? badge =
                             data['badge_prestador'] as String?;
+                        final nombreComercial =
+                            (data['nombre_comercial'] ?? '').toString().trim();
+                        final nombreMostrar = nombreComercial.isNotEmpty
+                            ? nombreComercial
+                            : '${data['nombre'] ?? ''} ${data['apellido'] ?? ''}'
+                                .trim();
 
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 12.0),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                        // Acento rotativo suave (misma idea que iconos Home)
+                        final accentColors = [
+                          _clientePrimary,
+                          _accentCoral,
+                          _accentLightBlue,
+                          _dark,
+                        ];
+                        final accent =
+                            accentColors[index % accentColors.length];
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 10,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
-                          elevation: 1,
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            leading: CircleAvatar(
-                              backgroundColor: primaryColor.withOpacity(0.15),
-                              child: Text(
-                                _initials(data),
-                                style: TextStyle(
-                                  color: primaryColor,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
+                          child: Material(
+                            color: Colors.transparent,
+                            borderRadius: BorderRadius.circular(16),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(16),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        TarjetaDigitalWidget(
+                                      usuarioRef: doc.reference,
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 12,
+                                ),
+                                child: Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 26,
+                                      backgroundColor:
+                                          accent.withOpacity(0.14),
+                                      child: Text(
+                                        _initials(data),
+                                        style: TextStyle(
+                                          color: accent,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            nombreMostrar.isEmpty
+                                                ? 'Prestador'
+                                                : nombreMostrar,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              color: _textColor,
+                                              fontSize: 15,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            profesiones.isNotEmpty
+                                                ? profesiones.join(', ')
+                                                : 'Prestador',
+                                            style: TextStyle(
+                                              color: Colors.grey.shade600,
+                                              fontSize: 13,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          _badgeChip(badge),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      children: [
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(
+                                              Icons.star_rounded,
+                                              color: Color(0xFFFFB000),
+                                              size: 18,
+                                            ),
+                                            const SizedBox(width: 3),
+                                            Text(
+                                              cantidadEvaluadores > 0
+                                                  ? promedio
+                                                      .toStringAsFixed(1)
+                                                  : '—',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: _textColor,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        if (cantidadEvaluadores > 0)
+                                          Text(
+                                            '$cantidadEvaluadores eval.',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: Colors.grey.shade500,
+                                            ),
+                                          ),
+                                        Icon(
+                                          Icons.chevron_right_rounded,
+                                          color: _clientePrimary
+                                              .withOpacity(0.6),
+                                          size: 22,
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
-                            title: Text(
-                              '${data['nombre'] ?? ''} ${data['apellido'] ?? ''}',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: textColor,
-                              ),
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  profesiones.isNotEmpty
-                                      ? profesiones.join(', ')
-                                      : 'Prestador',
-                                  style: const TextStyle(color: Colors.grey),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                _badgeChip(badge),
-                              ],
-                            ),
-                            isThreeLine: badge != null && badge.isNotEmpty,
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.star_rounded,
-                                  color: Color(0xFFFFB000),
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  cantidadEvaluadores > 0
-                                      ? promedio.toStringAsFixed(1)
-                                      : '—',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: textColor,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => TarjetaDigitalWidget(
-                                    usuarioRef: doc.reference,
-                                  ),
-                                ),
-                              );
-                            },
                           ),
                         );
                       },
