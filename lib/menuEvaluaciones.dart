@@ -2,22 +2,34 @@ import 'package:flutter/material.dart';
 import 'cargaTrabajoCliente.dart';
 import 'cargaTrabajoTrabajador.dart';
 import 'proximamente.dart';
+import 'user_session.dart';
+import 'theme/app_colors.dart';
+import 'theme/app_copy.dart';
 
 class MenuEvaluacionesWidget extends StatelessWidget {
   const MenuEvaluacionesWidget({super.key});
 
+  bool get _esPrestador {
+    final data = UserSession().datosCompletos;
+    return data?['es_trabajador'] == true || data?['rol'] == 'trabajador';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final primaryColor = const Color(0xFF0F52BA);
-    final textColor = const Color(0xFF1E293B);
+    final esPrestador = _esPrestador;
+    // Menú mixto: primary cliente (calificar es acción de quien contrata)
+    // Si solo hay acciones de prestador, usamos prestador.
+    final primary = esPrestador ? AppColors.prestador : AppColors.cliente;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
-        title: const Text('Gestión de Trabajos'),
-        backgroundColor: primaryColor,
-        foregroundColor: Colors.white,
+        title: const Text(AppCopy.navEvaluar),
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.text,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        iconTheme: const IconThemeData(color: AppColors.text),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -26,49 +38,82 @@ class MenuEvaluacionesWidget extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Seleccioná una opción',
-                style: TextStyle(
-                  fontSize: 22, 
-                  fontWeight: FontWeight.w800, 
-                  color: textColor,
+                AppCopy.ctaCalificar,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.text,
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 8),
+              Text(
+                esPrestador
+                    ? 'Como prestador también podés mostrar trabajos hechos.'
+                    : 'Contá cómo te fue para ayudar a otros a confiar.',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textMuted,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 28),
 
+              // —— Cliente (y también prestador si contrató a alguien) ——
+              _SectionLabel(
+                label: 'Si contrataste un servicio',
+                color: AppColors.cliente,
+              ),
+              const SizedBox(height: 10),
               _buildActionCard(
                 context,
-                titulo: 'Calificar servicio recibido',
-                subtitulo: 'Evaluá al profesional que contrataste.',
+                titulo: 'Calificar al profesional',
+                subtitulo: '¿Cómo te fue con el trabajo?',
                 icono: Icons.star_outline_rounded,
+                accent: AppColors.cliente,
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const CargaTrabajoClienteWidget()),
+                  MaterialPageRoute(
+                    builder: (context) => const CargaTrabajoClienteWidget(),
+                  ),
                 ),
               ),
-              const SizedBox(height: 16),
 
-              _buildActionCard(
-                context,
-                titulo: 'Mostrar trabajo realizado',
-                subtitulo: 'Subí fotos de un servicio que brindaste.',
-                icono: Icons.photo_camera_back_rounded,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const CargaTrabajoTrabajadorWidget()),
+              if (esPrestador) ...[
+                const SizedBox(height: 28),
+                _SectionLabel(
+                  label: 'Si ofrecés servicios',
+                  color: AppColors.prestador,
                 ),
-              ),
-              const SizedBox(height: 16),
-
-              _buildActionCard(
-                context,
-                titulo: 'Evaluar a un cliente',
-                subtitulo: 'Dejá una reseña sobre tu experiencia con un cliente.',
-                icono: Icons.how_to_reg_rounded,
-                onTap: () => Navigator.push(
+                const SizedBox(height: 10),
+                _buildActionCard(
                   context,
-                  MaterialPageRoute(builder: (context) => const ProximamenteWidget()),
+                  titulo: 'Mostrar trabajo realizado',
+                  subtitulo: 'Subí fotos de un servicio que brindaste (portfolio).',
+                  icono: Icons.photo_camera_back_rounded,
+                  accent: AppColors.prestador,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          const CargaTrabajoTrabajadorWidget(),
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(height: 16),
+                _buildActionCard(
+                  context,
+                  titulo: 'Evaluar a un cliente',
+                  subtitulo: AppCopy.ctaProximamente,
+                  icono: Icons.how_to_reg_rounded,
+                  accent: AppColors.prestador,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ProximamenteWidget(),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -76,7 +121,14 @@ class MenuEvaluacionesWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildActionCard(BuildContext context, {required String titulo, required String subtitulo, required IconData icono, required VoidCallback onTap}) {
+  Widget _buildActionCard(
+    BuildContext context, {
+    required String titulo,
+    required String subtitulo,
+    required IconData icono,
+    required Color accent,
+    required VoidCallback onTap,
+  }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -85,12 +137,11 @@ class MenuEvaluacionesWidget extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade200),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.02),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
@@ -99,10 +150,10 @@ class MenuEvaluacionesWidget extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFE8F0FE),
+                color: accent.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icono, color: const Color(0xFF0F52BA), size: 28),
+              child: Icon(icono, color: accent, size: 28),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -114,7 +165,7 @@ class MenuEvaluacionesWidget extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E293B),
+                      color: AppColors.text,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -122,15 +173,35 @@ class MenuEvaluacionesWidget extends StatelessWidget {
                     subtitulo,
                     style: const TextStyle(
                       fontSize: 13,
-                      color: Color(0xFF64748B),
+                      color: AppColors.textMuted,
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+            Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _SectionLabel({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label.toUpperCase(),
+      style: TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 0.6,
+        color: color,
       ),
     );
   }
