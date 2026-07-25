@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import 'user_session.dart';
 import 'loginScreen.dart';
+import 'theme/app_colors.dart';
+import 'theme/app_copy.dart';
 
 class ValidarDomicilioWidget extends StatefulWidget {
   final String? usuarioId;
@@ -17,9 +19,9 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
   final db = FirebaseFirestore.instance;
   final uuid = const Uuid();
 
-  final primaryColor = const Color(0xFF0F52BA);
-  final accentColor = const Color(0xFFE8F0FE);
-  final textColor = const Color(0xFF1E293B);
+  static const Color primaryColor = AppColors.cliente;
+  static const Color accentColor = Color(0xFFF0EBFB);
+  static const Color textColor = AppColors.text;
 
   bool _loading = true;
   String? _error;
@@ -69,25 +71,31 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
       final numero = (data['numero'] ?? '').toString().trim();
       final geo = data['direccion_geo'] as Map<String, dynamic>?;
 
-      if (calle.isEmpty || numero.isEmpty || geo == null || geo['localidad_id'] == null) {
+      if (calle.isEmpty ||
+          numero.isEmpty ||
+          geo == null ||
+          geo['localidad_id'] == null) {
         setState(() {
           _loading = false;
-          _error = 'Esta persona todavía no tiene un domicilio completo cargado.';
+          _error =
+              'Esta persona todavía no tiene un domicilio completo cargado.';
         });
         return;
       }
 
-      final localidadNombre = await _resolverLocalidadNombre(geo['localidad_id']?.toString());
+      final localidadNombre =
+          await _resolverLocalidadNombre(geo['localidad_id']?.toString());
       _domicilioReal = '$calle $numero, $localidadNombre';
 
-      _nombreTarget = '${data['nombre'] ?? ''} ${data['apellido'] ?? ''}'.trim();
+      _nombreTarget =
+          '${data['nombre'] ?? ''} ${data['apellido'] ?? ''}'.trim();
       if (_nombreTarget.isEmpty) _nombreTarget = 'esta persona';
 
       setState(() => _loading = false);
     } catch (e) {
       setState(() {
         _loading = false;
-        _error = 'Error al cargar la información: $e';
+        _error = '${AppCopy.errorGenerico} ($e)';
       });
     }
   }
@@ -95,9 +103,14 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
   Future<String> _resolverLocalidadNombre(String? id) async {
     if (id == null || id.isEmpty) return 'Localidad desconocida';
     try {
-      final q = await db.collection('cat_localidades').where('localidad_id', isEqualTo: id).limit(1).get();
+      final q = await db
+          .collection('cat_localidades')
+          .where('localidad_id', isEqualTo: id)
+          .limit(1)
+          .get();
       if (q.docs.isNotEmpty) {
-        return q.docs.first.data()['localidad_nombre']?.toString() ?? 'Localidad desconocida';
+        return q.docs.first.data()['localidad_nombre']?.toString() ??
+            'Localidad desconocida';
       }
     } catch (_) {}
     return 'Localidad desconocida';
@@ -122,9 +135,15 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
         final calle = (data['calle'] ?? '').toString().trim();
         final numero = (data['numero'] ?? '').toString().trim();
         final geo = data['direccion_geo'] as Map<String, dynamic>?;
-        if (calle.isEmpty || numero.isEmpty || geo == null || geo['localidad_id'] == null) continue;
+        if (calle.isEmpty ||
+            numero.isEmpty ||
+            geo == null ||
+            geo['localidad_id'] == null) {
+          continue;
+        }
 
-        final locNombre = await _resolverLocalidadNombre(geo['localidad_id']?.toString());
+        final locNombre =
+            await _resolverLocalidadNombre(geo['localidad_id']?.toString());
         final dir = '$calle $numero, $locNombre';
         if (dir != _domicilioReal && !candidatas.contains(dir)) {
           candidatas.add(dir);
@@ -152,7 +171,9 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
     if (_paso == 0) {
       if (_conoce == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Por favor respondé si conocés a la persona.')),
+          const SnackBar(
+            content: Text('Respondé si conocés a la persona.'),
+          ),
         );
         return;
       }
@@ -164,7 +185,9 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
     if (_paso == 1) {
       if (_domicilioSeleccionado == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Seleccioná el domicilio que corresponde.')),
+          const SnackBar(
+            content: Text('Elegí el domicilio que corresponde.'),
+          ),
         );
         return;
       }
@@ -174,7 +197,7 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
 
     if (_tiempoViviendo == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Seleccioná una opción de tiempo.')),
+        const SnackBar(content: Text('Elegí una opción de tiempo.')),
       );
       return;
     }
@@ -209,7 +232,7 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al guardar: $e')),
+          SnackBar(content: Text('${AppCopy.errorGenerico} ($e)')),
         );
       }
     } finally {
@@ -220,24 +243,29 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
   @override
   Widget build(BuildContext context) {
     if (_loading && _paso == 0) {
-      return Scaffold(
-        backgroundColor: const Color(0xFFF8FAFC),
+      return const Scaffold(
+        backgroundColor: AppColors.bg,
         body: Center(child: CircularProgressIndicator(color: primaryColor)),
       );
     }
 
     if (_error != null) {
       return Scaffold(
-        backgroundColor: const Color(0xFFF8FAFC),
+        backgroundColor: AppColors.bg,
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(32),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.error_outline_rounded, size: 64, color: Colors.red[400]),
+                Icon(Icons.error_outline_rounded,
+                    size: 64, color: Colors.red[400]),
                 const SizedBox(height: 16),
-                Text(_error!, textAlign: TextAlign.center, style: TextStyle(fontSize: 16, color: textColor)),
+                Text(
+                  _error!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 16, color: textColor),
+                ),
               ],
             ),
           ),
@@ -246,16 +274,19 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
-        title: const Text('Validar domicilio'),
-        backgroundColor: primaryColor,
-        foregroundColor: Colors.white,
+        title: const Text('Ayudar a validar'),
+        backgroundColor: Colors.white,
+        foregroundColor: textColor,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
       ),
       body: SafeArea(
         child: _loading
-            ? Center(child: CircularProgressIndicator(color: primaryColor))
+            ? const Center(
+                child: CircularProgressIndicator(color: primaryColor),
+              )
             : SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
                 child: Center(
@@ -264,6 +295,14 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        const Text(
+                          'Tu ayuda genera confianza en el barrio.',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
                         Row(
                           children: List.generate(3, (i) {
                             return Expanded(
@@ -271,7 +310,9 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
                                 height: 4,
                                 margin: EdgeInsets.only(right: i < 2 ? 8 : 0),
                                 decoration: BoxDecoration(
-                                  color: i <= _paso ? primaryColor : Colors.grey.shade300,
+                                  color: i <= _paso
+                                      ? primaryColor
+                                      : Colors.grey.shade300,
                                   borderRadius: BorderRadius.circular(2),
                                 ),
                               ),
@@ -279,23 +320,27 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
                           }),
                         ),
                         const SizedBox(height: 28),
-
                         if (_paso == 0) _buildPasoConoce(),
                         if (_paso == 1) _buildPasoDomicilio(),
                         if (_paso == 2) _buildPasoTiempo(),
-
                         const SizedBox(height: 32),
                         ElevatedButton(
                           onPressed: _avanzar,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: primaryColor,
                             foregroundColor: Colors.white,
+                            elevation: 0,
                             padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                           child: Text(
-                            _paso < 2 ? 'Continuar' : 'Avanzar',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            _paso < 2 ? 'Continuar' : 'Enviar respuesta',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
@@ -312,15 +357,19 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          '¿Conoce a $_nombreTarget?',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: textColor),
+          '¿Conocés a $_nombreTarget?',
+          style: const TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            color: textColor,
+          ),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
         const Text(
-          'Tu respuesta ayuda a la comunidad a mantener perfiles confiables.',
+          'No pedimos datos bancarios. Solo confirmás si la conocés de verdad.',
           textAlign: TextAlign.center,
-          style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+          style: TextStyle(color: AppColors.textMuted, fontSize: 14),
         ),
         const SizedBox(height: 32),
         Row(
@@ -330,7 +379,7 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
                 texto: 'Sí, lo/a conozco',
                 seleccionado: _conoce == true,
                 onTap: () => setState(() => _conoce = true),
-                color: const Color(0xFF25D366),
+                color: AppColors.success,
               ),
             ),
             const SizedBox(width: 12),
@@ -339,7 +388,7 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
                 texto: 'No lo/a conozco',
                 seleccionado: _conoce == false,
                 onTap: () => setState(() => _conoce = false),
-                color: Colors.redAccent,
+                color: AppColors.danger,
               ),
             ),
           ],
@@ -354,12 +403,16 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
       children: [
         Text(
           '¿Cuál es el domicilio de $_nombreTarget?',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: textColor),
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            color: textColor,
+          ),
         ),
         const SizedBox(height: 8),
         const Text(
-          'Marcá la opción que coincide con la dirección real.',
-          style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+          'Elegí la opción que coincide con la dirección real.',
+          style: TextStyle(color: AppColors.textMuted, fontSize: 14),
         ),
         const SizedBox(height: 24),
         ..._opcionesDomicilio.map((dir) {
@@ -375,14 +428,17 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
                   color: seleccionado ? accentColor : Colors.white,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: seleccionado ? primaryColor : Colors.grey.shade300,
+                    color:
+                        seleccionado ? primaryColor : Colors.grey.shade300,
                     width: seleccionado ? 2 : 1,
                   ),
                 ),
                 child: Row(
                   children: [
                     Icon(
-                      seleccionado ? Icons.radio_button_checked : Icons.radio_button_off,
+                      seleccionado
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_off,
                       color: seleccionado ? primaryColor : Colors.grey,
                     ),
                     const SizedBox(width: 12),
@@ -391,7 +447,9 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
                         dir,
                         style: TextStyle(
                           fontSize: 14,
-                          fontWeight: seleccionado ? FontWeight.w600 : FontWeight.normal,
+                          fontWeight: seleccionado
+                              ? FontWeight.w600
+                              : FontWeight.normal,
                           color: textColor,
                         ),
                       ),
@@ -411,13 +469,17 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          '¿Cuánto hace que $_nombreTarget vive en ese domicilio?',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: textColor),
+          '¿Hace cuánto vive $_nombreTarget ahí?',
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            color: textColor,
+          ),
         ),
         const SizedBox(height: 8),
         const Text(
-          'Este dato es solo informativo y se compara con lo declarado por otros.',
-          style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+          'Si no estás seguro, elegí “No sabe”.',
+          style: TextStyle(color: AppColors.textMuted, fontSize: 14),
         ),
         const SizedBox(height: 24),
         ..._opcionesTiempo.map((op) {
@@ -433,14 +495,17 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
                   color: seleccionado ? accentColor : Colors.white,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: seleccionado ? primaryColor : Colors.grey.shade300,
+                    color:
+                        seleccionado ? primaryColor : Colors.grey.shade300,
                     width: seleccionado ? 2 : 1,
                   ),
                 ),
                 child: Row(
                   children: [
                     Icon(
-                      seleccionado ? Icons.radio_button_checked : Icons.radio_button_off,
+                      seleccionado
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_off,
                       color: seleccionado ? primaryColor : Colors.grey,
                     ),
                     const SizedBox(width: 12),
@@ -448,7 +513,9 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
                       op,
                       style: TextStyle(
                         fontSize: 15,
-                        fontWeight: seleccionado ? FontWeight.w600 : FontWeight.normal,
+                        fontWeight: seleccionado
+                            ? FontWeight.w600
+                            : FontWeight.normal,
                         color: textColor,
                       ),
                     ),
@@ -476,7 +543,10 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
         decoration: BoxDecoration(
           color: seleccionado ? color.withOpacity(0.15) : Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: seleccionado ? color : Colors.grey.shade300, width: 2),
+          border: Border.all(
+            color: seleccionado ? color : Colors.grey.shade300,
+            width: 2,
+          ),
         ),
         child: Text(
           texto,
