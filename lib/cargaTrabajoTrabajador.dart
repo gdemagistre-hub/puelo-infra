@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'user_session.dart';
+import 'especialidadesLaboralesflotante.dart';
+import 'theme/app_colors.dart';
 
 class CargaTrabajoTrabajadorWidget extends StatefulWidget {
   const CargaTrabajoTrabajadorWidget({super.key});
@@ -22,6 +24,24 @@ class _CargaTrabajoTrabajadorWidgetState
   List<String> _profesiones = [];
   String? _profesionSeleccionada;
   bool _loadingPerfil = true;
+
+  static const Color _primary = AppColors.prestador;
+
+  static const Map<String, String> _labelOficio = {
+    'electricidad': 'Electricista',
+    'plomeria': 'Plomería',
+    'gasista': 'Gasista',
+    'carpinteria': 'Carpintería',
+    'pintura': 'Pintura',
+    'albanileria': 'Construcción',
+    'jardineria': 'Jardinería',
+    'limpieza': 'Limpieza',
+  };
+
+  String _labelDe(String clave) {
+    final k = clave.toLowerCase().trim();
+    return _labelOficio[k] ?? clave;
+  }
 
   @override
   void initState() {
@@ -70,14 +90,14 @@ class _CargaTrabajoTrabajadorWidgetState
     if (_profesionSeleccionada == null || _profesionSeleccionada!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Elegí el servicio al que corresponde la foto.'),
+          content: Text('Elegí el oficio al que corresponde la foto.'),
         ),
       );
       return;
     }
     if (_selectedImages.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tenés que seleccionar al menos una foto.')),
+        const SnackBar(content: Text('Seleccioná al menos una foto.')),
       );
       return;
     }
@@ -103,7 +123,8 @@ class _CargaTrabajoTrabajadorWidgetState
         imageUrls.add(await snapshot.ref.getDownloadURL());
       }
 
-      // Portfolio / trabajos mostrados — NO cuenta como experiencia realizada
+      // Portfolio: asociado al usuario logueado + oficio.
+      // NO cuenta como experiencia / trabajos realizados para scoring de volumen.
       await FirebaseFirestore.instance.collection('trabajos').add({
         'trabajadorRef': trabajadorRef,
         'usuario_id': uid,
@@ -117,7 +138,10 @@ class _CargaTrabajoTrabajadorWidgetState
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Fotos de trabajos cargadas con éxito')),
+          const SnackBar(
+            content: Text('Listo. Las fotos quedaron en tu portfolio.'),
+            backgroundColor: AppColors.success,
+          ),
         );
         Navigator.popUntil(context, (route) => route.isFirst);
       }
@@ -137,46 +161,109 @@ class _CargaTrabajoTrabajadorWidgetState
     final nombre = UserSession().nombreCompleto;
 
     return Scaffold(
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
         title: const Text('Mostrar trabajo realizado'),
-        backgroundColor: const Color(0xFF0F52BA),
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.text,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
       ),
       body: _loadingPerfil
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: _primary))
           : Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: _primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: _primary.withOpacity(0.25)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.info_outline, color: _primary, size: 22),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Estas fotos son tu **portfolio**: se ven en tu tarjeta '
+                            'y se asocian a un oficio tuyo.\n'
+                            'No suman como “experiencias realizadas”.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.text.withOpacity(0.9),
+                              height: 1.35,
+                            ),
+                          )._plainMarkdownFallback(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   Text(
-                    'Vas a cargar fotos para: ${nombre.isNotEmpty ? nombre : 'tu cuenta'}',
+                    'Cuenta: ${nombre.isNotEmpty ? nombre : 'tu sesión'}',
                     style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
+                      color: AppColors.text,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Estas fotos se asocian a tu perfil y a un servicio. No suman como experiencias realizadas.',
-                    style: TextStyle(fontSize: 13, color: Colors.grey),
-                  ),
                   const SizedBox(height: 20),
-                  if (_profesiones.isEmpty)
+                  if (_profesiones.isEmpty) ...[
                     const Text(
-                      'Primero cargá tus especialidades laborales en el perfil.',
-                      style: TextStyle(color: Colors.orange),
-                    )
-                  else
+                      'Todavía no tenés oficios cargados. Primero definí tus especialidades.',
+                      style: TextStyle(
+                        color: AppColors.warning,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _primary,
+                        side: const BorderSide(color: _primary),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                const EspecialidadesLaboralesFlotanteWidget(),
+                          ),
+                        ).then((_) => _cargarProfesionesDelUsuario());
+                      },
+                      child: const Text('Cargar especialidades'),
+                    ),
+                  ] else
                     DropdownButtonFormField<String>(
                       value: _profesionSeleccionada,
-                      decoration: const InputDecoration(
-                        labelText: 'Servicio / oficio de estas fotos',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: 'Oficio de estas fotos',
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide:
+                              const BorderSide(color: _primary, width: 1.5),
+                        ),
                       ),
                       items: _profesiones
                           .map(
-                            (p) => DropdownMenuItem(value: p, child: Text(p)),
+                            (p) => DropdownMenuItem(
+                              value: p,
+                              child: Text(_labelDe(p)),
+                            ),
                           )
                           .toList(),
                       onChanged: (v) =>
@@ -185,19 +272,29 @@ class _CargaTrabajoTrabajadorWidgetState
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey[200],
-                      foregroundColor: Colors.black87,
+                      backgroundColor: Colors.white,
+                      foregroundColor: AppColors.text,
+                      elevation: 0,
+                      side: const BorderSide(color: AppColors.border),
                       padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                    icon: const Icon(Icons.photo_library),
-                    label: const Text('Elegir fotos desde el dispositivo'),
-                    onPressed: _isUploading ? null : _pickImages,
+                    icon: const Icon(Icons.photo_library_outlined),
+                    label: const Text('Elegir fotos'),
+                    onPressed: _isUploading || _profesiones.isEmpty
+                        ? null
+                        : _pickImages,
                   ),
                   const SizedBox(height: 15),
                   if (_selectedImages.isNotEmpty) ...[
                     Text(
-                      'Imágenes seleccionadas: ${_selectedImages.length}',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                      '${_selectedImages.length} foto(s)',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.text,
+                      ),
                     ),
                     const SizedBox(height: 10),
                     SizedBox(
@@ -225,7 +322,9 @@ class _CargaTrabajoTrabajadorWidgetState
                                     width: 100,
                                     height: 100,
                                     child: Center(
-                                      child: CircularProgressIndicator(),
+                                      child: CircularProgressIndicator(
+                                        color: _primary,
+                                      ),
                                     ),
                                   );
                                 },
@@ -238,36 +337,47 @@ class _CargaTrabajoTrabajadorWidgetState
                   ],
                   const Spacer(),
                   if (_isUploading)
-                    const Center(child: CircularProgressIndicator())
+                    const Center(
+                      child: CircularProgressIndicator(color: _primary),
+                    )
                   else
                     Row(
                       children: [
                         Expanded(
-                          child: OutlinedButton.icon(
+                          child: OutlinedButton(
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.red,
-                              side: const BorderSide(color: Colors.red),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              foregroundColor: AppColors.danger,
+                              side: const BorderSide(color: AppColors.danger),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
-                            icon: const Icon(Icons.cancel),
-                            label: const Text('Cancelar'),
                             onPressed: () => Navigator.popUntil(
                               context,
                               (route) => route.isFirst,
                             ),
+                            child: const Text('Cancelar'),
                           ),
                         ),
-                        const SizedBox(width: 15),
+                        const SizedBox(width: 12),
                         Expanded(
-                          child: ElevatedButton.icon(
+                          child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF0F52BA),
+                              backgroundColor: _primary,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              elevation: 0,
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
-                            icon: const Icon(Icons.cloud_upload),
-                            label: const Text('Subir fotos'),
-                            onPressed: _uploadAndSave,
+                            onPressed: _profesiones.isEmpty
+                                ? null
+                                : _uploadAndSave,
+                            child: const Text('Subir al portfolio'),
                           ),
                         ),
                       ],
@@ -275,6 +385,17 @@ class _CargaTrabajoTrabajadorWidgetState
                 ],
               ),
             ),
+    );
+  }
+}
+
+extension on Text {
+  /// Evita depender de markdown packages: muestra texto plano sin **
+  Widget _plainMarkdownFallback() {
+    final t = data?.replaceAll('**', '') ?? '';
+    return Text(
+      t,
+      style: style,
     );
   }
 }
