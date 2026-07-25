@@ -16,7 +16,7 @@ import 'seleccionRol.dart';
 import 'pantallaValidacion.dart';
 import 'validar_domicilio.dart';
 
-void main() async {
+void main() async { 
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(
