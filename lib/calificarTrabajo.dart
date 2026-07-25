@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'Homepage.dart';
+import 'theme/app_colors.dart';
+import 'theme/app_copy.dart';
 
 class CalificarTrabajoWidget extends StatefulWidget {
   const CalificarTrabajoWidget({
@@ -26,8 +28,14 @@ class _CalificarTrabajoWidgetState extends State<CalificarTrabajoWidget> {
   int _estrellasSeleccionadas = 0;
   bool _enviando = false;
 
-  final primaryColor = const Color(0xFF0F52BA);
-  final textColor = const Color(0xFF1E293B);
+  static const Color primaryColor = AppColors.cliente;
+  static const Color textColor = AppColors.text;
+
+  @override
+  void dispose() {
+    _comentarioController.dispose();
+    super.dispose();
+  }
 
   void _volverAPrincipal() {
     Navigator.pushAndRemoveUntil(
@@ -40,36 +48,46 @@ class _CalificarTrabajoWidgetState extends State<CalificarTrabajoWidget> {
   Future<void> _guardarCalificacion() async {
     if (_estrellasSeleccionadas == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, seleccioná al menos 1 estrella.'), behavior: SnackBarBehavior.floating),
+        const SnackBar(
+          content: Text('Elegí al menos 1 estrella.'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
 
     setState(() => _enviando = true);
 
-    final trabajoRef = FirebaseFirestore.instance.collection('trabajos').doc(widget.trabajoId);
-    final trabajadorRef = FirebaseFirestore.instance.collection('usuarios').doc(widget.trabajadorId);
+    final trabajoRef =
+        FirebaseFirestore.instance.collection('trabajos').doc(widget.trabajoId);
+    final trabajadorRef = FirebaseFirestore.instance
+        .collection('usuarios')
+        .doc(widget.trabajadorId);
 
     try {
       await FirebaseFirestore.instance.runTransaction((transaction) async {
         final trabajadorSnapshot = await transaction.get(trabajadorRef);
-        
+
         if (!trabajadorSnapshot.exists) return;
 
-        Map<String, dynamic> trabajadorData = trabajadorSnapshot.data() as Map<String, dynamic>;
-        
-        Map<String, dynamic> historialVotos = trabajadorData['historialVotos'] != null 
-            ? Map<String, dynamic>.from(trabajadorData['historialVotos']) 
-            : {};
+        final trabajadorData =
+            trabajadorSnapshot.data() as Map<String, dynamic>;
 
-        int votosAnteriores = trabajadorData['cantidadEvaluadores'] ?? 0;
-        int sumaAnterior = trabajadorData['sumaEstrellas'] ?? 0;
+        final historialVotos = trabajadorData['historialVotos'] != null
+            ? Map<String, dynamic>.from(trabajadorData['historialVotos'])
+            : <String, dynamic>{};
+
+        final votosAnteriores =
+            (trabajadorData['cantidadEvaluadores'] as num?)?.toInt() ?? 0;
+        final sumaAnterior =
+            (trabajadorData['sumaEstrellas'] as num?)?.toInt() ?? 0;
 
         int nuevaSuma = sumaAnterior;
         int nuevosVotos = votosAnteriores;
 
         if (historialVotos.containsKey(widget.clienteId)) {
-          int votoViejo = historialVotos[widget.clienteId];
+          final votoViejo =
+              (historialVotos[widget.clienteId] as num).toInt();
           nuevaSuma = (sumaAnterior - votoViejo) + _estrellasSeleccionadas;
         } else {
           nuevosVotos = votosAnteriores + 1;
@@ -78,17 +96,17 @@ class _CalificarTrabajoWidgetState extends State<CalificarTrabajoWidget> {
 
         historialVotos[widget.clienteId] = _estrellasSeleccionadas;
 
-        double nuevoPromedio = nuevosVotos > 0 ? (nuevaSuma / nuevosVotos) : 0.0;
+        final nuevoPromedio =
+            nuevosVotos > 0 ? (nuevaSuma / nuevosVotos) : 0.0;
 
-        // 1. Guardamos la calificación en el trabajo
         transaction.update(trabajoRef, {
           'comentarioCliente': _comentarioController.text.trim(),
           'estrellas': _estrellasSeleccionadas,
           'clienteUid': widget.clienteId,
           'calificado': true,
+          'tipo': 'evaluacion',
         });
 
-        // 2. Impactamos los promedios calculados en el perfil del trabajador
         transaction.update(trabajadorRef, {
           'sumaEstrellas': nuevaSuma,
           'cantidadEvaluadores': nuevosVotos,
@@ -99,14 +117,19 @@ class _CalificarTrabajoWidgetState extends State<CalificarTrabajoWidget> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('¡Muchas gracias por tu calificación!')),
+          const SnackBar(
+            content: Text('Gracias. Tu opinión ayuda a otros a confiar.'),
+            backgroundColor: AppColors.success,
+          ),
         );
         _volverAPrincipal();
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al guardar la calificación: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${AppCopy.errorGenerico} ($e)')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _enviando = false);
     }
@@ -115,11 +138,16 @@ class _CalificarTrabajoWidgetState extends State<CalificarTrabajoWidget> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
-        title: const Text('Calificar Servicio', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Calificar servicio',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         foregroundColor: textColor,
         backgroundColor: Colors.white,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
           icon: const Icon(Icons.close_rounded),
           onPressed: _volverAPrincipal,
@@ -131,22 +159,28 @@ class _CalificarTrabajoWidgetState extends State<CalificarTrabajoWidget> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                '¿Qué te pareció el trabajo?',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: textColor),
+              const Text(
+                AppCopy.ctaCalificar,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: textColor,
+                ),
               ),
               const SizedBox(height: 8),
               const Text(
-                'Tu opinión sobre las fotos y el desempeño ayuda a mantener segura la comunidad.',
-                style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+                'Tu opinión ayuda a otros a elegir con más confianza.',
+                style: TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 14,
+                  height: 1.35,
+                ),
               ),
               const SizedBox(height: 28),
-
-              // Selector de 5 estrellas
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(5, (index) {
-                  int valorEstrella = index + 1;
+                  final valorEstrella = index + 1;
                   return IconButton(
                     iconSize: 40,
                     icon: Icon(
@@ -163,12 +197,25 @@ class _CalificarTrabajoWidgetState extends State<CalificarTrabajoWidget> {
                   );
                 }),
               ),
+              if (_estrellasSeleccionadas > 0) ...[
+                const SizedBox(height: 4),
+                Text(
+                  '$_estrellasSeleccionadas de 5',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+              ],
               const SizedBox(height: 28),
-
-              // Campo para comentario privado (máx 200 caracteres)
-              Text(
-                'Comentario para el trabajador (Opcional)',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textColor),
+              const Text(
+                'Comentario (opcional)',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
+                ),
               ),
               const SizedBox(height: 8),
               TextField(
@@ -176,28 +223,51 @@ class _CalificarTrabajoWidgetState extends State<CalificarTrabajoWidget> {
                 maxLength: 200,
                 maxLines: 4,
                 decoration: InputDecoration(
-                  hintText: 'Dejá tu opinión sobre las fotos subidas o el trabajo realizado...',
-                  helperText: 'Este comentario será privado, solo visible por el prestador.',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  hintText: '¿Cómo te fue? ¿Llegó a tiempo? ¿Quedó bien?',
+                  helperText:
+                      'El comentario lo ve el profesional. Las estrellas sí son públicas.',
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: primaryColor, width: 2),
+                    borderSide:
+                        const BorderSide(color: primaryColor, width: 2),
                   ),
                 ),
               ),
               const SizedBox(height: 36),
-
-              ElevatedButton(
-                onPressed: _enviando ? null : _guardarCalificacion,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryColor,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              SizedBox(
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: _enviando ? null : _guardarCalificacion,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: _enviando
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Enviar calificación',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
-                child: _enviando
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('Enviar Calificación', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
