@@ -204,6 +204,28 @@ class ScoringService {
     }
   }
 
+  /// Texto simple al toque (sin score crediticio).
+  static String explicacionBadge(String? badge) {
+    switch (badge) {
+      case 'nuevo':
+        return 'Lleva poco tiempo en Puelo. Todavía está armando su perfil.';
+      case 'registrado':
+        return 'Completó nombre, contacto, documento y domicilio. Ya es contactable con datos básicos.';
+      case 'bronce':
+        return 'Perfil completo y además muestra fotos de trabajos. Más fácil confiar en lo que hace.';
+      case 'bronce_plus':
+        return 'Como Bronce, y además validó su documento con foto. Identidad más sólida.';
+      case 'plata':
+        return 'Perfil fuerte: datos, fotos, documento validado y varias personas que confirman quién es.';
+      case 'oro':
+        return 'Nivel alto de confianza. Se definirá con más detalle más adelante.';
+      case 'diamante':
+        return 'Máximo nivel de confianza. Se definirá con más detalle más adelante.';
+      default:
+        return 'Todavía no tiene un identificador de confianza. Completar el perfil ayuda a generar confianza.';
+    }
+  }
+
   static ColorBadge coloresBadge(String? badge) {
     switch (badge) {
       case 'nuevo':
