@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'loginScreen.dart';
 import 'user_session.dart';
+import 'theme/app_colors.dart';
+import 'theme/app_copy.dart';
 
 class PantallaValidacionWidget extends StatefulWidget {
   final String? token;
@@ -9,17 +11,18 @@ class PantallaValidacionWidget extends StatefulWidget {
   const PantallaValidacionWidget({super.key, this.token});
 
   @override
-  State<PantallaValidacionWidget> createState() => _PantallaValidacionWidgetState();
+  State<PantallaValidacionWidget> createState() =>
+      _PantallaValidacionWidgetState();
 }
 
 class _PantallaValidacionWidgetState extends State<PantallaValidacionWidget> {
   final db = FirebaseFirestore.instance;
   bool _validando = true;
   bool _exito = false;
-  String _mensaje = 'Verificando tu identidad...';
+  String _mensaje = 'Verificando…';
 
-  final primaryColor = const Color(0xFF0F52BA);
-  final textColor = const Color(0xFF1E293B);
+  static const Color primaryColor = AppColors.cliente;
+  static const Color textColor = AppColors.text;
 
   @override
   void initState() {
@@ -32,7 +35,7 @@ class _PantallaValidacionWidgetState extends State<PantallaValidacionWidget> {
       setState(() {
         _validando = false;
         _exito = false;
-        _mensaje = 'Enlace de validación inválido o corrupto.';
+        _mensaje = 'El enlace no es válido.';
       });
       return;
     }
@@ -49,7 +52,8 @@ class _PantallaValidacionWidgetState extends State<PantallaValidacionWidget> {
         setState(() {
           _validando = false;
           _exito = false;
-          _mensaje = 'El enlace ya fue utilizado, expiró, o el usuario no existe.';
+          _mensaje =
+              'El enlace ya se usó, venció, o la cuenta no está pendiente de validación.';
         });
         return;
       }
@@ -64,7 +68,6 @@ class _PantallaValidacionWidgetState extends State<PantallaValidacionWidget> {
         'validado_en': FieldValue.serverTimestamp(),
       });
 
-      // Si este usuario venía de una validación de domicilio pendiente → impactamos
       final String? pendingDomicilio = data['pending_domicilio_token'];
       if (pendingDomicilio != null && pendingDomicilio.isNotEmpty) {
         await _impactarValidacionDomicilio(pendingDomicilio, docId);
@@ -73,18 +76,22 @@ class _PantallaValidacionWidgetState extends State<PantallaValidacionWidget> {
       setState(() {
         _validando = false;
         _exito = true;
-        _mensaje = '¡Tu identidad ha sido validada con éxito! Ya podés ingresar a la plataforma.';
+        _mensaje =
+            'Listo. Tu cuenta quedó activada. Ya podés ingresar a Puelo.';
       });
     } catch (e) {
       setState(() {
         _validando = false;
         _exito = false;
-        _mensaje = 'Ocurrió un error al intentar validar la cuenta: $e';
+        _mensaje = '${AppCopy.errorGenerico} ($e)';
       });
     }
   }
 
-  Future<void> _impactarValidacionDomicilio(String token, String validadorId) async {
+  Future<void> _impactarValidacionDomicilio(
+    String token,
+    String validadorId,
+  ) async {
     try {
       final pendRef = db.collection('validaciones_pendientes').doc(token);
       final pendSnap = await pendRef.get();
@@ -115,7 +122,6 @@ class _PantallaValidacionWidgetState extends State<PantallaValidacionWidget> {
         'validaciones_recibidas': FieldValue.arrayUnion([registro]),
       });
 
-      // Limpiamos el pending del session por si acaso
       UserSession().clearPendingValidacion();
     } catch (e) {
       debugPrint('Error impactando validación de domicilio: $e');
@@ -125,7 +131,7 @@ class _PantallaValidacionWidgetState extends State<PantallaValidacionWidget> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: AppColors.bg,
       body: SafeArea(
         child: Center(
           child: Padding(
@@ -134,42 +140,66 @@ class _PantallaValidacionWidgetState extends State<PantallaValidacionWidget> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (_validando) ...[
-                  CircularProgressIndicator(color: primaryColor),
+                  const CircularProgressIndicator(color: primaryColor),
                   const SizedBox(height: 24),
-                  Text(_mensaje, style: TextStyle(fontSize: 16, color: textColor)),
+                  Text(
+                    _mensaje,
+                    style: const TextStyle(fontSize: 16, color: textColor),
+                  ),
                 ] else ...[
                   Icon(
-                    _exito ? Icons.check_circle_outline_rounded : Icons.error_outline_rounded,
+                    _exito
+                        ? Icons.check_circle_outline_rounded
+                        : Icons.error_outline_rounded,
                     size: 80,
-                    color: _exito ? const Color(0xFF25D366) : Colors.red[400],
+                    color: _exito ? AppColors.success : Colors.red[400],
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    _exito ? '¡Cuenta Activada!' : 'Validación fallida',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: textColor),
+                    _exito ? 'Cuenta activada' : 'No se pudo validar',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: textColor,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Text(
                     _mensaje,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 16, color: Color(0xFF64748B)),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: AppColors.textMuted,
+                      height: 1.4,
+                    ),
                   ),
                   const SizedBox(height: 40),
                   ElevatedButton(
                     onPressed: () {
                       Navigator.pushAndRemoveUntil(
                         context,
-                        MaterialPageRoute(builder: (context) => const LoginScreenWidget()),
+                        MaterialPageRoute(
+                          builder: (context) => const LoginScreenWidget(),
+                        ),
                         (route) => false,
                       );
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryColor,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 16,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                    child: const Text('Ir al inicio de sesión', style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: const Text(
+                      'Ir al inicio de sesión',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ]
               ],
