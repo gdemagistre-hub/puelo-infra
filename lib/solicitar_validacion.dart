@@ -3,23 +3,28 @@ import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'user_session.dart';
-import 'completar_perfil.dart';
+import 'Domicilioflotante.dart';
+import 'theme/app_colors.dart';
+import 'theme/app_copy.dart';
 
 class SolicitarValidacionWidget extends StatefulWidget {
   const SolicitarValidacionWidget({super.key});
 
   @override
-  State<SolicitarValidacionWidget> createState() => _SolicitarValidacionWidgetState();
+  State<SolicitarValidacionWidget> createState() =>
+      _SolicitarValidacionWidgetState();
 }
 
 class _SolicitarValidacionWidgetState extends State<SolicitarValidacionWidget> {
-  final primaryColor = const Color(0xFF0F52BA);
-  final accentColor = const Color(0xFFE8F0FE);
-  final textColor = const Color(0xFF1E293B);
+  // Validaciones suman a la confianza del prestador
+  static const Color primaryColor = AppColors.prestador;
+  static const Color accentColor = Color(0xFFE6F7FA);
+  static const Color textColor = AppColors.text;
 
   bool _loading = true;
   bool _tieneDomicilio = false;
   String _nombreCompleto = '';
+  int _validacionesCount = 0;
 
   @override
   void initState() {
@@ -35,22 +40,30 @@ class _SolicitarValidacionWidgetState extends State<SolicitarValidacionWidget> {
     }
 
     try {
-      final doc = await FirebaseFirestore.instance.collection('usuarios').doc(uid).get();
+      final doc =
+          await FirebaseFirestore.instance.collection('usuarios').doc(uid).get();
       if (doc.exists) {
         final data = doc.data()!;
         final calle = (data['calle'] ?? '').toString().trim();
         final numero = (data['numero'] ?? '').toString().trim();
         final geo = data['direccion_geo'] as Map<String, dynamic>?;
-        final tieneGeo = geo != null && geo['localidad_id'] != null;
+        final tieneGeo = geo != null &&
+            (geo['localidad_id'] != null ||
+                (geo['localidad_nombre'] ?? '').toString().isNotEmpty);
 
-        _nombreCompleto = '${data['nombre'] ?? ''} ${data['apellido'] ?? ''}'.trim();
-        _tieneDomicilio = calle.isNotEmpty && numero.isNotEmpty && tieneGeo;
+        _nombreCompleto =
+            '${data['nombre'] ?? ''} ${data['apellido'] ?? ''}'.trim();
+        _tieneDomicilio =
+            calle.isNotEmpty && numero.isNotEmpty && tieneGeo;
+
+        final vals = data['validaciones_recibidas'] as List<dynamic>? ?? [];
+        _validacionesCount = vals.length;
       }
     } catch (e) {
       debugPrint('Error verificando domicilio: $e');
     }
 
-    setState(() => _loading = false);
+    if (mounted) setState(() => _loading = false);
   }
 
   String _generarLink(String idDocumento) {
@@ -59,9 +72,12 @@ class _SolicitarValidacionWidgetState extends State<SolicitarValidacionWidget> {
 
   Future<void> _compartirPorWhatsApp(String idDocumento) async {
     final link = _generarLink(idDocumento);
+    final nombre = _nombreCompleto.isNotEmpty ? _nombreCompleto : 'un vecino';
     final mensaje = Uri.encodeComponent(
-      '¡Hola! Te pido un favor: ayudame a validar mi domicilio en Puelo. '
-      'Solo te toma 1 minuto y aumenta la confianza de la comunidad.\n\n$link',
+      'Hola, soy $nombre. ¿Me ayudás con algo rápido?\n\n'
+      'En Puelo (app de oficios) me piden que alguien del barrio confirme '
+      'que me conoce y que la dirección es real. Son 3 preguntas, menos de un minuto.\n\n'
+      '$link\n\n¡Gracias!',
     );
     final url = Uri.parse('https://wa.me/?text=$mensaje');
 
@@ -73,12 +89,16 @@ class _SolicitarValidacionWidgetState extends State<SolicitarValidacionWidget> {
 
       if (!launched) {
         await Clipboard.setData(ClipboardData(text: link));
-        _mostrarAlerta('No se pudo abrir WhatsApp. El enlace se copió al portapapeles.');
+        _mostrarAlerta(
+          'No se pudo abrir WhatsApp. El enlace se copió al portapapeles.',
+        );
       }
     } catch (e) {
       debugPrint('Error abriendo WhatsApp: $e');
       await Clipboard.setData(ClipboardData(text: link));
-      _mostrarAlerta('No se pudo abrir WhatsApp. El enlace se copió al portapapeles.');
+      _mostrarAlerta(
+        'No se pudo abrir WhatsApp. El enlace se copió al portapapeles.',
+      );
     }
   }
 
@@ -86,7 +106,7 @@ class _SolicitarValidacionWidgetState extends State<SolicitarValidacionWidget> {
     final link = _generarLink(idDocumento);
     try {
       await Clipboard.setData(ClipboardData(text: link));
-      _mostrarAlerta('¡Enlace copiado al portapapeles!');
+      _mostrarAlerta('¡Enlace copiado!');
     } catch (e) {
       debugPrint('Error copiando al portapapeles: $e');
       _mostrarAlerta('No se pudo copiar el enlace. Intentá de nuevo.');
@@ -99,7 +119,9 @@ class _SolicitarValidacionWidgetState extends State<SolicitarValidacionWidget> {
         SnackBar(
           content: Text(mensaje),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
           duration: const Duration(seconds: 3),
         ),
       );
@@ -109,8 +131,8 @@ class _SolicitarValidacionWidgetState extends State<SolicitarValidacionWidget> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return Scaffold(
-        backgroundColor: const Color(0xFFF8FAFC),
+      return const Scaffold(
+        backgroundColor: AppColors.bg,
         body: Center(child: CircularProgressIndicator(color: primaryColor)),
       );
     }
@@ -119,11 +141,12 @@ class _SolicitarValidacionWidgetState extends State<SolicitarValidacionWidget> {
 
     if (uid == null) {
       return Scaffold(
-        backgroundColor: const Color(0xFFF8FAFC),
+        backgroundColor: AppColors.bg,
         appBar: AppBar(
-          backgroundColor: primaryColor,
-          foregroundColor: Colors.white,
-          title: const Text('Validación de perfil'),
+          backgroundColor: Colors.white,
+          foregroundColor: textColor,
+          elevation: 0,
+          title: const Text('Validación'),
         ),
         body: const Center(child: Text('Error de sesión. Volvé a ingresar.')),
       );
@@ -131,11 +154,13 @@ class _SolicitarValidacionWidgetState extends State<SolicitarValidacionWidget> {
 
     if (!_tieneDomicilio) {
       return Scaffold(
-        backgroundColor: const Color(0xFFF8FAFC),
+        backgroundColor: AppColors.bg,
         appBar: AppBar(
           title: const Text('Pedir validación'),
-          backgroundColor: primaryColor,
-          foregroundColor: Colors.white,
+          backgroundColor: Colors.white,
+          foregroundColor: textColor,
+          elevation: 0,
+          surfaceTintColor: Colors.transparent,
         ),
         body: Center(
           child: Padding(
@@ -143,34 +168,49 @@ class _SolicitarValidacionWidgetState extends State<SolicitarValidacionWidget> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.home_work_outlined, size: 64, color: Colors.grey.shade400),
+                Icon(Icons.home_work_outlined,
+                    size: 64, color: Colors.grey.shade400),
                 const SizedBox(height: 20),
                 const Text(
-                  'Completá primero tu domicilio',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                  'Primero cargá tu domicilio',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: textColor,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  'Para poder solicitar validaciones necesitás tener cargada tu dirección completa (calle, número y localidad).',
+                  'Para que un vecino o conocido pueda confirmar tu dirección, '
+                  'necesitás tener calle, número y localidad.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Color(0xFF64748B)),
+                  style: TextStyle(color: AppColors.textMuted, height: 1.4),
                 ),
                 const SizedBox(height: 28),
                 ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushReplacement(
+                  onPressed: () async {
+                    await Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const CompletarPerfilWidget()),
+                      MaterialPageRoute(
+                        builder: (context) => const DomicilioFlotanteWidget(),
+                      ),
                     );
+                    await _verificarPerfil();
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryColor,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 14,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                  child: const Text('Ir a Mis datos personales'),
+                  child: const Text('Cargar domicilio'),
                 ),
               ],
             ),
@@ -180,12 +220,13 @@ class _SolicitarValidacionWidgetState extends State<SolicitarValidacionWidget> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
-        title: const Text('Pedir validación del perfil'),
-        backgroundColor: primaryColor,
-        foregroundColor: Colors.white,
+        title: const Text('Pedir validación'),
+        backgroundColor: Colors.white,
+        foregroundColor: textColor,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -196,6 +237,37 @@ class _SolicitarValidacionWidgetState extends State<SolicitarValidacionWidget> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Text(
+                    AppCopy.validacionTercerosHint,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: textColor,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Alguien del barrio o de confianza confirma que te conoce. '
+                    'Eso genera mucha más confianza que un formulario solo.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textMuted,
+                      height: 1.4,
+                    ),
+                  ),
+                  if (_validacionesCount > 0) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      'Ya tenés $_validacionesCount validación(es) recibida(s).',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.success,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
+
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -204,8 +276,8 @@ class _SolicitarValidacionWidgetState extends State<SolicitarValidacionWidget> {
                     ),
                     child: Column(
                       children: [
-                        Text(
-                          'Tu solicitud de validación está lista',
+                        const Text(
+                          'Tu enlace está listo',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             color: primaryColor,
@@ -214,9 +286,13 @@ class _SolicitarValidacionWidgetState extends State<SolicitarValidacionWidget> {
                         ),
                         const SizedBox(height: 4),
                         const Text(
-                          'Compartí este enlace con personas que conozcan tu domicilio. Ellas confirmarán que te conocen y validarán la dirección.',
+                          'Mandáselo por WhatsApp a alguien que te conozca. '
+                          'Le toma menos de un minuto.',
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: Color(0xFF475569), fontSize: 12),
+                          style: TextStyle(
+                            color: Color(0xFF475569),
+                            fontSize: 12,
+                          ),
                         ),
                         const SizedBox(height: 12),
                         Row(
@@ -224,13 +300,14 @@ class _SolicitarValidacionWidgetState extends State<SolicitarValidacionWidget> {
                             Expanded(
                               child: ElevatedButton.icon(
                                 onPressed: () => _compartirPorWhatsApp(uid),
-                                icon: const Icon(Icons.share_rounded, size: 16),
-                                label: const Text('Enviar WhatsApp'),
+                                icon: const Icon(Icons.chat, size: 16),
+                                label: const Text('WhatsApp'),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: primaryColor,
+                                  backgroundColor: AppColors.whatsapp,
                                   foregroundColor: Colors.white,
                                   elevation: 0,
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 12),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
                                   ),
@@ -240,13 +317,18 @@ class _SolicitarValidacionWidgetState extends State<SolicitarValidacionWidget> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: OutlinedButton.icon(
-                                onPressed: () => _copiarEnlaceAlPortapapeles(uid),
+                                onPressed: () =>
+                                    _copiarEnlaceAlPortapapeles(uid),
                                 icon: const Icon(Icons.copy_rounded, size: 16),
-                                label: const Text('Copiar Enlace'),
+                                label: const Text('Copiar'),
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: primaryColor,
-                                  side: BorderSide(color: primaryColor, width: 1.5),
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  side: const BorderSide(
+                                    color: primaryColor,
+                                    width: 1.5,
+                                  ),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 12),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
                                   ),
@@ -258,13 +340,20 @@ class _SolicitarValidacionWidgetState extends State<SolicitarValidacionWidget> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 24),
+
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.grey.shade200),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -275,30 +364,49 @@ class _SolicitarValidacionWidgetState extends State<SolicitarValidacionWidget> {
                               radius: 24,
                               backgroundColor: primaryColor,
                               child: Text(
-                                _nombreCompleto.isNotEmpty ? _nombreCompleto[0].toUpperCase() : 'P',
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+                                _nombreCompleto.isNotEmpty
+                                    ? _nombreCompleto[0].toUpperCase()
+                                    : 'P',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                ),
                               ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
-                                _nombreCompleto.isNotEmpty ? _nombreCompleto : 'Tu perfil',
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
+                                _nombreCompleto.isNotEmpty
+                                    ? _nombreCompleto
+                                    : 'Tu perfil',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: textColor,
+                                ),
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 16),
                         const Text(
-                          '¿Qué van a hacer quienes reciban el enlace?',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E293B)),
+                          '¿Qué hace quien recibe el enlace?',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: textColor,
+                          ),
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          'Es un proceso simple, donde la persona confirma\n'
-                          'que te conoce respondiendo tres preguntas.\n'
-                          'No hay mejor manera que el acompañamiento de quienes nos conocen',
-                          style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.5),
+                          'Responde unas preguntas simples: si te conoce y si la dirección es correcta. '
+                          'No pide tarjetas ni datos bancarios. Es apoyo de quien te conoce en la vida real.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textMuted,
+                            height: 1.5,
+                          ),
                         ),
                       ],
                     ),
