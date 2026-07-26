@@ -72,13 +72,18 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
               child: Transform.scale(
                 scale: _scaleAnimation.value,
                 child: Image.asset(
-                  'assets/images/lifewallet.png',
+                  'assets/images/logo_prox_splash.png.png',
                   width: 200,
                   fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Icon(
-                    Icons.handyman_rounded,
-                    size: 80,
-                    color: Color(0xFF734BE4),
+                  errorBuilder: (_, __, ___) => Image.asset(
+                    'assets/images/lifewallet.png',
+                    width: 200,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.handyman_rounded,
+                      size: 80,
+                      color: Color(0xFF734BE4),
+                    ),
                   ),
                 ),
               ),
