@@ -2,22 +2,24 @@ import 'package:flutter/material.dart';
 import 'registroTrabajador.dart';
 import 'completar_perfil.dart';
 import 'solicitar_validacion.dart';
+import 'theme/app_colors.dart';
 
 class MenuPerfilWidget extends StatelessWidget {
   const MenuPerfilWidget({super.key});
 
+  static const Color _primary = AppColors.prestador;
+
   @override
   Widget build(BuildContext context) {
-    final primaryColor = const Color(0xFF0F52BA);
-    final textColor = const Color(0xFF1E293B);
-
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
         title: const Text('Sobre mí'),
-        backgroundColor: primaryColor,
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.text,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        iconTheme: const IconThemeData(color: AppColors.text),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -25,48 +27,67 @@ class MenuPerfilWidget extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                'Configuración de tu cuenta',
+              const Text(
+                'Tu perfil en Puelo',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
-                  color: textColor,
+                  color: AppColors.text,
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 8),
+              const Text(
+                'Definí qué servicios ofrecés, cargá tus datos y pedí que te validen. '
+                'Así los clientes confían más en vos.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textMuted,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 28),
 
               _buildActionCard(
-                context,
-                titulo: 'Crear perfil profesional',
-                subtitulo: 'Activá tu tarjeta digital para ofrecer servicios y definir tus zonas de cobertura.',
-                icono: Icons.work_outline_rounded,
+                titulo: 'Mis servicios y zona',
+                subtitulo:
+                    'Qué oficios hacés, dónde trabajás y tu tarjeta para compartir con clientes.',
+                icono: Icons.handyman_outlined,
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const RegistroTrabajadorWidget()),
+                  MaterialPageRoute(
+                    builder: (context) => const RegistroTrabajadorWidget(),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
 
               _buildActionCard(
-                context,
                 titulo: 'Mis datos personales',
-                subtitulo: 'Actualizá tu dirección, documento y foto para validar tu identidad.',
+                subtitulo:
+                    'Nombre, apellido y teléfono se pueden mostrar al cliente. '
+                    'El resto (documento, domicilio completo, etc.) no se comparte: '
+                    'sirve para validarte y para que otros vean que tu perfil es confiable.',
                 icono: Icons.person_outline_rounded,
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const CompletarPerfilWidget()),
+                  MaterialPageRoute(
+                    builder: (context) => const CompletarPerfilWidget(),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
 
               _buildActionCard(
-                context,
                 titulo: 'Pedir validación del perfil',
-                subtitulo: 'Generá un enlace para que conocidos confirmen que conocen tu domicilio. Aumentá la confianza de la comunidad.',
+                subtitulo:
+                    'Pedile a alguien del barrio o de confianza que confirme que te conoce. '
+                    'Eso suma mucho a la hora de que te elijan.',
                 icono: Icons.verified_user_outlined,
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const SolicitarValidacionWidget()),
+                  MaterialPageRoute(
+                    builder: (context) => const SolicitarValidacionWidget(),
+                  ),
                 ),
               ),
             ],
@@ -76,7 +97,12 @@ class MenuPerfilWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildActionCard(BuildContext context, {required String titulo, required String subtitulo, required IconData icono, required VoidCallback onTap}) {
+  Widget _buildActionCard({
+    required String titulo,
+    required String subtitulo,
+    required IconData icono,
+    required VoidCallback onTap,
+  }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -85,24 +111,24 @@ class MenuPerfilWidget extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade200),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.02),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFE8F0FE),
+                color: _primary.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icono, color: const Color(0xFF0F52BA), size: 28),
+              child: Icon(icono, color: _primary, size: 28),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -114,21 +140,23 @@ class MenuPerfilWidget extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E293B),
+                      color: AppColors.text,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Text(
                     subtitulo,
                     style: const TextStyle(
                       fontSize: 13,
-                      color: Color(0xFF64748B),
+                      color: AppColors.textMuted,
+                      height: 1.35,
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+            const SizedBox(width: 4),
+            Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
           ],
         ),
       ),
