@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'user_session.dart';
 import 'scoring_service.dart';
+import 'theme/app_colors.dart';
 
 class PerfilCompletoFlotanteWidget extends StatefulWidget {
   const PerfilCompletoFlotanteWidget({super.key});
@@ -14,9 +15,9 @@ class PerfilCompletoFlotanteWidget extends StatefulWidget {
 
 class _PerfilCompletoFlotanteWidgetState
     extends State<PerfilCompletoFlotanteWidget> {
-  static const Color primaryColor = Color(0xFF734BE4);
-  static const Color _bg = Color(0xFFF8FAFC);
-  static const Color _textColor = Color(0xFF1E293B);
+  static const Color primaryColor = AppColors.cliente;
+  static const Color _bg = AppColors.bg;
+  static const Color _textColor = AppColors.text;
 
   bool _loading = true;
   Map<String, dynamic> _data = {};
@@ -74,7 +75,6 @@ class _PerfilCompletoFlotanteWidgetState
         .toList();
 
     final badge = _data['badge_prestador'] as String?;
-    final score = _data['score_credito'];
     final telefono = _str(_data['telefono']);
     final whatsapp = _data['tiene_whatsapp'] == true;
 
@@ -104,26 +104,29 @@ class _PerfilCompletoFlotanteWidgetState
           : ListView(
               padding: const EdgeInsets.all(20),
               children: [
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: primaryColor.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: primaryColor.withOpacity(0.2)),
+                  ),
+                  child: const Text(
+                    'Al cliente solo se le puede mostrar nombre, apellido y teléfono. '
+                    'El resto de datos sirve para validarte y generar confianza.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.text,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
                 if (badge != null &&
                     ScoringService.labelBadge(badge).isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16),
-                    child: Row(
-                      children: [
-                        _badgeChip(badge),
-                        if (score != null) ...[
-                          const SizedBox(width: 10),
-                          Text(
-                            'Score $score',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
+                    child: _badgeChip(badge),
                   ),
                 _sectionCard(
                   title: 'Datos personales',
@@ -163,7 +166,7 @@ class _PerfilCompletoFlotanteWidgetState
                       const SizedBox(height: 8),
                       const Text(
                         'Foto del documento',
-                        style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                        style: TextStyle(fontSize: 13, color: AppColors.textMuted),
                       ),
                       const SizedBox(height: 6),
                       ClipRRect(
@@ -187,7 +190,7 @@ class _PerfilCompletoFlotanteWidgetState
                 ),
                 const SizedBox(height: 14),
                 _sectionCard(
-                  title: 'Domicilio particular',
+                  title: 'Domicilio',
                   children: [
                     _row('Calle', _str(_data['calle'])),
                     _row('Número', _str(_data['numero'])),
@@ -206,7 +209,7 @@ class _PerfilCompletoFlotanteWidgetState
                 ),
                 const SizedBox(height: 14),
                 _sectionCard(
-                  title: 'Información profesional',
+                  title: 'Servicios que ofrecés',
                   children: [
                     _row(
                       'Nombre comercial',
@@ -215,7 +218,7 @@ class _PerfilCompletoFlotanteWidgetState
                       ),
                     ),
                     _row(
-                      'Oficios / Especialidades',
+                      'Oficios',
                       profesiones.isEmpty ? '—' : profesiones.join(', '),
                     ),
                     const SizedBox(height: 8),
@@ -224,7 +227,7 @@ class _PerfilCompletoFlotanteWidgetState
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF64748B),
+                        color: AppColors.textMuted,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -309,7 +312,7 @@ class _PerfilCompletoFlotanteWidgetState
             width: 140,
             child: Text(
               label,
-              style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+              style: const TextStyle(fontSize: 13, color: AppColors.textMuted),
             ),
           ),
           Expanded(
