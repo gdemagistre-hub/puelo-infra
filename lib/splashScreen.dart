@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'loginScreen.dart';
 
 class SplashScreenWidget extends StatefulWidget {
   static const String routePath = '/splash';
@@ -20,7 +21,6 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
   void initState() {
     super.initState();
 
-    // Ocultar barra de estado para que se vea más limpio
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
     _controller = AnimationController(
@@ -28,7 +28,6 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
       duration: const Duration(milliseconds: 1600),
     );
 
-    // Leve crecimiento (de 88% a 100%)
     _scaleAnimation = Tween<double>(begin: 0.88, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
@@ -36,7 +35,6 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
       ),
     );
 
-    // Fade in suave
     _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
@@ -46,13 +44,10 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
 
     _controller.forward();
 
-    // Navegar después de la animación
+    // Etapa de prueba: siempre al login con dropdown de usuarios
     Future.delayed(const Duration(milliseconds: 2400), () {
       if (mounted) {
-        // Acá ponés la lógica real de a dónde va
-        // Por ahora ejemplo:
-        Navigator.pushReplacementNamed(context, '/seleccionRol');
-        // o LoginScreenWidget.routePath, etc.
+        Navigator.pushReplacementNamed(context, LoginScreenWidget.routePath);
       }
     });
   }
@@ -60,14 +55,14 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
   @override
   void dispose() {
     _controller.dispose();
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge); // Restaurar
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white, // Cambiá si querés otro fondo
+      backgroundColor: Colors.white,
       body: Center(
         child: AnimatedBuilder(
           animation: _controller,
@@ -77,9 +72,14 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
               child: Transform.scale(
                 scale: _scaleAnimation.value,
                 child: Image.asset(
-                  'assets/images/logo_prox.png', // ← Ruta del logo
+                  'assets/images/lifewallet.png',
                   width: 200,
                   fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.handyman_rounded,
+                    size: 80,
+                    color: Color(0xFF734BE4),
+                  ),
                 ),
               ),
             );
