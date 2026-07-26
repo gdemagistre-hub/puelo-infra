@@ -79,14 +79,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
-    - assets/videos/
-    - assets/audios/
-    - assets/rive_animations/
-    - assets/pdfs/
-    - assets/jsons/
     - assets/provincia.json
     - assets/departamentos.json
     - assets/localidades.json
     - assets/usuarios_dummy_500.json
-    - assets/images/logo_prox.png
-    - assets/images/logo_prox_icon.png
