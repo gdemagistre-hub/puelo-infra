@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'datosPersonalesflotante.dart';
+import 'completar_perfil.dart';
 import 'Domicilioflotante.dart';
 import 'especialidadesLaboralesflotante.dart';
 import 'ZonaDeTrabajoflotante.dart';
 import 'perfilCompletoflotante.dart';
+import 'theme/app_colors.dart';
 
 class MenuPerfilOpcionesWidget extends StatelessWidget {
   final VoidCallback? onClose;
@@ -17,12 +18,8 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
     this.modoPrestador = false,
   });
 
-  // Paleta
-  static const Color _clientePrimary = Color(0xFF734BE4);
-  static const Color _prestadorPrimary = Color(0xFF28B5CD);
-  static const Color _textColor = Color(0xFF1E293B);
-
-  Color get primaryColor => modoPrestador ? _prestadorPrimary : _clientePrimary;
+  Color get primaryColor =>
+      modoPrestador ? AppColors.prestador : AppColors.cliente;
 
   void _abrirFlotante(BuildContext context, Widget page) {
     Navigator.of(context).push(
@@ -46,24 +43,30 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Cliente: solo datos personales, domicilio y perfil completo
-    // Prestador: todo
+    // Misma experiencia que el botón «Mi perfil» del Home prestador
     final items = <_MenuItem>[
       _MenuItem(
         icon: Icons.person_outline_rounded,
-        label: 'Datos personales',
+        label: 'Mis datos personales',
+        subtitle:
+            'Nombre, apellido y teléfono se pueden mostrar al cliente. '
+            'El resto no se comparte: sirve para validarte y generar confianza.',
         onTap: () =>
-            _abrirFlotante(context, const DatosPersonalesFlotanteWidget()),
+            _abrirFlotante(context, const CompletarPerfilWidget()),
       ),
       _MenuItem(
         icon: Icons.home_outlined,
         label: 'Domicilio',
+        subtitle:
+            'Tu dirección completa no se muestra al cliente; se usa para '
+            'validaciones y para priorizar búsquedas cercanas.',
         onTap: () => _abrirFlotante(context, const DomicilioFlotanteWidget()),
       ),
       if (modoPrestador) ...[
         _MenuItem(
           icon: Icons.handyman_outlined,
-          label: 'Especialidades laborales',
+          label: 'Mis servicios y oficios',
+          subtitle: 'Qué trabajos ofrecés y cómo te presentás.',
           onTap: () => _abrirFlotante(
             context,
             const EspecialidadesLaboralesFlotanteWidget(),
@@ -71,7 +74,8 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
         ),
         _MenuItem(
           icon: Icons.map_outlined,
-          label: 'Zona de trabajo preferida',
+          label: 'Zona de trabajo',
+          subtitle: 'Dónde podés atender para que te encuentren cerca.',
           onTap: () =>
               _abrirFlotante(context, const ZonaDeTrabajoFlotanteWidget()),
         ),
@@ -79,17 +83,17 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
       _MenuItem(
         icon: Icons.badge_outlined,
         label: 'Mi perfil completo',
+        subtitle: 'Resumen de lo que tenés cargado en Puelo.',
         onTap: () =>
             _abrirFlotante(context, const PerfilCompletoFlotanteWidget()),
       ),
     ];
 
     return Container(
-      color: Colors.white,
+      color: AppColors.bg,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Handle del bottom sheet
           Center(
             child: Container(
               margin: const EdgeInsets.only(top: 10, bottom: 8),
@@ -101,10 +105,8 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
               ),
             ),
           ),
-
-          // Título + cerrar
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 12, 12),
+            padding: const EdgeInsets.fromLTRB(20, 4, 12, 8),
             child: Row(
               children: [
                 Expanded(
@@ -115,7 +117,7 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: _textColor,
+                      color: AppColors.text,
                     ),
                   ),
                 ),
@@ -128,58 +130,99 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
               ],
             ),
           ),
-
-          const Divider(height: 1),
-
-          // Lista de opciones
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+            child: Text(
+              modoPrestador
+                  ? 'Completá tus datos, servicios y zona. Así los clientes confían más en vos.'
+                  : 'Tus datos ayudan a contactarte y a priorizar prestadores cerca tuyo.',
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textMuted,
+                height: 1.35,
+              ),
+            ),
+          ),
           Expanded(
             child: ListView.separated(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
               itemCount: items.length,
-              separatorBuilder: (_, __) => Divider(
-                height: 1,
-                indent: 72,
-                color: Colors.grey.shade200,
-              ),
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
                 final item = items[index];
-                return ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 6,
-                  ),
-                  leading: Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: primaryColor.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      item.icon,
-                      color: primaryColor,
-                      size: 22,
-                    ),
-                  ),
-                  title: Text(
-                    item.label,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      color: _textColor,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  trailing: Icon(
-                    Icons.chevron_right_rounded,
-                    color: primaryColor.withOpacity(0.7),
-                    size: 26,
-                  ),
-                  onTap: item.onTap,
-                );
+                return _buildCard(item);
               },
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCard(_MenuItem item) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      elevation: 0,
+      shadowColor: Colors.black12,
+      child: InkWell(
+        onTap: item.onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: primaryColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(item.icon, color: primaryColor, size: 26),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.label,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.text,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      item.subtitle,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textMuted,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: Colors.grey.shade400,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -188,11 +231,13 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
 class _MenuItem {
   final IconData icon;
   final String label;
+  final String subtitle;
   final VoidCallback onTap;
 
   _MenuItem({
     required this.icon,
     required this.label,
+    required this.subtitle,
     required this.onTap,
   });
 }
