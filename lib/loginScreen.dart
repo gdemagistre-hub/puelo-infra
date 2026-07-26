@@ -148,24 +148,23 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                   const SizedBox(height: 40),
 
                   Center(
-                    child: Container(
-                      height: 80,
-                      width: 80,
-                      decoration: BoxDecoration(
-                        color: primaryColor,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: primaryColor.withOpacity(0.2),
-                            blurRadius: 15,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.handyman_rounded,
-                        color: Colors.white,
-                        size: 42,
+                    child: Image.asset(
+                      'assets/images/logo_prox_icon.png.png',
+                      height: 88,
+                      width: 88,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => Container(
+                        height: 80,
+                        width: 80,
+                        decoration: BoxDecoration(
+                          color: primaryColor,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Icon(
+                          Icons.handyman_rounded,
+                          color: Colors.white,
+                          size: 42,
+                        ),
                       ),
                     ),
                   ),
