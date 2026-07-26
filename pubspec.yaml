@@ -6,7 +6,7 @@ environment:
 
 dependencies:
   flutter:
-    sdk: flutter
+    sdk: 
   auto_size_text: 3.0.0
   cached_network_image: 3.4.1
   cached_network_image_platform_interface: 4.1.1
@@ -88,3 +88,5 @@ flutter:
     - assets/departamentos.json
     - assets/localidades.json
     - assets/usuarios_dummy_500.json
+    - assets/images/logo_prox.png
+    - assets/images/logo_prox_icon.png
