@@ -45,13 +45,12 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   bool _cargandoConsejos = true;
   bool _corriendoBatch = false;
 
-  /// Señal de "estoy visible / consigo clientes" para home prestador
   bool _visibilidadCargando = true;
   bool _estaVisible = false;
   String _resumenOficios = '';
   String _resumenZona = '';
   int _pasosCompletos = 0;
-  static const int _pasosTotales = 4; // oficios, zona, teléfono, nombre
+  static const int _pasosTotales = 4;
 
   Color get primaryColor =>
       _modoPrestador ? _prestadorPrimary : _clientePrimary;
@@ -105,6 +104,57 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         _consejos = [];
       });
     }
+  }
+
+  /// Tras onboarding de oficios: relee Firestore y habilita modo prestador.
+  Future<void> _refrescarRolDesdeFirestore() async {
+    final uid = UserSession().uid;
+    if (uid == null) return;
+
+    try {
+      final doc =
+          await FirebaseFirestore.instance.collection('usuarios').doc(uid).get();
+      if (!doc.exists) return;
+
+      final data = doc.data()!;
+      UserSession().iniciarSesion(uid, data);
+
+      final esPrestador =
+          data['es_trabajador'] == true || data['rol'] == 'trabajador';
+
+      if (!mounted) return;
+      setState(() {
+        _puedeSerAmbos = esPrestador;
+        if (esPrestador) {
+          _modoPrestador = true;
+          _currentIndex = 0;
+        }
+      });
+
+      if (esPrestador) {
+        await _cargarEstadoVisibilidadYConsejos();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Listo: ya podés ofrecer servicios. Completá zona si te falta.',
+              ),
+              backgroundColor: Color(0xFF28B5CD),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error refrescando rol: $e');
+    }
+  }
+
+  Future<void> _irAOfrecerServicios() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const RegistroTrabajadorWidget()),
+    );
+    await _refrescarRolDesdeFirestore();
   }
 
   Future<void> _cargarTopServicios() async {
@@ -467,7 +517,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               MaterialPageRoute(
                 builder: (_) => const RegistroTrabajadorWidget(),
               ),
-            ).then((_) => _cargarEstadoVisibilidadYConsejos());
+            ).then((_) => _refrescarRolDesdeFirestore());
           }
         } else {
           if (context.mounted) {
@@ -516,7 +566,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   }
 
   void _onBottomNavTap(int index) {
-    // 0 Home · 1 Evaluar · 2 Perfil (sin Mensajes)
     if (index == 0) {
       setState(() => _currentIndex = 0);
       return;
@@ -645,6 +694,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                 key: ValueKey('perfil_$_modoPrestador'),
                 modoPrestador: _modoPrestador,
                 onClose: () => setState(() => _currentIndex = 0),
+                onRolPuedeHaberCambiado: _refrescarRolDesdeFirestore,
               )
             : (_modoPrestador
                 ? _buildPrestadorBody(key: const ValueKey('prestador'))
@@ -685,6 +735,71 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // CTA para quien quiere vender (visible en <5s si no es prestador)
+          if (!_puedeSerAmbos)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: Material(
+                color: _prestadorPrimary,
+                borderRadius: BorderRadius.circular(16),
+                child: InkWell(
+                  onTap: _irAOfrecerServicios,
+                  borderRadius: BorderRadius.circular(16),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 16,
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.handyman_outlined,
+                            color: Colors.white,
+                            size: 26,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '¿Ofrecés un oficio?',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Empezá a recibir clientes en 3 pasos',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          color: Colors.white,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(
@@ -785,6 +900,17 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               ],
             ),
           ),
+          if (!_puedeSerAmbos) ...[
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: _buildQuickAction(
+                icon: Icons.handyman_outlined,
+                label: 'Quiero ofrecer mis servicios',
+                onTap: _irAOfrecerServicios,
+              ),
+            ),
+          ],
           const SizedBox(height: 28),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
@@ -836,10 +962,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // —— Señal de visibilidad / demanda (primer bloque) ——
           _buildVisibilidadCard(),
-
-          // —— CTA primario: tarjeta para contactar ——
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
             child: Material(
@@ -902,7 +1025,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               ),
             ),
           ),
-
           const SizedBox(height: 20),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
@@ -928,7 +1050,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                         MaterialPageRoute(
                           builder: (_) => const RegistroTrabajadorWidget(),
                         ),
-                      ).then((_) => _cargarEstadoVisibilidadYConsejos());
+                      ).then((_) => _refrescarRolDesdeFirestore());
                     },
                   ),
                 ),
@@ -952,7 +1074,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               ],
             ),
           ),
-
           const SizedBox(height: 28),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
@@ -982,7 +1103,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             )
           else
             ..._consejos.map((c) => _buildTipCard(c)),
-
           if (AppEnv.showDevTools) ...[
             const SizedBox(height: 24),
             Padding(
@@ -1064,7 +1184,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
-            _estaVisible ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+            _estaVisible
+                ? Icons.visibility_outlined
+                : Icons.visibility_off_outlined,
             color: iconColor,
             size: 28,
           ),
