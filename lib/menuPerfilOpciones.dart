@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'completar_perfil.dart';
+import 'datosPersonalesflotante.dart';
 import 'Domicilioflotante.dart';
 import 'especialidadesLaboralesflotante.dart';
 import 'ZonaDeTrabajoflotante.dart';
@@ -43,7 +43,6 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Misma experiencia que el botón «Mi perfil» del Home prestador
     final items = <_MenuItem>[
       _MenuItem(
         icon: Icons.person_outline_rounded,
@@ -52,7 +51,7 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
             'Nombre, apellido y teléfono se pueden mostrar al cliente. '
             'El resto no se comparte: sirve para validarte y generar confianza.',
         onTap: () =>
-            _abrirFlotante(context, const CompletarPerfilWidget()),
+            _abrirFlotante(context, const DatosPersonalesFlotanteWidget()),
       ),
       _MenuItem(
         icon: Icons.home_outlined,
