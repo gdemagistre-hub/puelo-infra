@@ -8,6 +8,9 @@ import 'email_service.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_copy.dart';
 
+/// Alta mínima de cuenta.
+/// Solo: nombre, apellido + canal de validación (WhatsApp o email).
+/// Documento y rol prestador se completan después (datos personales / oficios).
 class RegistroCuentaWidget extends StatefulWidget {
   const RegistroCuentaWidget({super.key});
 
@@ -20,12 +23,9 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
 
   final _nombreController = TextEditingController();
   final _apellidoController = TextEditingController();
-  final _docNumeroController = TextEditingController();
   final _whatsappController = TextEditingController();
   final _emailController = TextEditingController();
 
-  String? _tipoDocSeleccionado;
-  String? _paisSeleccionado;
   String _metodoValidacion = 'whatsapp'; // whatsapp | email
 
   bool _isLoading = false;
@@ -37,13 +37,11 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
   final uuid = const Uuid();
 
   static const Color primaryColor = AppColors.cliente;
-  static const Color inputBgColor = AppColors.bg;
 
   @override
   void dispose() {
     _nombreController.dispose();
     _apellidoController.dispose();
-    _docNumeroController.dispose();
     _whatsappController.dispose();
     _emailController.dispose();
     super.dispose();
@@ -51,14 +49,6 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
 
   Future<void> _generarRegistro() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_tipoDocSeleccionado == null || _paisSeleccionado == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Completá el tipo y el país del documento.'),
-        ),
-      );
-      return;
-    }
 
     if (_metodoValidacion == 'whatsapp' &&
         _whatsappController.text.trim().isEmpty) {
@@ -83,11 +73,11 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
       final Map<String, dynamic> dataUsuario = {
         'nombre': _nombreController.text.trim(),
         'apellido': _apellidoController.text.trim(),
-        'documento_tipo': _tipoDocSeleccionado,
-        'documento_pais': _paisSeleccionado,
-        'documento': _docNumeroController.text.trim(),
         'telefono': _whatsappController.text.trim(),
         'email': _emailController.text.trim(),
+        'tiene_whatsapp': _metodoValidacion == 'whatsapp',
+        // Alta sin rol prestador: se activa al cargar oficios/zona
+        'es_trabajador': false,
         'estado': 'pendiente_validacion',
         'token_validacion': _tokenValidacion,
         'metodo_validacion': _metodoValidacion,
@@ -123,7 +113,9 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
         );
 
         if (!ok) {
-          throw Exception('No se pudo enviar el email. Revisá la configuración.');
+          throw Exception(
+            'No se pudo enviar el email. Revisá la configuración.',
+          );
         }
 
         if (mounted) _mostrarPopupEmailEnviado();
@@ -294,7 +286,7 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const Text(
-                  'Datos personales',
+                  'Tus datos',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -303,8 +295,13 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  AppCopy.datoSensibleHint,
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 14),
+                  'Con nombre y un contacto ya podés empezar. '
+                  'Documento y más datos los cargás después si querés.',
+                  style: TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 14,
+                    height: 1.35,
+                  ),
                 ),
                 const SizedBox(height: 24),
                 _buildTextField(
@@ -319,48 +316,9 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
                   icon: Icons.person_outline_rounded,
                   obligatorio: true,
                 ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: _tipoDocSeleccionado,
-                        decoration: _inputDeco('Tipo Doc.', true),
-                        items: ['DNI', 'Pasaporte', 'Cédula']
-                            .map(
-                              (t) => DropdownMenuItem(value: t, child: Text(t)),
-                            )
-                            .toList(),
-                        onChanged: (val) =>
-                            setState(() => _tipoDocSeleccionado = val),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: _paisSeleccionado,
-                        decoration: _inputDeco('País emisor', true),
-                        items: ['Argentina', 'Uruguay', 'Chile', 'Otro']
-                            .map(
-                              (p) => DropdownMenuItem(value: p, child: Text(p)),
-                            )
-                            .toList(),
-                        onChanged: (val) =>
-                            setState(() => _paisSeleccionado = val),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _buildTextField(
-                  controller: _docNumeroController,
-                  labelText: 'Número de documento',
-                  icon: Icons.badge_outlined,
-                  keyboardType: TextInputType.number,
-                  obligatorio: true,
-                ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
                 const Text(
-                  'Método de validación',
+                  'Cómo te validamos',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     color: AppColors.text,
@@ -497,42 +455,6 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
                 ? 'Este campo es obligatorio'
                 : null
             : null,
-      ),
-    );
-  }
-
-  InputDecoration _inputDeco(String labelText, bool obligatorio) {
-    return InputDecoration(
-      label: RichText(
-        text: TextSpan(
-          text: labelText,
-          style: TextStyle(color: Colors.grey[700], fontSize: 14),
-          children: obligatorio
-              ? const [
-                  TextSpan(
-                    text: ' *',
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ]
-              : [],
-        ),
-      ),
-      filled: true,
-      fillColor: Colors.white,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade200),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade200),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: primaryColor, width: 1.5),
       ),
     );
   }
