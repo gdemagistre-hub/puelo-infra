@@ -113,7 +113,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
     final linkTarjeta =
         'https://lifewalletpuelo.web.app/#/tarjetaDigital?id=$idDocumento';
     final mensajeShared = Uri.encodeComponent(
-      '¡Hola! Te comparto mi tarjeta profesional en Puelo:\n\n$linkTarjeta',
+      '¡Hola! Te comparto mi tarjeta de servicios en Puelo:\n\n$linkTarjeta',
     );
     final url = Uri.parse('https://wa.me/?text=$mensajeShared');
 
@@ -372,7 +372,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                         child: Column(
                           children: [
                             const Text(
-                              'Tarjeta profesional activa',
+                              'Tarjeta de servicios activa',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: primaryColor,
@@ -547,7 +547,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
 
                             if (profesiones.isNotEmpty) ...[
                               const Text(
-                                'Especialidades',
+                                'Servicios que ofrece',
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
@@ -703,7 +703,6 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                             }
                           }
 
-                          // Fallback: sin índice usuario_id, buscar por ref (limitado)
                           return FutureBuilder<QuerySnapshot?>(
                             future: todasLasImagenes.isNotEmpty
                                 ? Future.value(null)
@@ -801,9 +800,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                                       physics:
                                           const NeverScrollableScrollPhysics(),
                                       gridDelegate:
-                                          const
-                                             
-SliverGridDelegateWithFixedCrossAxisCount(
+                                          const SliverGridDelegateWithFixedCrossAxisCount(
                                         crossAxisCount: 2,
                                         crossAxisSpacing: 12,
                                         mainAxisSpacing: 12,
