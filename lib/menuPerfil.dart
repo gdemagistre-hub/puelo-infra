@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'registroTrabajador.dart';
-import 'completar_perfil.dart';
+import 'datosPersonalesflotante.dart';
 import 'solicitar_validacion.dart';
 import 'theme/app_colors.dart';
 
@@ -71,7 +71,7 @@ class MenuPerfilWidget extends StatelessWidget {
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const CompletarPerfilWidget(),
+                    builder: (context) => const DatosPersonalesFlotanteWidget(),
                   ),
                 ),
               ),
