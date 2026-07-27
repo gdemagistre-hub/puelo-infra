@@ -141,7 +141,7 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
     if (uid == null) {
       return const Scaffold(
         body: Center(
-          child: Text('Iniciá sesión para configurar tu perfil profesional.'),
+          child: Text('Iniciá sesión para configurar tus servicios.'),
         ),
       );
     }
@@ -149,7 +149,7 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
     return Scaffold(
       backgroundColor: AppColors.bg,
       appBar: AppBar(
-        title: const Text('Perfil profesional'),
+        title: const Text('Mis servicios'),
         backgroundColor: Colors.white,
         foregroundColor: AppColors.text,
         elevation: 0,
