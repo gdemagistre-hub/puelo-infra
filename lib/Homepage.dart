@@ -4,7 +4,6 @@ import 'user_session.dart';
 import 'loginScreen.dart';
 import 'buscadorPrestadores.dart';
 import 'menuEvaluaciones.dart';
-import 'menuPerfil.dart';
 import 'registroTrabajador.dart';
 import 'tarjetaDigital.dart';
 import 'menuPerfilOpciones.dart';
@@ -33,6 +32,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
   final TextEditingController _searchController = TextEditingController();
 
+  /// 0 = Home, 1 = Evaluar (push), 2 = Perfil
   int _currentIndex = 0;
 
   bool _modoPrestador = false;
@@ -45,7 +45,16 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   bool _cargandoConsejos = true;
   bool _corriendoBatch = false;
 
-  Color get primaryColor => _modoPrestador ? _prestadorPrimary : _clientePrimary;
+  /// Señal de "estoy visible / consigo clientes" para home prestador
+  bool _visibilidadCargando = true;
+  bool _estaVisible = false;
+  String _resumenOficios = '';
+  String _resumenZona = '';
+  int _pasosCompletos = 0;
+  static const int _pasosTotales = 4; // oficios, zona, teléfono, nombre
+
+  Color get primaryColor =>
+      _modoPrestador ? _prestadorPrimary : _clientePrimary;
 
   static const Map<String, _ServicioMeta> _metaServicios = {
     'electricidad':
@@ -88,10 +97,11 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       _modoPrestador = esPrestador;
     });
     if (esPrestador) {
-      _cargarConsejosPersonalizados();
+      _cargarEstadoVisibilidadYConsejos();
     } else {
       setState(() {
         _cargandoConsejos = false;
+        _visibilidadCargando = false;
         _consejos = [];
       });
     }
@@ -214,13 +224,18 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     }
   }
 
-  Future<void> _cargarConsejosPersonalizados() async {
-    setState(() => _cargandoConsejos = true);
+  Future<void> _cargarEstadoVisibilidadYConsejos() async {
+    setState(() {
+      _cargandoConsejos = true;
+      _visibilidadCargando = true;
+    });
     final uid = UserSession().uid;
     if (uid == null) {
       setState(() {
         _consejos = [];
         _cargandoConsejos = false;
+        _visibilidadCargando = false;
+        _estaVisible = false;
       });
       return;
     }
@@ -230,14 +245,36 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           await FirebaseFirestore.instance.collection('usuarios').doc(uid).get();
       final data = doc.data() ?? {};
 
-      final consejos = <_ConsejoItem>[];
-
+      final profesiones = (data['profesiones'] as List<dynamic>? ?? [])
+          .map((e) => e.toString().toLowerCase().trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
       final zonas = data['zonas_cobertura'] as Map<String, dynamic>?;
       final localidades = zonas?['localidades'] as List<dynamic>? ?? [];
+      final telefono = (data['telefono'] ?? '').toString().trim();
+      final nombre = (data['nombre'] ?? '').toString().trim();
+      final apellido = (data['apellido'] ?? '').toString().trim();
+
+      final labelsOficios = profesiones
+          .map((k) => _metaServicios[k]?.label ?? k)
+          .take(3)
+          .join(' · ');
+
+      int pasos = 0;
+      if (profesiones.isNotEmpty) pasos++;
+      if (localidades.isNotEmpty) pasos++;
+      if (telefono.isNotEmpty) pasos++;
+      if (nombre.isNotEmpty && apellido.isNotEmpty) pasos++;
+
+      final visible =
+          profesiones.isNotEmpty && localidades.isNotEmpty && telefono.isNotEmpty;
+
+      final consejos = <_ConsejoItem>[];
+
       if (localidades.isEmpty) {
         consejos.add(_ConsejoItem(
           title: 'Definí tu zona de trabajo',
-          body: 'Sin localidades de cobertura los clientes no te encuentran.',
+          body: 'Sin zona los clientes de tu barrio no te encuentran.',
           icon: Icons.map_outlined,
           onTap: () {
             Navigator.push(
@@ -245,55 +282,48 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               MaterialPageRoute(
                 builder: (_) => const ZonaDeTrabajoFlotanteWidget(),
               ),
-            );
+            ).then((_) => _cargarEstadoVisibilidadYConsejos());
           },
         ));
       }
 
-      final docNumero = (data['doc_numero'] ??
-              data['numero_documento'] ??
-              data['documento'] ??
-              '')
-          .toString()
-          .trim();
-      if (docNumero.isEmpty) {
+      if (profesiones.isEmpty) {
         consejos.add(_ConsejoItem(
-          title: 'Cargá tu número de documento',
-          body: 'Es un dato clave de confianza para quienes te contratan.',
-          icon: Icons.badge_outlined,
+          title: 'Indicá qué oficios hacés',
+          body: 'Sin oficios no aparecés cuando alguien busca un servicio.',
+          icon: Icons.handyman_outlined,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const RegistroTrabajadorWidget(),
+              ),
+            ).then((_) => _cargarEstadoVisibilidadYConsejos());
+          },
+        ));
+      }
+
+      if (telefono.isEmpty) {
+        consejos.add(_ConsejoItem(
+          title: 'Cargá tu celular',
+          body: 'Es como te van a contactar por WhatsApp o llamada.',
+          icon: Icons.phone_outlined,
           onTap: () {
             Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (_) => const DatosPersonalesFlotanteWidget(),
               ),
-            );
-          },
-        ));
-      }
-
-      if (data['fecha_nacimiento'] == null) {
-        consejos.add(_ConsejoItem(
-          title: 'Completá tu fecha de nacimiento',
-          body: 'Ayuda a validar tu identidad y a personalizar tu perfil.',
-          icon: Icons.cake_outlined,
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const DatosPersonalesFlotanteWidget(),
-              ),
-            );
+            ).then((_) => _cargarEstadoVisibilidadYConsejos());
           },
         ));
       }
 
       final vals = data['validaciones_recibidas'] as List<dynamic>? ?? [];
-      if (vals.isEmpty) {
+      if (vals.isEmpty && consejos.length < 2) {
         consejos.add(_ConsejoItem(
           title: 'Pedí validaciones de terceros',
-          body:
-              'Las referencias de vecinos o conocidos aumentan mucho la confianza.',
+          body: 'Que alguien del barrio confirme que te conoce suma confianza.',
           icon: Icons.verified_user_outlined,
           onTap: () {
             Navigator.push(
@@ -306,28 +336,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         ));
       }
 
-      final docValidado = data['doc_validado'] == true;
-      final urlFoto = (data['url_foto_documento'] ?? '').toString();
-      if (!docValidado || urlFoto.isEmpty) {
-        consejos.add(_ConsejoItem(
-          title: 'Validá tu documento con foto',
-          body: 'Escaneá el DNI: es el diferencial más fuerte frente al resto.',
-          icon: Icons.document_scanner_outlined,
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const DatosPersonalesFlotanteWidget(),
-              ),
-            );
-          },
-        ));
-      }
-
       if (consejos.isEmpty) {
         consejos.add(_ConsejoItem(
-          title: '¡Perfil muy completo!',
-          body: 'Seguí compartiendo tu tarjeta y pidiendo evaluaciones.',
+          title: 'Estás listo para que te contacten',
+          body: 'Pasale tu tarjeta por WhatsApp o pedí evaluaciones.',
           icon: Icons.emoji_events_outlined,
           onTap: _compartirTarjeta,
         ));
@@ -335,16 +347,25 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
       if (mounted) {
         setState(() {
-          _consejos = consejos.take(2).toList(); // máx 2 en UI
+          _estaVisible = visible;
+          _resumenOficios =
+              labelsOficios.isEmpty ? 'Sin oficios cargados' : labelsOficios;
+          _resumenZona = localidades.isEmpty
+              ? 'Sin zona de trabajo'
+              : '${localidades.length} zona${localidades.length == 1 ? '' : 's'} activa${localidades.length == 1 ? '' : 's'}';
+          _pasosCompletos = pasos;
+          _consejos = consejos.take(2).toList();
           _cargandoConsejos = false;
+          _visibilidadCargando = false;
         });
       }
     } catch (e) {
-      debugPrint('Error consejos: $e');
+      debugPrint('Error visibilidad/consejos: $e');
       if (mounted) {
         setState(() {
           _consejos = [];
           _cargandoConsejos = false;
+          _visibilidadCargando = false;
         });
       }
     }
@@ -437,7 +458,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text(
-                  'Para compartir tu tarjeta, primero configurá tus especialidades y zonas.',
+                  'Para que te contacten, primero cargá tus oficios y zona de trabajo.',
                 ),
               ),
             );
@@ -446,7 +467,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               MaterialPageRoute(
                 builder: (_) => const RegistroTrabajadorWidget(),
               ),
-            );
+            ).then((_) => _cargarEstadoVisibilidadYConsejos());
           }
         } else {
           if (context.mounted) {
@@ -472,16 +493,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     }
   }
 
-  void _irAGuiaInstagram() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Abriendo guía: Cómo promocionar tus trabajos en Instagram...',
-        ),
-      ),
-    );
-  }
-
   void _irABuscador([String? query]) {
     final texto = (query ?? _searchController.text).trim();
     Navigator.push(
@@ -505,10 +516,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   }
 
   void _onBottomNavTap(int index) {
-    if (_currentIndex == 3 && index != 3) {
-      setState(() => _currentIndex = 0);
-    }
-
+    // 0 Home · 1 Evaluar · 2 Perfil (sin Mensajes)
     if (index == 0) {
       setState(() => _currentIndex = 0);
       return;
@@ -524,17 +532,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     }
 
     if (index == 2) {
-      setState(() => _currentIndex = 0);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('${AppCopy.navMensajes}: ${AppCopy.ctaProximamente}'),
-        ),
-      );
-      return;
-    }
-
-    if (index == 3) {
-      setState(() => _currentIndex = 3);
+      setState(() => _currentIndex = 2);
     }
   }
 
@@ -578,10 +576,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                   setState(() {
                     _modoPrestador = !_modoPrestador;
                   });
-                  if (_modoPrestador &&
-                      _consejos.isEmpty &&
-                      !_cargandoConsejos) {
-                    _cargarConsejosPersonalizados();
+                  if (_modoPrestador) {
+                    _cargarEstadoVisibilidadYConsejos();
                   }
                 },
                 child: Container(
@@ -597,14 +593,14 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                     children: [
                       Icon(
                         _modoPrestador
-                            ? Icons.engineering
-                            : Icons.person_search,
+                            ? Icons.handyman_outlined
+                            : Icons.search_rounded,
                         size: 16,
                         color: primaryColor,
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        _modoPrestador ? 'Prestador' : 'Cliente',
+                        _modoPrestador ? 'Ofrezco trabajo' : 'Busco trabajo',
                         style: TextStyle(
                           color: primaryColor,
                           fontWeight: FontWeight.w600,
@@ -644,7 +640,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           );
           return SlideTransition(position: offsetAnimation, child: child);
         },
-        child: _currentIndex == 3
+        child: _currentIndex == 2
             ? MenuPerfilOpcionesWidget(
                 key: ValueKey('perfil_$_modoPrestador'),
                 modoPrestador: _modoPrestador,
@@ -655,7 +651,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                 : _buildClienteBody(key: const ValueKey('cliente'))),
       ),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex == 3 ? 3 : 0,
+        currentIndex: _currentIndex == 2 ? 2 : 0,
         selectedItemColor: primaryColor,
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
@@ -664,10 +660,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           BottomNavigationBarItem(
             icon: Icon(Icons.add_circle_outline),
             label: 'Evaluar',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.chat_bubble_outline),
-            label: 'Mensajes',
           ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
         ],
@@ -844,122 +836,123 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          GestureDetector(
-            onTap: _irAGuiaInstagram,
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              height: 120,
-              decoration: BoxDecoration(
+          // —— Señal de visibilidad / demanda (primer bloque) ——
+          _buildVisibilidadCard(),
+
+          // —— CTA primario: tarjeta para contactar ——
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+            child: Material(
+              color: _prestadorPrimary,
+              borderRadius: BorderRadius.circular(16),
+              child: InkWell(
+                onTap: _compartirTarjeta,
                 borderRadius: BorderRadius.circular(16),
-                gradient: LinearGradient(
-                  colors: [
-                    _prestadorPrimary.withOpacity(0.9),
-                    _clientePrimary.withOpacity(0.85),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-              child: const Padding(
-                padding: EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      '¿Sabés cómo comunicar tus trabajos en Instagram?',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        height: 1.3,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 18,
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.qr_code_2_rounded,
+                          color: Colors.white,
+                          size: 28,
+                        ),
                       ),
-                    ),
-                    SizedBox(height: 6),
-                    Text(
-                      'Tocá aquí para ver el mini-manual',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Tu tarjeta para que te contacten',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Pasale tu ficha al cliente por WhatsApp',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                height: 1.3,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        color: Colors.white,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 16),
+
+          const SizedBox(height: 20),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Text(
-              'Tu negocio',
+              'Tu trabajo',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
           ),
           const SizedBox(height: 12),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 1.45,
+            child: Row(
               children: [
-                _buildPrestadorCard(
-                  icon: Icons.badge_outlined,
-                  title: 'Compartir tarjeta',
-                  subtitle: 'Tu perfil profesional',
-                  color: _prestadorPrimary,
-                  onTap: _compartirTarjeta,
+                Expanded(
+                  child: _buildPrestadorCard(
+                    icon: Icons.handyman_outlined,
+                    title: 'Oficios y zona',
+                    subtitle: 'Cómo te encuentran',
+                    color: _clientePrimary,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const RegistroTrabajadorWidget(),
+                        ),
+                      ).then((_) => _cargarEstadoVisibilidadYConsejos());
+                    },
+                  ),
                 ),
-                _buildPrestadorCard(
-                  icon: Icons.handyman_outlined,
-                  title: 'Especialidades',
-                  subtitle: 'Oficios y zonas',
-                  color: _clientePrimary,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const RegistroTrabajadorWidget(),
-                      ),
-                    );
-                  },
-                ),
-                _buildPrestadorCard(
-                  icon: Icons.star_outline,
-                  title: 'Evaluaciones',
-                  subtitle: 'Lo que dicen de vos',
-                  color: _accentCoral,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const MenuEvaluacionesWidget(),
-                      ),
-                    );
-                  },
-                ),
-                _buildPrestadorCard(
-                  icon: Icons.person_outline,
-                  title: 'Mi perfil',
-                  subtitle: 'Datos y validaciones',
-                  color: _dark,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const MenuPerfilWidget(),
-                      ),
-                    );
-                  },
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildPrestadorCard(
+                    icon: Icons.star_outline,
+                    title: 'Evaluaciones',
+                    subtitle: 'Lo que dicen de vos',
+                    color: _accentCoral,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const MenuEvaluacionesWidget(),
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ],
             ),
           ),
+
           const SizedBox(height: 28),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
@@ -972,7 +965,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Text(
-              'Basados en lo que todavía te falta completar',
+              'Priorizamos lo que te hace aparecer en búsquedas',
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
           ),
@@ -990,7 +983,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           else
             ..._consejos.map((c) => _buildTipCard(c)),
 
-          // Solo debug / staging — nunca en prod
           if (AppEnv.showDevTools) ...[
             const SizedBox(height: 24),
             Padding(
@@ -1026,6 +1018,101 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ] else
             const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVisibilidadCard() {
+    if (_visibilidadCargando) {
+      return const Padding(
+        padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+        child: Center(
+          child: SizedBox(
+            height: 36,
+            width: 36,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+
+    final Color bg = _estaVisible
+        ? const Color(0xFFECFDF5)
+        : const Color(0xFFFFF7ED);
+    final Color border = _estaVisible
+        ? const Color(0xFF6EE7B7)
+        : const Color(0xFFFDBA74);
+    final Color iconColor =
+        _estaVisible ? const Color(0xFF059669) : const Color(0xFFEA580C);
+    final String titulo = _estaVisible
+        ? 'Estás visible para clientes'
+        : 'Todavía no aparecés en búsquedas';
+    final String cuerpo = _estaVisible
+        ? '$_resumenOficios · $_resumenZona'
+        : 'Completá oficios, zona y teléfono para que te encuentren.';
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            _estaVisible ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+            color: iconColor,
+            size: 28,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  titulo,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: iconColor,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  cuerpo,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF334155),
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: _pasosTotales == 0
+                        ? 0
+                        : _pasosCompletos / _pasosTotales,
+                    minHeight: 6,
+                    backgroundColor: Colors.white.withOpacity(0.8),
+                    color: iconColor,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$_pasosCompletos de $_pasosTotales pasos para que te contacten',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
