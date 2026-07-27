@@ -4,6 +4,7 @@ import 'Domicilioflotante.dart';
 import 'especialidadesLaboralesflotante.dart';
 import 'ZonaDeTrabajoflotante.dart';
 import 'perfilCompletoflotante.dart';
+import 'registroTrabajador.dart';
 import 'theme/app_colors.dart';
 
 class MenuPerfilOpcionesWidget extends StatelessWidget {
@@ -12,10 +13,14 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
   /// true = muestra opciones de prestador; false = solo cliente
   final bool modoPrestador;
 
+  /// Se llama al volver del onboarding de oficios (para refrescar rol en Home)
+  final VoidCallback? onRolPuedeHaberCambiado;
+
   const MenuPerfilOpcionesWidget({
     super.key,
     this.onClose,
     this.modoPrestador = false,
+    this.onRolPuedeHaberCambiado,
   });
 
   Color get primaryColor =>
@@ -44,6 +49,22 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = <_MenuItem>[
+      if (!modoPrestador)
+        _MenuItem(
+          icon: Icons.handyman_outlined,
+          label: 'Quiero ofrecer mis servicios',
+          subtitle:
+              'Cargá oficios y zona en 3 pasos y empezá a que te contacten.',
+          destacado: true,
+          onTap: () async {
+            await Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const RegistroTrabajadorWidget(),
+              ),
+            );
+            onRolPuedeHaberCambiado?.call();
+          },
+        ),
       _MenuItem(
         icon: Icons.person_outline_rounded,
         label: 'Mis datos personales',
@@ -134,7 +155,7 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
             child: Text(
               modoPrestador
                   ? 'Completá tus datos, servicios y zona. Así los clientes confían más en vos.'
-                  : 'Tus datos ayudan a contactarte y a priorizar prestadores cerca tuyo.',
+                  : 'Tus datos ayudan a contactarte. Si ofrecés un oficio, tocá “Quiero ofrecer mis servicios”.',
               style: const TextStyle(
                 fontSize: 13,
                 color: AppColors.textMuted,
@@ -159,6 +180,7 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
   }
 
   Widget _buildCard(_MenuItem item) {
+    final color = item.destacado ? AppColors.prestador : primaryColor;
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
@@ -171,6 +193,9 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
+            border: item.destacado
+                ? Border.all(color: AppColors.prestador.withOpacity(0.45), width: 1.5)
+                : null,
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.05),
@@ -185,10 +210,10 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: primaryColor.withOpacity(0.12),
+                  color: color.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(item.icon, color: primaryColor, size: 26),
+                child: Icon(item.icon, color: color, size: 26),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -197,10 +222,10 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
                   children: [
                     Text(
                       item.label,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.text,
+                        color: item.destacado ? AppColors.prestador : AppColors.text,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -232,11 +257,13 @@ class _MenuItem {
   final String label;
   final String subtitle;
   final VoidCallback onTap;
+  final bool destacado;
 
   _MenuItem({
     required this.icon,
     required this.label,
     required this.subtitle,
     required this.onTap,
+    this.destacado = false,
   });
 }
