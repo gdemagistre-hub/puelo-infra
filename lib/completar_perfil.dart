@@ -132,10 +132,13 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
       _pisoDeptoController.text = data['piso_depto'] ?? '';
       _barrioController.text = data['barrio'] ?? '';
       _cpController.text = data['codigo_postal'] ?? '';
-      _docNumeroController.text = data['documento'] ?? '';
+      _docNumeroController.text =
+          (data['documento'] ?? data['doc_numero'] ?? '').toString();
       _instagramController.text = data['instagram'] ?? '';
-      _tipoDocSeleccionado = data['documento_tipo'];
-      _paisDocSeleccionado = data['documento_pais'];
+      _tipoDocSeleccionado =
+          data['documento_tipo'] ?? data['tipo_doc'];
+      _paisDocSeleccionado =
+          data['documento_pais'] ?? data['pais_doc'];
 
       if (data['fecha_nacimiento'] != null) {
         _fechaNacimiento =
@@ -247,20 +250,18 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
   }
 
   Future<void> _guardarPerfil() async {
+    // Solo domicilio es obligatorio en esta pantalla.
+    // Identidad (fecha, tipo, país, número, foto doc) es opcional.
     if (_calleController.text.trim().isEmpty ||
         _numeroController.text.trim().isEmpty ||
         _barrioController.text.trim().isEmpty ||
-        _docNumeroController.text.trim().isEmpty ||
-        _tipoDocSeleccionado == null ||
-        _paisDocSeleccionado == null ||
         _provinciaDirId == null ||
         _partidoDirId == null ||
-        _localidadDirId == null ||
-        _fechaNacimiento == null) {
+        _localidadDirId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Completá todos los campos obligatorios marcados con *.',
+            'Completá la dirección (calle, número, barrio, provincia, partido y localidad).',
           ),
         ),
       );
@@ -297,8 +298,10 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
         'documento_tipo': _tipoDocSeleccionado,
         'documento_pais': _paisDocSeleccionado,
         'documento': _docNumeroController.text.trim(),
+        'doc_numero': _docNumeroController.text.trim(),
+        'tipo_doc': _tipoDocSeleccionado,
+        'pais_doc': _paisDocSeleccionado,
         'instagram': _instagramController.text.trim(),
-        // Campos canónicos para tarjeta + scoring
         'url_foto_perfil': urlPerfil,
         'foto_perfil': urlPerfil,
         'url_foto_documento': urlDoc,
@@ -320,7 +323,7 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
       await db
           .collection('usuarios')
           .doc(_selectedUsuarioId)
-          .update(actualizacion);
+          .set(actualizacion, SetOptions(merge: true));
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -392,9 +395,10 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
-                                  '${AppCopy.datoSensibleHint}. '
-                                  'La foto de perfil se ve en tu tarjeta. '
-                                  'Instagram es opcional y ayuda a mostrar tu trabajo.',
+                                  'La dirección es lo principal en esta pantalla. '
+                                  'Fecha de nacimiento, documento y foto son opcionales '
+                                  '(suman confianza si los cargás). '
+                                  'Nombre y apellido se editan en Datos personales.',
                                   style: TextStyle(
                                     color: primaryColor.withOpacity(0.95),
                                     fontSize: 13,
@@ -570,7 +574,7 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
                           obligatorio: false,
                         ),
 
-                        _buildSectionHeader('Identidad'),
+                        _buildSectionHeader('Identidad (opcional)'),
                         InkWell(
                           onTap: _seleccionarFechaNacimiento,
                           child: Container(
@@ -590,7 +594,7 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
                                 _fechaNacimiento == null
                                     ? _buildLabel(
                                         'Fecha de nacimiento',
-                                        obligatorio: true,
+                                        obligatorio: false,
                                       )
                                     : Text(
                                         DateFormat('dd/MM/yyyy')
@@ -616,7 +620,7 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
                               child: DropdownButtonFormField<String>(
                                 value: _tipoDocSeleccionado,
                                 decoration:
-                                    _inputDeco('Tipo', obligatorio: true),
+                                    _inputDeco('Tipo', obligatorio: false),
                                 items: ['DNI', 'Pasaporte', 'Cédula']
                                     .map(
                                       (t) => DropdownMenuItem(
@@ -636,7 +640,7 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
                                 value: _paisDocSeleccionado,
                                 decoration: _inputDeco(
                                   'País emisor',
-                                  obligatorio: true,
+                                  obligatorio: false,
                                 ),
                                 items: [
                                   'Argentina',
@@ -664,7 +668,7 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
                           controller: _docNumeroController,
                           labelText: 'Número de documento',
                           keyboardType: TextInputType.number,
-                          obligatorio: true,
+                          obligatorio: false,
                         ),
 
                         const SizedBox(height: 16),
