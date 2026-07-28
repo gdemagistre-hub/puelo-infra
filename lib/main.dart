@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'config/app_env.dart';
 import 'theme/app_theme.dart';
 import 'theme/app_copy.dart';
+import 'analytics/prox_analytics.dart';
 
 import 'splashScreen.dart';
 import 'loginScreen.dart';
@@ -15,8 +16,11 @@ import 'tarjetaDigital.dart';
 import 'seleccionRol.dart';
 import 'pantallaValidacion.dart';
 import 'validar_domicilio.dart';
+import 'consola_prox.dart';
 
-void main() async { 
+final ProxRouteObserver proxRouteObserver = ProxRouteObserver();
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(
@@ -45,8 +49,8 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: AppCopy.appName,
       debugShowCheckedModeBanner: false,
-      // Tema default = cliente; pantallas prestador pueden envolver con Theme.
       theme: AppTheme.light(modoPrestador: false),
+      navigatorObservers: [proxRouteObserver],
       initialRoute: SplashScreenWidget.routePath,
       routes: {
         SplashScreenWidget.routePath: (context) => const SplashScreenWidget(),
@@ -56,6 +60,7 @@ class MyApp extends StatelessWidget {
             const RegistroTrabajadorWidget(),
         BuscadorPrestadoresWidget.routePath: (context) =>
             const BuscadorPrestadoresWidget(),
+        ConsolaProxWidget.routePath: (context) => const ConsolaProxWidget(),
         '/seleccionRol': (context) => const SeleccionRolWidget(),
       },
       onGenerateRoute: (settings) {
