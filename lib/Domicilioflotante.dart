@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_session.dart';
+import 'widgets/searchable_picker.dart';
+import 'catalogo_geo_cache.dart';
 
 class DomicilioFlotanteWidget extends StatefulWidget {
   const DomicilioFlotanteWidget({super.key});
@@ -24,8 +26,11 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
   final _cpController = TextEditingController();
 
   String? selectedProvinciaId;
+  String? selectedProvinciaNombre;
   String? selectedPartidoId;
+  String? selectedPartidoNombre;
   String? selectedLocalidadId;
+  String? selectedLocalidadNombre;
 
   List<Map<String, dynamic>> provincias = [];
   List<Map<String, dynamic>> partidos = [];
@@ -79,11 +84,7 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
     }
 
     try {
-      final paisDoc = await db.collection('cat_paises').doc('AR').get();
-      if (paisDoc.exists && paisDoc.data()!.containsKey('provincias')) {
-        provincias =
-            List<Map<String, dynamic>>.from(paisDoc.data()!['provincias']);
-      }
+      provincias = await CatalogoGeoCache.instance.provinciasAR();
 
       final doc = await db.collection('usuarios').doc(uid).get();
       if (doc.exists) {
@@ -98,14 +99,19 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
         final geo = data['direccion_geo'] as Map<String, dynamic>?;
         if (geo != null) {
           selectedProvinciaId = geo['provincia_id']?.toString();
+          selectedProvinciaNombre = geo['provincia_nombre']?.toString();
           selectedPartidoId = geo['partido_id']?.toString();
+          selectedPartidoNombre = geo['partido_nombre']?.toString();
           selectedLocalidadId = geo['localidad_id']?.toString();
+          selectedLocalidadNombre = geo['localidad_nombre']?.toString();
 
           if (selectedProvinciaId != null) {
-            await _loadPartidos(selectedProvinciaId!);
+            partidos = await CatalogoGeoCache.instance
+                .partidosDeProvincia(selectedProvinciaId!);
           }
           if (selectedPartidoId != null) {
-            await _loadLocalidades(selectedPartidoId!);
+            localidades = await CatalogoGeoCache.instance
+                .localidadesDePartido(selectedPartidoId!);
           }
         }
       }
@@ -116,44 +122,116 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
     setState(() => _loading = false);
   }
 
-  Future<void> _loadPartidos(String provId) async {
-    final query = await db
-        .collection('cat_departamentos')
-        .where('provincia_id', isEqualTo: provId)
-        .get();
-    setState(() {
-      partidos = query.docs.map((d) => d.data()).toList();
-    });
-  }
+  Future<void> _abrirProvincia() async {
+    final opciones = provincias
+        .map(
+          (p) => {
+            'id': p['id'].toString(),
+            'nombre': p['nombre'].toString(),
+          },
+        )
+        .toList()
+      ..sort((a, b) => a['nombre']!.compareTo(b['nombre']!));
 
-  Future<void> _loadLocalidades(String partId) async {
-    final query = await db
-        .collection('cat_localidades')
-        .where('partido_id', isEqualTo: partId)
-        .get();
-    setState(() {
-      localidades = query.docs.map((d) => d.data()).toList();
-    });
-  }
+    final elegido = await SearchablePicker.pickSingle(
+      context: context,
+      titulo: 'Provincia',
+      opciones: opciones,
+      selectedId: selectedProvinciaId,
+      accent: primaryColor,
+      hintBuscar: 'Escribí el nombre de la provincia…',
+    );
+    if (elegido == null) return;
 
-  Future<void> _onProvinciaChanged(String? provId) async {
     setState(() {
-      selectedProvinciaId = provId;
+      selectedProvinciaId = elegido['id'];
+      selectedProvinciaNombre = elegido['nombre'];
       selectedPartidoId = null;
+      selectedPartidoNombre = null;
       selectedLocalidadId = null;
+      selectedLocalidadNombre = null;
       partidos = [];
       localidades = [];
     });
-    if (provId != null) await _loadPartidos(provId);
+
+    partidos = await CatalogoGeoCache.instance
+        .partidosDeProvincia(elegido['id']!);
+    if (mounted) setState(() {});
   }
 
-  Future<void> _onPartidoChanged(String? partId) async {
+  Future<void> _abrirPartido() async {
+    if (selectedProvinciaId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Primero elegí la provincia')),
+      );
+      return;
+    }
+
+    final opciones = partidos
+        .map(
+          (p) => {
+            'id': (p['departamento_id'] ?? p['id']).toString(),
+            'nombre': (p['departamento_nombre'] ?? p['nombre']).toString(),
+          },
+        )
+        .toList()
+      ..sort((a, b) => a['nombre']!.compareTo(b['nombre']!));
+
+    final elegido = await SearchablePicker.pickSingle(
+      context: context,
+      titulo: 'Partido / Departamento',
+      opciones: opciones,
+      selectedId: selectedPartidoId,
+      accent: primaryColor,
+      hintBuscar: 'Escribí el nombre del partido…',
+    );
+    if (elegido == null) return;
+
     setState(() {
-      selectedPartidoId = partId;
+      selectedPartidoId = elegido['id'];
+      selectedPartidoNombre = elegido['nombre'];
       selectedLocalidadId = null;
+      selectedLocalidadNombre = null;
       localidades = [];
     });
-    if (partId != null) await _loadLocalidades(partId);
+
+    localidades = await CatalogoGeoCache.instance
+        .localidadesDePartido(elegido['id']!);
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _abrirLocalidad() async {
+    if (selectedPartidoId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Primero elegí el partido')),
+      );
+      return;
+    }
+
+    final opciones = localidades
+        .map(
+          (l) => {
+            'id': (l['localidad_id'] ?? l['id']).toString(),
+            'nombre': (l['localidad_nombre'] ?? l['nombre']).toString(),
+          },
+        )
+        .toList()
+      ..sort((a, b) => a['nombre']!.compareTo(b['nombre']!));
+
+    final elegido = await SearchablePicker.pickSingle(
+      context: context,
+      titulo: 'Localidad',
+      opciones: opciones,
+      selectedId: selectedLocalidadId,
+      accent: primaryColor,
+      hintBuscar: 'Escribí el nombre de la localidad…',
+    );
+    if (elegido == null) return;
+
+    setState(() {
+      selectedLocalidadId = elegido['id'];
+      selectedLocalidadNombre = elegido['nombre'];
+    });
   }
 
   Future<void> _actualizarDatos() async {
@@ -183,43 +261,6 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
     setState(() => _saving = true);
 
     try {
-      String? provNombre;
-      String? partNombre;
-      String? locNombre;
-
-      if (selectedProvinciaId != null) {
-        final p = provincias
-            .where((e) => e['id'].toString() == selectedProvinciaId)
-            .toList();
-        if (p.isNotEmpty) provNombre = p.first['nombre']?.toString();
-      }
-      if (selectedPartidoId != null) {
-        final p = partidos
-            .where(
-              (e) =>
-                  (e['departamento_id'] ?? e['id']).toString() ==
-                  selectedPartidoId,
-            )
-            .toList();
-        if (p.isNotEmpty) {
-          partNombre =
-              (p.first['departamento_nombre'] ?? p.first['nombre'])?.toString();
-        }
-      }
-      if (selectedLocalidadId != null) {
-        final p = localidades
-            .where(
-              (e) =>
-                  (e['localidad_id'] ?? e['id']).toString() ==
-                  selectedLocalidadId,
-            )
-            .toList();
-        if (p.isNotEmpty) {
-          locNombre =
-              (p.first['localidad_nombre'] ?? p.first['nombre'])?.toString();
-        }
-      }
-
       await db.collection('usuarios').doc(uid).set({
         'calle': _calleController.text.trim(),
         'numero': _numeroController.text.trim(),
@@ -227,11 +268,11 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
         'cp': _cpController.text.trim(),
         'direccion_geo': {
           'provincia_id': selectedProvinciaId,
-          'provincia_nombre': provNombre,
+          'provincia_nombre': selectedProvinciaNombre,
           'partido_id': selectedPartidoId,
-          'partido_nombre': partNombre,
+          'partido_nombre': selectedPartidoNombre,
           'localidad_id': selectedLocalidadId,
-          'localidad_nombre': locNombre,
+          'localidad_nombre': selectedLocalidadNombre,
         },
         'updated_at': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -289,45 +330,20 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
                   _buildField('Calle', _calleController),
                   _buildField('Número', _numeroController),
                   _buildField('Piso / Departamento', _pisoController),
-                  _buildDropdown(
-                    'Provincia',
-                    selectedProvinciaId,
-                    provincias
-                        .map(
-                          (p) => MapEntry(
-                            p['id'].toString(),
-                            p['nombre'].toString(),
-                          ),
-                        )
-                        .toList(),
-                    _onProvinciaChanged,
+                  _buildGeoTile(
+                    label: 'Provincia',
+                    value: selectedProvinciaNombre ?? 'Buscar o elegir…',
+                    onTap: _abrirProvincia,
                   ),
-                  _buildDropdown(
-                    'Partido / Departamento',
-                    selectedPartidoId,
-                    partidos
-                        .map(
-                          (p) => MapEntry(
-                            (p['departamento_id'] ?? p['id']).toString(),
-                            (p['departamento_nombre'] ?? p['nombre'])
-                                .toString(),
-                          ),
-                        )
-                        .toList(),
-                    _onPartidoChanged,
+                  _buildGeoTile(
+                    label: 'Partido / Departamento',
+                    value: selectedPartidoNombre ?? 'Buscar o elegir…',
+                    onTap: _abrirPartido,
                   ),
-                  _buildDropdown(
-                    'Localidad',
-                    selectedLocalidadId,
-                    localidades
-                        .map(
-                          (l) => MapEntry(
-                            (l['localidad_id'] ?? l['id']).toString(),
-                            (l['localidad_nombre'] ?? l['nombre']).toString(),
-                          ),
-                        )
-                        .toList(),
-                    (v) => setState(() => selectedLocalidadId = v),
+                  _buildGeoTile(
+                    label: 'Localidad',
+                    value: selectedLocalidadNombre ?? 'Buscar o elegir…',
+                    onTap: _abrirLocalidad,
                   ),
                   _buildField(
                     'Código postal',
@@ -336,7 +352,7 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Si cargás calle y número, provincia, partido y localidad son obligatorios.',
+                    'Tocá provincia, partido o localidad para buscar escribiendo o desplazarte por la lista.',
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                   const SizedBox(height: 24),
@@ -390,27 +406,30 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
     );
   }
 
-  Widget _buildDropdown(
-    String label,
-    String? value,
-    List<MapEntry<String, String>> items,
-    ValueChanged<String?> onChanged,
-  ) {
+  Widget _buildGeoTile({
+    required String label,
+    required String value,
+    required VoidCallback onTap,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
-      child: DropdownButtonFormField<String>(
-        value: value != null && items.any((e) => e.key == value) ? value : null,
-        decoration: _dec(label),
-        items: items
-            .map(
-              (e) => DropdownMenuItem(
-                value: e.key,
-                child: Text(e.value, overflow: TextOverflow.ellipsis),
-              ),
-            )
-            .toList(),
-        onChanged: onChanged,
-        isExpanded: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: InputDecorator(
+          decoration: _dec(label).copyWith(
+            suffixIcon: const Icon(Icons.search),
+          ),
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 15,
+              color: value.startsWith('Buscar')
+                  ? Colors.grey.shade500
+                  : _textColor,
+            ),
+          ),
+        ),
       ),
     );
   }
