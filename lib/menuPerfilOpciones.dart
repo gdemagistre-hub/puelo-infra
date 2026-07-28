@@ -5,15 +5,13 @@ import 'especialidadesLaboralesflotante.dart';
 import 'ZonaDeTrabajoflotante.dart';
 import 'perfilCompletoflotante.dart';
 import 'registroTrabajador.dart';
+import 'consola_prox.dart';
+import 'user_session.dart';
 import 'theme/app_colors.dart';
 
 class MenuPerfilOpcionesWidget extends StatelessWidget {
   final VoidCallback? onClose;
-
-  /// true = muestra opciones de prestador; false = solo cliente
   final bool modoPrestador;
-
-  /// Se llama al volver del onboarding de oficios (para refrescar rol en Home)
   final VoidCallback? onRolPuedeHaberCambiado;
 
   const MenuPerfilOpcionesWidget({
@@ -107,6 +105,19 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
         onTap: () =>
             _abrirFlotante(context, const PerfilCompletoFlotanteWidget()),
       ),
+      // Solo administradores — gate client-side + reglas Firestore
+      if (UserSession().isAdmin)
+        _MenuItem(
+          icon: Icons.monitor_heart_outlined,
+          label: 'Consola Prox',
+          subtitle:
+              'Monitoreo de pantallas, demoras y abandono. Solo operadores.',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ConsolaProxWidget()),
+            );
+          },
+        ),
     ];
 
     return Container(
@@ -194,7 +205,10 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             border: item.destacado
-                ? Border.all(color: AppColors.prestador.withOpacity(0.45), width: 1.5)
+                ? Border.all(
+                    color: AppColors.prestador.withOpacity(0.45),
+                    width: 1.5,
+                  )
                 : null,
             boxShadow: [
               BoxShadow(
@@ -225,7 +239,9 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: item.destacado ? AppColors.prestador : AppColors.text,
+                        color: item.destacado
+                            ? AppColors.prestador
+                            : AppColors.text,
                       ),
                     ),
                     const SizedBox(height: 6),
