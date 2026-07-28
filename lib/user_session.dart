@@ -1,3 +1,5 @@
+import 'catalogo_geo_cache.dart';
+
 class UserSession {
   static final UserSession _instance = UserSession._internal();
   factory UserSession() => _instance;
@@ -24,6 +26,7 @@ class UserSession {
     apellido = null;
     datosCompletos = null;
     pendingValidacionToken = null;
+    CatalogoGeoCache.instance.clear();
   }
 
   String get nombreCompleto => '$nombre $apellido'.trim();
