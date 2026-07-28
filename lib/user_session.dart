@@ -1,4 +1,5 @@
 import 'catalogo_geo_cache.dart';
+import 'analytics/prox_analytics.dart';
 
 class UserSession {
   static final UserSession _instance = UserSession._internal();
@@ -20,7 +21,18 @@ class UserSession {
     datosCompletos = data;
   }
 
+  /// Admin de consola Prox (campo en Firestore usuarios/{id}).
+  bool get isAdmin {
+    final d = datosCompletos;
+    if (d == null) return false;
+    return d['es_admin'] == true || d['rol'] == 'admin';
+  }
+
   void cerrarSesion() {
+    // Cierra sesión de analytics sin PII
+    try {
+      ProxAnalytics.instance.endSession(reason: 'logout');
+    } catch (_) {}
     uid = null;
     nombre = null;
     apellido = null;
