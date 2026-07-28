@@ -6,6 +6,7 @@ import 'registroCuenta.dart';
 import 'pantalla_gracias_validacion.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_copy.dart';
+import 'analytics/prox_analytics.dart';
 
 class LoginScreenWidget extends StatefulWidget {
   const LoginScreenWidget({super.key});
@@ -39,6 +40,13 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
 
     UserSession().iniciarSesion(_selectedUserId!, _selectedUserData!);
 
+    final esPrestador = _selectedUserData!['es_trabajador'] == true ||
+        _selectedUserData!['rol'] == 'trabajador';
+    ProxAnalytics.instance.startSession(
+      role: esPrestador ? 'prestador' : 'cliente',
+    );
+    ProxAnalytics.instance.action('login_dev_dropdown', screen: '/login');
+
     if (UserSession().pendingValidacionToken != null) {
       Navigator.pushReplacement(
         context,
@@ -69,7 +77,6 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Dropdown de prueba — se mantiene hasta salir de la etapa de prueba
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -146,7 +153,6 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                     ),
                   ),
                   const SizedBox(height: 40),
-
                   Center(
                     child: Image.asset(
                       'assets/images/logo_prox_icon.png.png',
@@ -169,7 +175,6 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                     ),
                   ),
                   const SizedBox(height: 24),
-
                   Text(
                     AppCopy.welcomeTitle,
                     textAlign: TextAlign.center,
@@ -191,7 +196,6 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                     ),
                   ),
                   const SizedBox(height: 36),
-
                   _buildLoginButton(
                     onPressed: _irAHome,
                     icon: _buildIconCircle(
@@ -211,7 +215,6 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                     hasBorder: true,
                   ),
                   const SizedBox(height: 14),
-
                   _buildLoginButton(
                     onPressed: _irAHome,
                     icon: _buildIconCircle(
@@ -227,7 +230,6 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                     textColor: Colors.white,
                   ),
                   const SizedBox(height: 14),
-
                   _buildLoginButton(
                     onPressed: _irAHome,
                     icon: _buildIconCircle(
@@ -246,7 +248,6 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                     textColor: Colors.white,
                   ),
                   const SizedBox(height: 20),
-
                   Row(
                     children: [
                       Expanded(
@@ -265,7 +266,6 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                     ],
                   ),
                   const SizedBox(height: 20),
-
                   _buildLoginButton(
                     onPressed: _irAHome,
                     icon: _buildIconCircle(
@@ -283,7 +283,6 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                     borderColor: primaryColor.withOpacity(0.4),
                   ),
                   const SizedBox(height: 32),
-
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
