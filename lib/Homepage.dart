@@ -32,7 +32,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
   final TextEditingController _searchController = TextEditingController();
 
-  /// 0 = Home, 1 = Evaluar (push), 2 = Perfil
   int _currentIndex = 0;
 
   bool _modoPrestador = false;
@@ -106,7 +105,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     }
   }
 
-  /// Tras onboarding de oficios: relee Firestore y habilita modo prestador.
   Future<void> _refrescarRolDesdeFirestore() async {
     final uid = UserSession().uid;
     if (uid == null) return;
@@ -157,85 +155,27 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     await _refrescarRolDesdeFirestore();
   }
 
+  /// Solo lee stats/top_servicios. No barre prestadores en horario de uso.
   Future<void> _cargarTopServicios() async {
     setState(() => _cargandoServicios = true);
     try {
-      final statsRef =
-          FirebaseFirestore.instance.collection('stats').doc('top_servicios');
-      final statsDoc = await statsRef.get();
+      final statsDoc = await FirebaseFirestore.instance
+          .collection('stats')
+          .doc('top_servicios')
+          .get();
 
-      bool usarStats = false;
       List<String> ranking = [];
-
       if (statsDoc.exists) {
-        final data = statsDoc.data()!;
-        final actualizado = data['actualizado_en'];
-        DateTime? ts;
-        if (actualizado is Timestamp) ts = actualizado.toDate();
-
-        if (ts != null && DateTime.now().difference(ts).inHours < 24) {
-          ranking = (data['ranking'] as List<dynamic>? ?? [])
-              .map((e) => e.toString().toLowerCase().trim())
-              .where((s) => s.isNotEmpty)
-              .toList();
-          if (ranking.isNotEmpty) usarStats = true;
-        }
+        ranking = (statsDoc.data()!['ranking'] as List<dynamic>? ?? [])
+            .map((e) => e.toString().toLowerCase().trim())
+            .where((s) => s.isNotEmpty)
+            .toList();
       }
-
-      if (!usarStats) {
-        ranking = await _recalcularYGuardarRanking(statsRef);
-      }
-
       _aplicarRanking(ranking.isNotEmpty ? ranking : _fallbackOrden);
     } catch (e) {
       debugPrint('Error cargando top servicios: $e');
       _aplicarRanking(_fallbackOrden);
     }
-  }
-
-  Future<List<String>> _recalcularYGuardarRanking(
-    DocumentReference statsRef,
-  ) async {
-    final counts = <String, int>{};
-
-    final snap = await FirebaseFirestore.instance
-        .collection('usuarios')
-        .where('es_trabajador', isEqualTo: true)
-        .limit(500)
-        .get();
-
-    for (final doc in snap.docs) {
-      final profs = doc.data()['profesiones'] as List<dynamic>? ?? [];
-      for (final p in profs) {
-        final key = p.toString().toLowerCase().trim();
-        if (key.isEmpty) continue;
-        if (!_metaServicios.containsKey(key)) continue;
-        counts[key] = (counts[key] ?? 0) + 1;
-      }
-    }
-
-    final sorted = counts.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-
-    final ranking = sorted.map((e) => e.key).take(8).toList();
-
-    for (final k in _fallbackOrden) {
-      if (ranking.length >= 8) break;
-      if (!ranking.contains(k)) ranking.add(k);
-    }
-
-    try {
-      await statsRef.set({
-        'ranking': ranking,
-        'actualizado_en': FieldValue.serverTimestamp(),
-        'fuente': 'app_auto',
-        'total_prestadores_muestra': snap.docs.length,
-      });
-    } catch (e) {
-      debugPrint('No se pudo guardar stats/top_servicios: $e');
-    }
-
-    return ranking;
   }
 
   void _aplicarRanking(List<String> claves) {
@@ -462,14 +402,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
-  }
-
-  void _cerrarSesion() {
-    UserSession().cerrarSesion();
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const LoginScreenWidget()),
-    );
   }
 
   void _compartirTarjeta() async {
@@ -735,7 +667,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // CTA para quien quiere vender (visible en <5s si no es prestador)
           if (!_puedeSerAmbos)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -799,7 +730,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                 ),
               ),
             ),
-
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(
@@ -830,7 +760,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Text(
-              'Actualizados según demanda de las últimas 24 hs',
+              'Según ranking diario de demanda',
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
           ),
@@ -1157,12 +1087,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       );
     }
 
-    final Color bg = _estaVisible
-        ? const Color(0xFFECFDF5)
-        : const Color(0xFFFFF7ED);
-    final Color border = _estaVisible
-        ? const Color(0xFF6EE7B7)
-        : const Color(0xFFFDBA74);
+    final Color bg =
+        _estaVisible ? const Color(0xFFECFDF5) : const Color(0xFFFFF7ED);
+    final Color border =
+        _estaVisible ? const Color(0xFF6EE7B7) : const Color(0xFFFDBA74);
     final Color iconColor =
         _estaVisible ? const Color(0xFF059669) : const Color(0xFFEA580C);
     final String titulo = _estaVisible
