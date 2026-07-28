@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_session.dart';
+import 'widgets/searchable_picker.dart';
+import 'catalogo_geo_cache.dart';
 
 class ZonaDeTrabajoFlotanteWidget extends StatefulWidget {
   const ZonaDeTrabajoFlotanteWidget({super.key});
@@ -12,7 +14,6 @@ class ZonaDeTrabajoFlotanteWidget extends StatefulWidget {
 
 class _ZonaDeTrabajoFlotanteWidgetState
     extends State<ZonaDeTrabajoFlotanteWidget> {
-  // Look & feel prestador
   static const Color primaryColor = Color(0xFF28B5CD);
   static const Color _bg = Color(0xFFF8FAFC);
   static const Color _textColor = Color(0xFF1E293B);
@@ -53,11 +54,7 @@ class _ZonaDeTrabajoFlotanteWidgetState
   }
 
   Future<void> _cargarProvincias() async {
-    final doc = await db.collection('cat_paises').doc('AR').get();
-    if (doc.exists && doc.data()!.containsKey('provincias')) {
-      _todasLasProvincias =
-          List<Map<String, dynamic>>.from(doc.data()!['provincias']);
-    }
+    _todasLasProvincias = await CatalogoGeoCache.instance.provinciasAR();
   }
 
   Future<void> _cargarDatosUsuario() async {
@@ -110,18 +107,18 @@ class _ZonaDeTrabajoFlotanteWidgetState
     setState(() => _cargandoZonas = true);
 
     try {
-      final depQuery = await db
-          .collection('cat_departamentos')
-          .where('provincia_id', isEqualTo: provId)
-          .get();
+      final partidos =
+          await CatalogoGeoCache.instance.partidosDeProvincia(provId);
 
+      // Localidades por provincia: se obtienen de todos los partidos en cache
+      // o una query directa por provincia_id si existe ese campo.
       final locQuery = await db
           .collection('cat_localidades')
           .where('provincia_id', isEqualTo: provId)
           .get();
 
       setState(() {
-        _partidosDeProvincia = depQuery.docs.map((d) => d.data()).toList();
+        _partidosDeProvincia = partidos;
         _localidadesDeProvincia = locQuery.docs.map((d) => d.data()).toList();
 
         if (limpiarSeleccion) {
@@ -165,140 +162,74 @@ class _ZonaDeTrabajoFlotanteWidgetState
     });
   }
 
-  void _mostrarSeleccionUnica({
-    required String titulo,
-    required List<Map<String, String>> opciones,
-    required void Function(Map<String, String>) onConfirm,
-  }) {
-    showDialog(
+  Future<void> _abrirProvincia() async {
+    final opciones = _todasLasProvincias
+        .map(
+          (p) => {
+            'id': p['id'].toString(),
+            'nombre': p['nombre'].toString(),
+          },
+        )
+        .toList()
+      ..sort((a, b) => a['nombre']!.compareTo(b['nombre']!));
+
+    final elegido = await SearchablePicker.pickSingle(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Text(
-            titulo,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: _textColor,
-            ),
-          ),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: opciones.length,
-              itemBuilder: (context, index) {
-                return ListTile(
-                  title: Text(
-                    opciones[index]['nombre']!,
-                    style: const TextStyle(color: _textColor),
-                  ),
-                  onTap: () {
-                    onConfirm(opciones[index]);
-                    Navigator.pop(context);
-                  },
-                );
-              },
-            ),
-          ),
-        );
-      },
+      titulo: 'Seleccionar provincia',
+      opciones: opciones,
+      selectedId: _provinciaId,
+      accent: primaryColor,
+      hintBuscar: 'Ej: Buenos Aires, Córdoba…',
     );
+    if (elegido != null) await _seleccionarProvincia(elegido);
   }
 
-  void _mostrarSeleccionMultiple({
-    required String titulo,
-    required List<Map<String, String>> opciones,
-    required List<Map<String, String>> seleccionadas,
-    required void Function(List<Map<String, String>>) onConfirm,
-  }) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        List<Map<String, String>> temp = List.from(seleccionadas);
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              title: Text(
-                titulo,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: _textColor,
-                ),
-              ),
-              content: SizedBox(
-                width: double.maxFinite,
-                child: opciones.isEmpty
-                    ? const Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Text(
-                          'Primero debés seleccionar el filtro anterior.',
-                          textAlign: TextAlign.center,
-                        ),
-                      )
-                    : ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: opciones.length,
-                        itemBuilder: (context, index) {
-                          final item = opciones[index];
-                          final isChecked =
-                              temp.any((e) => e['id'] == item['id']);
-                          return CheckboxListTile(
-                            title: Text(
-                              item['nombre']!,
-                              style: const TextStyle(color: _textColor),
-                            ),
-                            value: isChecked,
-                            activeColor: primaryColor,
-                            onChanged: (checked) {
-                              setDialogState(() {
-                                if (checked == true) {
-                                  temp.add(item);
-                                } else {
-                                  temp.removeWhere(
-                                    (e) => e['id'] == item['id'],
-                                  );
-                                }
-                              });
-                            },
-                          );
-                        },
-                      ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(
-                    'Cancelar',
-                    style: TextStyle(color: Colors.grey.shade600),
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    onConfirm(temp);
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: const Text('Confirmar'),
-                ),
-              ],
-            );
+  Future<void> _abrirPartidos() async {
+    final opciones = _partidosDeProvincia
+        .map(
+          (p) => {
+            'id': (p['departamento_id'] ?? p['id']).toString(),
+            'nombre': (p['departamento_nombre'] ?? p['nombre']).toString(),
           },
-        );
-      },
+        )
+        .toList()
+      ..sort((a, b) => a['nombre']!.compareTo(b['nombre']!));
+
+    final res = await SearchablePicker.pickMulti(
+      context: context,
+      titulo: 'Seleccionar partidos',
+      opciones: opciones,
+      seleccionadas: _partidosSeleccionados,
+      accent: primaryColor,
+      hintBuscar: 'Escribí el nombre del partido…',
     );
+    if (res != null) _actualizarPartidos(res);
+  }
+
+  Future<void> _abrirLocalidades() async {
+    final idsPartidos = _partidosSeleccionados.map((p) => p['id']).toSet();
+    final filtradas = _localidadesDeProvincia.where(
+      (l) => idsPartidos.contains(l['partido_id']?.toString()),
+    );
+    final opciones = filtradas
+        .map(
+          (l) => {
+            'id': (l['localidad_id'] ?? l['id']).toString(),
+            'nombre': (l['localidad_nombre'] ?? l['nombre']).toString(),
+          },
+        )
+        .toList()
+      ..sort((a, b) => a['nombre']!.compareTo(b['nombre']!));
+
+    final res = await SearchablePicker.pickMulti(
+      context: context,
+      titulo: 'Seleccionar localidades',
+      opciones: opciones,
+      seleccionadas: _localidadesSeleccionadas,
+      accent: primaryColor,
+      hintBuscar: 'Escribí el nombre de la localidad…',
+    );
+    if (res != null) setState(() => _localidadesSeleccionadas = res);
   }
 
   Future<void> _actualizarDatos() async {
@@ -388,7 +319,7 @@ class _ZonaDeTrabajoFlotanteWidgetState
                       SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Definí dónde ofrecés tus servicios. Los clientes te encuentran por estas zonas.',
+                          'Definí dónde ofrecés tus servicios. Podés buscar escribiendo el nombre.',
                           style: TextStyle(
                             fontSize: 13,
                             color: _textColor,
@@ -409,7 +340,6 @@ class _ZonaDeTrabajoFlotanteWidgetState
                   ),
                 ),
                 const SizedBox(height: 12),
-
                 _buildSelectorWidget(
                   label: 'País',
                   valor: _paisNombre,
@@ -417,24 +347,9 @@ class _ZonaDeTrabajoFlotanteWidgetState
                 ),
                 _buildSelectorWidget(
                   label: 'Provincia',
-                  valor: _provinciaNombre ?? 'Seleccionar provincia',
-                  onTap: () {
-                    final opciones = _todasLasProvincias
-                        .map(
-                          (p) => {
-                            'id': p['id'].toString(),
-                            'nombre': p['nombre'].toString(),
-                          },
-                        )
-                        .toList();
-                    _mostrarSeleccionUnica(
-                      titulo: 'Seleccionar provincia',
-                      opciones: opciones,
-                      onConfirm: _seleccionarProvincia,
-                    );
-                  },
+                  valor: _provinciaNombre ?? 'Buscar o elegir provincia',
+                  onTap: _abrirProvincia,
                 ),
-
                 if (_cargandoZonas)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 12),
@@ -442,74 +357,28 @@ class _ZonaDeTrabajoFlotanteWidgetState
                       child: CircularProgressIndicator(color: primaryColor),
                     ),
                   ),
-
                 _buildSelectorWidget(
                   label: 'Partidos / Departamentos',
                   valor: _partidosSeleccionados.isEmpty
-                      ? 'Seleccionar (múltiples)'
+                      ? 'Buscar o elegir (múltiples)'
                       : _partidosSeleccionados
                           .map((e) => e['nombre'])
                           .join(', '),
                   onTap: _provinciaId == null || _cargandoZonas
                       ? null
-                      : () {
-                          final opciones = _partidosDeProvincia
-                              .map(
-                                (p) => {
-                                  'id': (p['departamento_id'] ?? p['id'])
-                                      .toString(),
-                                  'nombre': (p['departamento_nombre'] ??
-                                          p['nombre'])
-                                      .toString(),
-                                },
-                              )
-                              .toList();
-                          _mostrarSeleccionMultiple(
-                            titulo: 'Seleccionar partidos',
-                            opciones: opciones,
-                            seleccionadas: _partidosSeleccionados,
-                            onConfirm: _actualizarPartidos,
-                          );
-                        },
+                      : _abrirPartidos,
                 ),
                 _buildSelectorWidget(
                   label: 'Localidades',
                   valor: _localidadesSeleccionadas.isEmpty
-                      ? 'Seleccionar localidades (múltiples)'
+                      ? 'Buscar o elegir localidades'
                       : _localidadesSeleccionadas
                           .map((e) => e['nombre'])
                           .join(', '),
                   onTap: _partidosSeleccionados.isEmpty || _cargandoZonas
                       ? null
-                      : () {
-                          final idsPartidos =
-                              _partidosSeleccionados.map((p) => p['id']).toSet();
-                          final filtradas = _localidadesDeProvincia.where(
-                            (l) => idsPartidos
-                                .contains(l['partido_id']?.toString()),
-                          );
-                          final opciones = filtradas
-                              .map(
-                                (l) => {
-                                  'id': (l['localidad_id'] ?? l['id'])
-                                      .toString(),
-                                  'nombre': (l['localidad_nombre'] ??
-                                          l['nombre'])
-                                      .toString(),
-                                },
-                              )
-                              .toList();
-                          _mostrarSeleccionMultiple(
-                            titulo: 'Seleccionar localidades',
-                            opciones: opciones,
-                            seleccionadas: _localidadesSeleccionadas,
-                            onConfirm: (res) {
-                              setState(() => _localidadesSeleccionadas = res);
-                            },
-                          );
-                        },
+                      : _abrirLocalidades,
                 ),
-
                 if (_partidosSeleccionados.isNotEmpty ||
                     _localidadesSeleccionadas.isNotEmpty) ...[
                   const SizedBox(height: 8),
@@ -548,7 +417,6 @@ class _ZonaDeTrabajoFlotanteWidgetState
                     ],
                   ),
                 ],
-
                 const SizedBox(height: 28),
                 SizedBox(
                   width: double.infinity,
@@ -638,7 +506,7 @@ class _ZonaDeTrabajoFlotanteWidgetState
                 ),
               ),
               Icon(
-                Icons.arrow_drop_down,
+                Icons.search,
                 color: onTap == null
                     ? Colors.grey.shade300
                     : Colors.grey.shade500,
