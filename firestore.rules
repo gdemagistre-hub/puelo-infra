@@ -1,0 +1,56 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- helpers ----------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Admin vía custom claim (preferido) o documento usuarios/{uid}.es_admin
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.admin == true ||
+        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.es_admin == true
+      );
+    }
+
+    function analyticsKeysOk() {
+      let forbidden = ['email', 'telefono', 'phone', 'celular', 'nombre', 'apellido',
+                       'documento', 'dni', 'calle', 'password', 'token', 'whatsapp'];
+      return !request.resource.data.keys().hasAny(forbidden);
+    }
+
+    function analyticsSizeOk() {
+      return request.resource.data.keys().size() <= 24;
+    }
+
+    // ---------- analytics (escritura acotada, lectura solo admin) ----------
+    match /analytics_events/{id} {
+      // Sin Auth en MVP: create abierto pero SIN lectura pública y sin campos PII.
+      // Cuando activen Firebase Auth, preferir: allow create: if isSignedIn() && analyticsKeysOk();
+      allow create: if analyticsKeysOk() && analyticsSizeOk()
+        && request.resource.data.type is string
+        && request.resource.data.session_id is string;
+
+      allow read: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // Agregados de consola / batch
+    match /stats/{doc} {
+      allow read: if true; // top_servicios es público de producto
+      allow write: if isAdmin();
+    }
+
+    // Usuarios: ajustar a su modelo real cuando haya Auth
+    match /usuarios/{userId} {
+      allow read: if true;
+      allow write: if true; // TEMPORAL MVP — reemplazar con isSignedIn() && request.auth.uid == userId
+    }
+
+    match /{document=**} {
+      allow read, write: if true; // TEMPORAL: alinear con Auth real antes de producción masiva
+    }
+  }
+}
