@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -5,14 +7,18 @@ import 'tarjetaDigital.dart';
 import 'scoring_service.dart';
 import 'theme/app_copy.dart';
 import 'user_session.dart';
+import 'catalogo_geo_cache.dart';
 
+/// Buscador optimizado para pico laboral:
+/// - get() + RefreshIndicator (no stream de 400)
+/// - array-contains por oficio cuando el chip ≠ Todos
+/// - páginas de 30 + "Ver más"
+/// - debounce 350ms en texto
+/// - catálogos geo vía CatalogoGeoCache
 class BuscadorPrestadoresWidget extends StatefulWidget {
   final String? initialQuery;
 
-  const BuscadorPrestadoresWidget({
-    super.key,
-    this.initialQuery,
-  });
+  const BuscadorPrestadoresWidget({super.key, this.initialQuery});
 
   static const String routeName = 'BuscadorPrestadores';
   static const String routePath = '/buscadorPrestadores';
@@ -30,17 +36,20 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
   static const Color _bg = Color(0xFFF8FAFC);
   static const Color _textColor = Color(0xFF1E293B);
   static const Color _whatsapp = Color(0xFF25D366);
+  static const int _pageSize = 30;
 
-  final scaffoldKey = GlobalKey<ScaffoldState>();
   final db = FirebaseFirestore.instance;
+  final _searchController = TextEditingController();
+  final _provinciaController = TextEditingController();
+  final _partidoController = TextEditingController();
+  final _localidadController = TextEditingController();
 
-  late String _searchQuery;
-  final TextEditingController _searchController = TextEditingController();
-
+  Timer? _debounce;
+  String _searchQuery = '';
   bool _filtrosAbiertos = false;
 
   String _selectedRubro = 'Todos';
-  final List<String> _rubros = [
+  final List<String> _rubros = const [
     'Todos',
     'Electricista',
     'Plomero',
@@ -74,16 +83,10 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     'limpieza': 'Limpieza',
   };
 
-  final TextEditingController _provinciaController = TextEditingController();
-  final TextEditingController _partidoController = TextEditingController();
-  final TextEditingController _localidadController = TextEditingController();
-
-  /// Filtros duros (usuario en panel Filtros)
   String? selectedProvinciaId;
   String? selectedPartidoId;
   String? selectedLocalidadId;
 
-  /// Preferencia suave desde domicilio del cliente (solo ranking)
   String? _prefProvinciaId;
   String? _prefPartidoId;
   String? _prefLocalidadId;
@@ -96,19 +99,34 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
   List<Map<String, dynamic>> partidos = [];
   List<Map<String, dynamic>> localidades = [];
 
+  List<QueryDocumentSnapshot> _docs = [];
+  DocumentSnapshot? _lastDoc;
+  bool _loading = true;
+  bool _loadingMore = false;
+  bool _hasMore = true;
+  String? _error;
+
   @override
   void initState() {
     super.initState();
     final initial = widget.initialQuery?.trim() ?? '';
     _searchQuery = initial.toLowerCase();
     _searchController.text = initial;
-
-    // Mapear texto del Home al chip de oficio
     _selectedRubro = _rubroDesdeQuery(initial);
-
     _filtrosAbiertos = initial.isEmpty;
     _cargarPreferenciaZonaCliente();
     _loadProvincias();
+    _cargarPrestadores(reset: true);
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    _provinciaController.dispose();
+    _partidoController.dispose();
+    _localidadController.dispose();
+    super.dispose();
   }
 
   String _rubroDesdeQuery(String q) {
@@ -117,15 +135,14 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     for (final r in _rubros) {
       if (r.toLowerCase() == t) return r;
     }
-    // labels / claves
     for (final e in _labelOficio.entries) {
       if (e.value.toLowerCase() == t || e.key == t) {
-        final match = _rubros.where(
-          (r) =>
-              r.toLowerCase() == e.value.toLowerCase() ||
-              (_rubroToProfesion[r] ?? '') == e.key,
-        );
-        if (match.isNotEmpty) return match.first;
+        for (final r in _rubros) {
+          if (r.toLowerCase() == e.value.toLowerCase() ||
+              (_rubroToProfesion[r] ?? '') == e.key) {
+            return r;
+          }
+        }
       }
     }
     for (final e in _rubroToProfesion.entries) {
@@ -136,58 +153,38 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
 
   void _cargarPreferenciaZonaCliente() {
     final data = UserSession().datosCompletos;
-    if (data == null) return;
-
-    final geo = data['direccion_geo'] as Map<String, dynamic>?;
+    final geo = data?['direccion_geo'] as Map<String, dynamic>?;
     if (geo == null) return;
-
     final provId = (geo['provincia_id'] ?? '').toString().trim();
     final partId = (geo['partido_id'] ?? '').toString().trim();
     final locId = (geo['localidad_id'] ?? '').toString().trim();
-
     if (provId.isEmpty && partId.isEmpty && locId.isEmpty) return;
-
     _prefProvinciaId = provId.isEmpty ? null : provId;
     _prefPartidoId = partId.isEmpty ? null : partId;
     _prefLocalidadId = locId.isEmpty ? null : locId;
     _prefProvinciaNombre =
         (geo['provincia_nombre'] ?? '').toString().trim().isEmpty
             ? null
-            : (geo['provincia_nombre'] ?? '').toString().trim();
+            : geo['provincia_nombre'].toString().trim();
     _prefPartidoNombre =
         (geo['partido_nombre'] ?? '').toString().trim().isEmpty
             ? null
-            : (geo['partido_nombre'] ?? '').toString().trim();
+            : geo['partido_nombre'].toString().trim();
     _prefLocalidadNombre =
         (geo['localidad_nombre'] ?? '').toString().trim().isEmpty
             ? null
-            : (geo['localidad_nombre'] ?? '').toString().trim();
+            : geo['localidad_nombre'].toString().trim();
     _tienePreferenciaZona = true;
   }
 
-  @override
-  void dispose() {
-    _searchController.dispose();
-    _provinciaController.dispose();
-    _partidoController.dispose();
-    _localidadController.dispose();
-    super.dispose();
-  }
-
   Future<void> _loadProvincias() async {
-    final doc = await db.collection('cat_paises').doc('AR').get();
-    if (doc.exists && doc.data()!.containsKey('provincias')) {
-      setState(() {
-        provincias =
-            List<Map<String, dynamic>>.from(doc.data()!['provincias']);
-      });
-    }
+    final list = await CatalogoGeoCache.instance.provinciasAR();
+    if (mounted) setState(() => provincias = list);
   }
 
   Future<void> _onProvinciaSelected(String? provId) async {
     _partidoController.clear();
     _localidadController.clear();
-
     setState(() {
       selectedProvinciaId = provId;
       selectedPartidoId = null;
@@ -195,38 +192,21 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
       partidos = [];
       localidades = [];
     });
-
     if (provId == null) return;
-
-    final query = await db
-        .collection('cat_departamentos')
-        .where('provincia_id', isEqualTo: provId)
-        .get();
-
-    setState(() {
-      partidos = query.docs.map((d) => d.data()).toList();
-    });
+    final list = await CatalogoGeoCache.instance.partidosDeProvincia(provId);
+    if (mounted) setState(() => partidos = list);
   }
 
   Future<void> _onPartidoSelected(String? partId) async {
     _localidadController.clear();
-
     setState(() {
       selectedPartidoId = partId;
       selectedLocalidadId = null;
       localidades = [];
     });
-
     if (partId == null) return;
-
-    final query = await db
-        .collection('cat_localidades')
-        .where('partido_id', isEqualTo: partId)
-        .get();
-
-    setState(() {
-      localidades = query.docs.map((d) => d.data()).toList();
-    });
+    final list = await CatalogoGeoCache.instance.localidadesDePartido(partId);
+    if (mounted) setState(() => localidades = list);
   }
 
   void _limpiarFiltrosZona() {
@@ -242,6 +222,87 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     });
   }
 
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      setState(() => _searchQuery = value.toLowerCase().trim());
+    });
+  }
+
+  void _onRubroSelected(String rubro) {
+    if (_selectedRubro == rubro) return;
+    setState(() => _selectedRubro = rubro);
+    _cargarPrestadores(reset: true);
+  }
+
+  Future<void> _cargarPrestadores({required bool reset}) async {
+    if (reset) {
+      setState(() {
+        _loading = true;
+        _error = null;
+        _docs = [];
+        _lastDoc = null;
+        _hasMore = true;
+      });
+    } else {
+      if (!_hasMore || _loadingMore) return;
+      setState(() => _loadingMore = true);
+    }
+
+    try {
+      Query query = db
+          .collection('usuarios')
+          .where('es_trabajador', isEqualTo: true);
+
+      if (_selectedRubro != 'Todos') {
+        final clave = _rubroToProfesion[_selectedRubro] ??
+            _selectedRubro.toLowerCase();
+        query = query.where('profesiones', arrayContains: clave);
+      }
+
+      query = query.limit(_pageSize);
+      if (!reset && _lastDoc != null) {
+        query = query.startAfterDocument(_lastDoc!);
+      }
+
+      final snap = await query.get();
+      if (!mounted) return;
+
+      setState(() {
+        if (reset) {
+          _docs = snap.docs;
+        } else {
+          _docs = [..._docs, ...snap.docs];
+        }
+        _lastDoc = snap.docs.isNotEmpty ? snap.docs.last : _lastDoc;
+        _hasMore = snap.docs.length >= _pageSize;
+        _loading = false;
+        _loadingMore = false;
+        _error = null;
+      });
+    } catch (e) {
+      debugPrint('Error buscador: $e');
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadingMore = false;
+        _error = e.toString();
+      });
+    }
+  }
+
+  String _telefonoDe(Map<String, dynamic> data) =>
+      (data['telefono'] ?? data['celular'] ?? '').toString().trim();
+
+  bool _tieneWhatsApp(Map<String, dynamic> data) {
+    if (_telefonoDe(data).isEmpty) return false;
+    if (data.containsKey('tiene_whatsapp')) {
+      return data['tiene_whatsapp'] == true;
+    }
+    return true;
+  }
+
   String _initials(Map<String, dynamic> data) {
     final n = (data['nombre'] ?? '').toString().trim();
     final a = (data['apellido'] ?? '').toString().trim();
@@ -251,25 +312,11 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     return '${n[0]}${a[0]}'.toUpperCase();
   }
 
-  String _telefonoDe(Map<String, dynamic> data) {
-    return (data['telefono'] ?? data['celular'] ?? '').toString().trim();
-  }
-
-  bool _tieneWhatsApp(Map<String, dynamic> data) {
-    final tel = _telefonoDe(data);
-    if (tel.isEmpty) return false;
-    if (data.containsKey('tiene_whatsapp')) {
-      return data['tiene_whatsapp'] == true;
-    }
-    return true;
-  }
-
   String _labelsOficios(List<dynamic> profesiones) {
     if (profesiones.isEmpty) return 'Prestador';
-    return profesiones.map((e) {
-      final k = e.toString().toLowerCase().trim();
-      return _labelOficio[k] ?? e.toString();
-    }).join(', ');
+    return profesiones
+        .map((e) => _labelOficio[e.toString().toLowerCase().trim()] ?? e.toString())
+        .join(', ');
   }
 
   String _zonaResumen(Map<String, dynamic> data) {
@@ -287,8 +334,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
           .join(', ');
       if (nombres.isNotEmpty) return nombres;
     }
-    final pn = (cobertura['provincia_nombre'] ?? '').toString();
-    return pn;
+    return (cobertura['provincia_nombre'] ?? '').toString();
   }
 
   Future<void> _abrirWhatsApp(Map<String, dynamic> data) async {
@@ -308,94 +354,63 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     final url = Uri.parse('https://wa.me/$tel?text=$mensaje');
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo abrir WhatsApp')),
-        );
-      }
     }
   }
 
-  bool _matchLocalidadCobertura(
-    Map<String, dynamic>? cobertura,
-    String? locId,
-    String? locNombre,
-  ) {
-    if (cobertura == null) return false;
-    final locs = cobertura['localidades'] as List<dynamic>? ?? [];
+  bool _matchLoc(Map<String, dynamic>? c, String? id, String? nom) {
+    if (c == null) return false;
+    final locs = c['localidades'] as List<dynamic>? ?? [];
     return locs.any((l) {
       if (l is! Map) return false;
-      final id = (l['id'] ?? l['localidad_id'] ?? '').toString();
-      final nombre =
+      final lid = (l['id'] ?? l['localidad_id'] ?? '').toString();
+      final ln =
           (l['nombre'] ?? l['localidad_nombre'] ?? '').toString().toLowerCase();
-      if (locId != null && locId.isNotEmpty && id == locId) return true;
-      if (locNombre != null &&
-          locNombre.isNotEmpty &&
-          nombre == locNombre.toLowerCase()) {
-        return true;
-      }
+      if (id != null && id.isNotEmpty && lid == id) return true;
+      if (nom != null && nom.isNotEmpty && ln == nom.toLowerCase()) return true;
       return false;
     });
   }
 
-  bool _matchPartidoCobertura(
-    Map<String, dynamic>? cobertura,
-    String? partId,
-    String? partNombre,
-  ) {
-    if (cobertura == null) return false;
-    final partidos = cobertura['partidos'] as List<dynamic>? ?? [];
-    final locs = cobertura['localidades'] as List<dynamic>? ?? [];
-
-    final byPartido = partidos.any((p) {
+  bool _matchPart(Map<String, dynamic>? c, String? id, String? nom) {
+    if (c == null) return false;
+    final partidos = c['partidos'] as List<dynamic>? ?? [];
+    final locs = c['localidades'] as List<dynamic>? ?? [];
+    if (partidos.any((p) {
       if (p is! Map) return false;
-      final id = (p['id'] ?? p['partido_id'] ?? p['departamento_id'] ?? '')
-          .toString();
-      final nombre =
-          (p['nombre'] ?? p['partido_nombre'] ?? p['departamento_nombre'] ?? '')
-              .toString()
-              .toLowerCase();
-      if (partId != null && partId.isNotEmpty && id == partId) return true;
-      if (partNombre != null &&
-          partNombre.isNotEmpty &&
-          nombre == partNombre.toLowerCase()) {
-        return true;
-      }
+      final pid =
+          (p['id'] ?? p['partido_id'] ?? p['departamento_id'] ?? '').toString();
+      final pn = (p['nombre'] ??
+              p['partido_nombre'] ??
+              p['departamento_nombre'] ??
+              '')
+          .toString()
+          .toLowerCase();
+      if (id != null && id.isNotEmpty && pid == id) return true;
+      if (nom != null && nom.isNotEmpty && pn == nom.toLowerCase()) return true;
       return false;
-    });
-    if (byPartido) return true;
-
-    return locs.any((l) {
-      if (l is! Map) return false;
-      final pid = (l['partido_id'] ?? '').toString();
-      return partId != null && partId.isNotEmpty && pid == partId;
-    });
-  }
-
-  bool _matchProvinciaCobertura(
-    Map<String, dynamic>? cobertura,
-    String? provId,
-    String? provNombre,
-  ) {
-    if (cobertura == null) return false;
-    final pid = (cobertura['provincia_id'] ?? '').toString();
-    final pn = (cobertura['provincia_nombre'] ?? '').toString().toLowerCase();
-    if (provId != null && provId.isNotEmpty && pid == provId) return true;
-    if (provNombre != null &&
-        provNombre.isNotEmpty &&
-        pn == provNombre.toLowerCase()) {
+    })) {
       return true;
     }
+    return locs.any((l) {
+      if (l is! Map) return false;
+      return id != null &&
+          id.isNotEmpty &&
+          (l['partido_id'] ?? '').toString() == id;
+    });
+  }
+
+  bool _matchProv(Map<String, dynamic>? c, String? id, String? nom) {
+    if (c == null) return false;
+    final pid = (c['provincia_id'] ?? '').toString();
+    final pn = (c['provincia_nombre'] ?? '').toString().toLowerCase();
+    if (id != null && id.isNotEmpty && pid == id) return true;
+    if (nom != null && nom.isNotEmpty && pn == nom.toLowerCase()) return true;
     return false;
   }
 
-  /// Ranking: cercanía (preferencia cliente o filtros) >> WhatsApp >> estrellas >> badge
   int _scoreOrden(Map<String, dynamic> data) {
     int s = 0;
     final cobertura = data['zonas_cobertura'] as Map<String, dynamic>?;
-
-    // 1) Filtros manuales (si el usuario eligió zona en el panel)
     final useProv = selectedProvinciaId ?? _prefProvinciaId;
     final usePart = selectedPartidoId ?? _prefPartidoId;
     final useLoc = selectedLocalidadId ?? _prefLocalidadId;
@@ -406,37 +421,76 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
         selectedProvinciaId != null ? null : _prefProvinciaNombre;
 
     if (useLoc != null || (useLocNom != null && useLocNom.isNotEmpty)) {
-      if (_matchLocalidadCobertura(cobertura, useLoc, useLocNom)) {
-        s += 300;
-      }
+      if (_matchLoc(cobertura, useLoc, useLocNom)) s += 300;
     }
     if (usePart != null || (usePartNom != null && usePartNom.isNotEmpty)) {
-      if (_matchPartidoCobertura(cobertura, usePart, usePartNom)) {
-        s += 180;
-      }
+      if (_matchPart(cobertura, usePart, usePartNom)) s += 180;
     }
     if (useProv != null || (useProvNom != null && useProvNom.isNotEmpty)) {
-      if (_matchProvinciaCobertura(cobertura, useProv, useProvNom)) {
-        s += 80;
-      }
+      if (_matchProv(cobertura, useProv, useProvNom)) s += 80;
     }
-
-    // Penalizar levemente a quien no tiene zona cargada (menos útil al cliente)
     if (cobertura == null) s -= 20;
-
     if (_tieneWhatsApp(data) && _telefonoDe(data).isNotEmpty) s += 25;
-
     final evals = (data['cantidadEvaluadores'] as num?)?.toInt() ?? 0;
     final prom = (data['promedioEstrellas'] as num?)?.toDouble() ?? 0.0;
-    s += (prom * 2).round().toInt();
+    s += (prom * 2).round();
     if (evals > 0) s += 5;
-
     final badge = (data['badge_prestador'] ?? '').toString();
     if (badge == 'plata') s += 15;
     if (badge == 'bronce_plus' || badge == 'bronce+') s += 10;
     if (badge == 'bronce') s += 6;
     if (badge == 'registrado') s += 3;
     return s;
+  }
+
+  bool _pasaFiltrosZona(Map<String, dynamic> data) {
+    final hay = selectedProvinciaId != null ||
+        selectedPartidoId != null ||
+        selectedLocalidadId != null;
+    if (!hay) return true;
+    final cobertura = data['zonas_cobertura'] as Map<String, dynamic>?;
+    if (cobertura == null) return false;
+    if (selectedLocalidadId != null) {
+      return _matchLoc(cobertura, selectedLocalidadId, null);
+    }
+    if (selectedPartidoId != null) {
+      return _matchPart(cobertura, selectedPartidoId, null);
+    }
+    if (selectedProvinciaId != null) {
+      return _matchProv(cobertura, selectedProvinciaId, null);
+    }
+    return true;
+  }
+
+  List<QueryDocumentSnapshot> get _filtrados {
+    var list = _docs.where((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      if (!_pasaFiltrosZona(data)) return false;
+      if (_searchQuery.isEmpty) return true;
+      final profesiones = (data['profesiones'] as List<dynamic>? ?? [])
+          .map((e) => e.toString().toLowerCase())
+          .toList();
+      final nombre = (data['nombre'] ?? '').toString().toLowerCase();
+      final apellido = (data['apellido'] ?? '').toString().toLowerCase();
+      final comercial =
+          (data['nombre_comercial'] ?? '').toString().toLowerCase();
+      final labels = profesiones
+          .map((k) => _labelOficio[k] ?? k)
+          .join(' ')
+          .toLowerCase();
+      return nombre.contains(_searchQuery) ||
+          apellido.contains(_searchQuery) ||
+          comercial.contains(_searchQuery) ||
+          profesiones.join(' ').contains(_searchQuery) ||
+          labels.contains(_searchQuery);
+    }).toList();
+
+    list.sort((a, b) {
+      final da = a.data() as Map<String, dynamic>;
+      final db_ = b.data() as Map<String, dynamic>;
+      return _scoreOrden(db_).compareTo(_scoreOrden(da));
+    });
+    return list;
   }
 
   InputDecorationTheme get _dropdownDecoration => InputDecorationTheme(
@@ -456,7 +510,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
         ),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        labelStyle: TextStyle(color: Colors.grey.shade600, fontSize: 14),
       );
 
   Widget _badgeChip(String? badge) {
@@ -482,109 +535,13 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     );
   }
 
-  /// Solo aplica filtro duro si el usuario eligió algo en el panel Filtros.
-  bool _pasaFiltrosZona(Map<String, dynamic> data) {
-    final hayFiltroManual = selectedProvinciaId != null ||
-        selectedPartidoId != null ||
-        selectedLocalidadId != null;
-    if (!hayFiltroManual) return true;
-
-    final cobertura = data['zonas_cobertura'] as Map<String, dynamic>?;
-    if (cobertura == null) return false;
-
-    final String providerProvinciaId =
-        (cobertura['provincia_id'] ?? '').toString();
-    final List<dynamic> provLocalidades =
-        cobertura['localidades'] as List<dynamic>? ?? [];
-    final List<dynamic> provPartidos =
-        cobertura['partidos'] as List<dynamic>? ?? [];
-
-    if (selectedProvinciaId != null &&
-        providerProvinciaId != selectedProvinciaId.toString()) {
-      final selectedNombre = provincias
-          .where((p) => p['id'].toString() == selectedProvinciaId)
-          .map((p) => p['nombre'].toString().toLowerCase())
-          .cast<String>()
-          .toList();
-      final providerNombre =
-          (cobertura['provincia_nombre'] ?? '').toString().toLowerCase();
-      final matchByName =
-          selectedNombre.isNotEmpty && selectedNombre.first == providerNombre;
-      if (!matchByName) return false;
-    }
-
-    if (selectedLocalidadId != null) {
-      final tieneLocalidad = provLocalidades.any((l) {
-        if (l is! Map) return false;
-        final id = (l['id'] ?? l['localidad_id'] ?? '').toString();
-        final nombre = (l['nombre'] ?? l['localidad_nombre'] ?? '')
-            .toString()
-            .toLowerCase();
-        final selectedLoc = localidades
-            .where((x) =>
-                (x['localidad_id'] ?? x['id']).toString() ==
-                selectedLocalidadId)
-            .toList();
-        final selectedNombre = selectedLoc.isNotEmpty
-            ? (selectedLoc.first['localidad_nombre'] ??
-                    selectedLoc.first['nombre'] ??
-                    '')
-                .toString()
-                .toLowerCase()
-            : '';
-        return id == selectedLocalidadId ||
-            (selectedNombre.isNotEmpty && nombre == selectedNombre);
-      });
-      if (!tieneLocalidad) return false;
-    } else if (selectedPartidoId != null) {
-      final tienePartido = provPartidos.any((p) {
-            if (p is! Map) return false;
-            final id = (p['id'] ?? '').toString();
-            final nombre = (p['nombre'] ?? '').toString().toLowerCase();
-            final selectedPart = partidos
-                .where((x) =>
-                    (x['departamento_id'] ?? x['id']).toString() ==
-                    selectedPartidoId)
-                .toList();
-            final selectedNombre = selectedPart.isNotEmpty
-                ? (selectedPart.first['departamento_nombre'] ??
-                        selectedPart.first['nombre'] ??
-                        '')
-                    .toString()
-                    .toLowerCase()
-                : '';
-            return id == selectedPartidoId ||
-                (selectedNombre.isNotEmpty && nombre == selectedNombre);
-          }) ||
-          provLocalidades.any((l) {
-            if (l is! Map) return false;
-            return (l['partido_id'] ?? '').toString() == selectedPartidoId;
-          });
-      if (!tienePartido) return false;
-    }
-
-    return true;
-  }
-
-  String get _textoPreferenciaZona {
-    if (_prefLocalidadNombre != null && _prefLocalidadNombre!.isNotEmpty) {
-      return 'Priorizando cerca de $_prefLocalidadNombre';
-    }
-    if (_prefPartidoNombre != null && _prefPartidoNombre!.isNotEmpty) {
-      return 'Priorizando cerca de $_prefPartidoNombre';
-    }
-    if (_prefProvinciaNombre != null && _prefProvinciaNombre!.isNotEmpty) {
-      return 'Priorizando en $_prefProvinciaNombre';
-    }
-    return 'Priorizando según tu domicilio';
-  }
-
   @override
   Widget build(BuildContext context) {
+    final filtered = _filtrados;
+
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-        key: scaffoldKey,
         backgroundColor: _bg,
         appBar: AppBar(
           backgroundColor: Colors.white,
@@ -603,7 +560,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
               fontSize: 18,
             ),
           ),
-          centerTitle: false,
           actions: [
             TextButton.icon(
               onPressed: () =>
@@ -635,11 +591,8 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                   textInputAction: TextInputAction.search,
                   decoration: InputDecoration(
                     hintText: '¿Qué servicio buscas?',
-                    hintStyle: TextStyle(color: Colors.grey.shade500),
-                    prefixIcon: Icon(
-                      Icons.search,
-                      color: Colors.grey.shade500,
-                    ),
+                    prefixIcon:
+                        Icon(Icons.search, color: Colors.grey.shade500),
                     filled: true,
                     fillColor: _bg,
                     border: OutlineInputBorder(
@@ -648,8 +601,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                     ),
                     contentPadding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  onChanged: (value) =>
-                      setState(() => _searchQuery = value.toLowerCase()),
+                  onChanged: _onSearchChanged,
                 ),
               ),
               if (_tienePreferenciaZona)
@@ -665,19 +617,14 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          _textoPreferenciaZona,
+                          _prefLocalidadNombre != null
+                              ? 'Priorizando cerca de $_prefLocalidadNombre'
+                              : 'Priorizando según tu domicilio',
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color: _clientePrimary,
                           ),
-                        ),
-                      ),
-                      Text(
-                        'Usá Filtros para acotar',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey.shade600,
                         ),
                       ),
                     ],
@@ -711,16 +658,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                           selectedColor: _clientePrimary.withOpacity(0.14),
                           backgroundColor: _bg,
                           checkmarkColor: _clientePrimary,
-                          side: BorderSide(
-                            color: isSelected
-                                ? _clientePrimary.withOpacity(0.4)
-                                : Colors.grey.shade300,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          onSelected: (_) =>
-                              setState(() => _selectedRubro = rubro),
+                          onSelected: (_) => _onRubroSelected(rubro),
                         ),
                       );
                     },
@@ -734,7 +672,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                   color: Colors.white,
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       DropdownMenu<String>(
                         controller: _provinciaController,
@@ -746,7 +683,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                         onSelected: _onProvinciaSelected,
                         dropdownMenuEntries: provincias
                             .map(
-                              (p) => DropdownMenuEntry<String>(
+                              (p) => DropdownMenuEntry(
                                 value: p['id'].toString(),
                                 label: p['nombre'].toString(),
                               ),
@@ -767,7 +704,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                               onSelected: _onPartidoSelected,
                               dropdownMenuEntries: partidos
                                   .map(
-                                    (p) => DropdownMenuEntry<String>(
+                                    (p) => DropdownMenuEntry(
                                       value: (p['departamento_id'] ?? p['id'])
                                           .toString(),
                                       label: (p['departamento_nombre'] ??
@@ -791,7 +728,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                                   setState(() => selectedLocalidadId = val),
                               dropdownMenuEntries: localidades
                                   .map(
-                                    (l) => DropdownMenuEntry<String>(
+                                    (l) => DropdownMenuEntry(
                                       value: (l['localidad_id'] ?? l['id'])
                                           .toString(),
                                       label: (l['localidad_nombre'] ??
@@ -804,8 +741,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                           ),
                         ],
                       ),
-                      if (selectedProvinciaId != null) ...[
-                        const SizedBox(height: 8),
+                      if (selectedProvinciaId != null)
                         Align(
                           alignment: Alignment.centerRight,
                           child: TextButton(
@@ -813,7 +749,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                             child: const Text('Limpiar zona'),
                           ),
                         ),
-                      ],
                     ],
                   ),
                 ),
@@ -824,346 +759,348 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
               ),
               const Divider(height: 1),
               Expanded(
-                child: StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance
-                      .collection('usuarios')
-                      .where('es_trabajador', isEqualTo: true)
-                      .limit(400)
-                      .snapshots(),
-                  builder: (context, snapshot) {
-                    if (snapshot.hasError) {
-                      return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Text(
-                            AppCopy.errorGenerico,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.grey.shade700),
-                          ),
-                        ),
-                      );
-                    }
-
-                    if (!snapshot.hasData) {
-                      return const Center(
+                child: _loading
+                    ? const Center(
                         child: CircularProgressIndicator(
                           color: _clientePrimary,
                         ),
-                      );
-                    }
-
-                    final docs = snapshot.data!.docs;
-
-                    var filtered = docs.where((doc) {
-                      final data = doc.data() as Map<String, dynamic>;
-
-                      if (!_pasaFiltrosZona(data)) return false;
-
-                      final List<dynamic> profesiones =
-                          data['profesiones'] ?? [];
-                      final profesionesNorm = profesiones
-                          .map((e) => e.toString().toLowerCase().trim())
-                          .toList();
-
-                      if (_selectedRubro != 'Todos') {
-                        final clave = _rubroToProfesion[_selectedRubro] ??
-                            _selectedRubro.toLowerCase();
-                        if (!profesionesNorm.contains(clave)) return false;
-                      }
-
-                      final nombre =
-                          (data['nombre'] ?? '').toString().toLowerCase();
-                      final apellido =
-                          (data['apellido'] ?? '').toString().toLowerCase();
-                      final nombreComercial = (data['nombre_comercial'] ?? '')
-                          .toString()
-                          .toLowerCase();
-                      final profesionesStr = profesionesNorm.join(' ');
-                      final labels = profesionesNorm
-                          .map((k) => _labelOficio[k] ?? k)
-                          .join(' ')
-                          .toLowerCase();
-
-                      if (_searchQuery.isEmpty) return true;
-
-                      return nombre.contains(_searchQuery) ||
-                          apellido.contains(_searchQuery) ||
-                          nombreComercial.contains(_searchQuery) ||
-                          profesionesStr.contains(_searchQuery) ||
-                          labels.contains(_searchQuery);
-                    }).toList();
-
-                    filtered.sort((a, b) {
-                      final da = a.data() as Map<String, dynamic>;
-                      final db_ = b.data() as Map<String, dynamic>;
-                      return _scoreOrden(db_).compareTo(_scoreOrden(da));
-                    });
-
-                    if (filtered.isEmpty) {
-                      return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(32),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.search_off_rounded,
-                                size: 48,
-                                color: Colors.grey.shade400,
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                AppCopy.sinPrestadoresZona,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Colors.grey.shade600,
-                                  fontSize: 15,
-                                  height: 1.4,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              OutlinedButton(
-                                onPressed: () {
-                                  _limpiarFiltrosZona();
-                                  setState(() {
-                                    _selectedRubro = 'Todos';
-                                    _searchQuery = '';
-                                    _searchController.clear();
-                                    _filtrosAbiertos = true;
-                                  });
-                                },
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: _clientePrimary,
-                                  side: const BorderSide(
-                                    color: _clientePrimary,
+                      )
+                    : _error != null
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    AppCopy.errorGenerico,
+                                    textAlign: TextAlign.center,
                                   ),
-                                ),
-                                child: const Text('Ampliar búsqueda'),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }
-
-                    return ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                      itemCount: filtered.length,
-                      itemBuilder: (context, index) {
-                        final doc = filtered[index];
-                        final data = doc.data() as Map<String, dynamic>;
-
-                        final double promedio =
-                            (data['promedioEstrellas'] as num?)?.toDouble() ??
-                                0.0;
-                        final int cantidadEvaluadores =
-                            (data['cantidadEvaluadores'] as num?)?.toInt() ??
-                                0;
-                        final List<dynamic> profesiones =
-                            data['profesiones'] ?? [];
-                        final String? badge =
-                            data['badge_prestador'] as String?;
-                        final nombreComercial =
-                            (data['nombre_comercial'] ?? '').toString().trim();
-                        final nombreMostrar = nombreComercial.isNotEmpty
-                            ? nombreComercial
-                            : '${data['nombre'] ?? ''} ${data['apellido'] ?? ''}'
-                                .trim();
-                        final tel = _telefonoDe(data);
-                        final puedeWa =
-                            tel.isNotEmpty && _tieneWhatsApp(data);
-                        final zona = _zonaResumen(data);
-
-                        final accentColors = [
-                          _clientePrimary,
-                          _accentCoral,
-                          _accentLightBlue,
-                          _dark,
-                        ];
-                        final accent =
-                            accentColors[index % accentColors.length];
-
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Material(
-                            color: Colors.transparent,
-                            borderRadius: BorderRadius.circular(16),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(16),
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => TarjetaDigitalWidget(
-                                      usuarioRef: doc.reference,
-                                    ),
+                                  const SizedBox(height: 12),
+                                  OutlinedButton(
+                                    onPressed: () =>
+                                        _cargarPrestadores(reset: true),
+                                    child: const Text('Reintentar'),
                                   ),
-                                );
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 12,
-                                ),
-                                child: Row(
-                                  children: [
-                                    CircleAvatar(
-                                      radius: 26,
-                                      backgroundColor:
-                                          accent.withOpacity(0.14),
-                                      child: Text(
-                                        _initials(data),
-                                        style: TextStyle(
-                                          color: accent,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 15,
+                                ],
+                              ),
+                            ),
+                          )
+                        : RefreshIndicator(
+                            color: _clientePrimary,
+                            onRefresh: () => _cargarPrestadores(reset: true),
+                            child: filtered.isEmpty
+                                ? ListView(
+                                    physics:
+                                        const AlwaysScrollableScrollPhysics(),
+                                    children: [
+                                      const SizedBox(height: 80),
+                                      Icon(Icons.search_off_rounded,
+                                          size: 48,
+                                          color: Colors.grey.shade400),
+                                      const SizedBox(height: 12),
+                                      Padding(
+                                        padding: const EdgeInsets.all(24),
+                                        child: Text(
+                                          AppCopy.sinPrestadoresZona,
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: Colors.grey.shade600,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            nombreMostrar.isEmpty
-                                                ? 'Prestador'
-                                                : nombreMostrar,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              color: _textColor,
-                                              fontSize: 15,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            _labelsOficios(profesiones),
-                                            style: TextStyle(
-                                              color: Colors.grey.shade600,
-                                              fontSize: 13,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          if (zona.isNotEmpty) ...[
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              zona,
-                                              style: TextStyle(
-                                                color: Colors.grey.shade500,
-                                                fontSize: 11,
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ],
-                                          _badgeChip(badge),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.end,
-                                      children: [
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const Icon(
-                                              Icons.star_rounded,
-                                              color: Color(0xFFFFB000),
-                                              size: 18,
-                                            ),
-                                            const SizedBox(width: 3),
-                                            Text(
-                                              cantidadEvaluadores > 0
-                                                  ? promedio
-                                                      .toStringAsFixed(1)
-                                                  : '—',
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                color: _textColor,
-                                                fontSize: 14,
-                                              ),
-                                            ),
-                                          ],
+                                      Center(
+                                        child: OutlinedButton(
+                                          onPressed: () {
+                                            _limpiarFiltrosZona();
+                                            _searchController.clear();
+                                            setState(() {
+                                              _selectedRubro = 'Todos';
+                                              _searchQuery = '';
+                                              _filtrosAbiertos = true;
+                                            });
+                                            _cargarPrestadores(reset: true);
+                                          },
+                                          child: const Text('Ampliar búsqueda'),
                                         ),
-                                        if (cantidadEvaluadores > 0)
-                                          Text(
-                                            '$cantidadEvaluadores eval.',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: Colors.grey.shade500,
-                                            ),
+                                      ),
+                                    ],
+                                  )
+                                : ListView.builder(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        16, 12, 16, 24),
+                                    itemCount: filtered.length +
+                                        (_hasMore ? 1 : 0),
+                                    itemBuilder: (context, index) {
+                                      if (index >= filtered.length) {
+                                        return Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 16),
+                                          child: Center(
+                                            child: _loadingMore
+                                                ? const CircularProgressIndicator(
+                                                    color: _clientePrimary,
+                                                  )
+                                                : TextButton(
+                                                    onPressed: () =>
+                                                        _cargarPrestadores(
+                                                      reset: false,
+                                                    ),
+                                                    child: const Text(
+                                                      'Ver más prestadores',
+                                                    ),
+                                                  ),
                                           ),
-                                        const SizedBox(height: 6),
-                                        Material(
-                                          color: puedeWa
-                                              ? _whatsapp
-                                              : Colors.grey.shade300,
+                                        );
+                                      }
+
+                                      final doc = filtered[index];
+                                      final data =
+                                          doc.data() as Map<String, dynamic>;
+                                      final promedio =
+                                          (data['promedioEstrellas'] as num?)
+                                                  ?.toDouble() ??
+                                              0.0;
+                                      final cantidadEvaluadores =
+                                          (data['cantidadEvaluadores'] as num?)
+                                                  ?.toInt() ??
+                                              0;
+                                      final profesiones =
+                                          data['profesiones'] as List? ?? [];
+                                      final badge =
+                                          data['badge_prestador'] as String?;
+                                      final comercial =
+                                          (data['nombre_comercial'] ?? '')
+                                              .toString()
+                                              .trim();
+                                      final nombreMostrar =
+                                          comercial.isNotEmpty
+                                              ? comercial
+                                              : '${data['nombre'] ?? ''} ${data['apellido'] ?? ''}'
+                                                  .trim();
+                                      final tel = _telefonoDe(data);
+                                      final puedeWa =
+                                          tel.isNotEmpty && _tieneWhatsApp(data);
+                                      final zona = _zonaResumen(data);
+                                      final accents = [
+                                        _clientePrimary,
+                                        _accentCoral,
+                                        _accentLightBlue,
+                                        _dark,
+                                      ];
+                                      final accent =
+                                          accents[index % accents.length];
+
+                                      return Container(
+                                        margin:
+                                            const EdgeInsets.only(bottom: 12),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
                                           borderRadius:
-                                              BorderRadius.circular(20),
+                                              BorderRadius.circular(16),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black
+                                                  .withOpacity(0.05),
+                                              blurRadius: 10,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Material(
+                                          color: Colors.transparent,
+                                          borderRadius:
+                                              BorderRadius.circular(16),
                                           child: InkWell(
                                             borderRadius:
-                                                BorderRadius.circular(20),
-                                            onTap: puedeWa
-                                                ? () => _abrirWhatsApp(data)
-                                                : null,
-                                            child: const Padding(
-                                              padding: EdgeInsets.symmetric(
-                                                horizontal: 10,
-                                                vertical: 6,
+                                                BorderRadius.circular(16),
+                                            onTap: () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (_) =>
+                                                      TarjetaDigitalWidget(
+                                                    usuarioRef: doc.reference,
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                            child: Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 14,
+                                                vertical: 12,
                                               ),
                                               child: Row(
-                                                mainAxisSize:
-                                                    MainAxisSize.min,
                                                 children: [
-                                                  Icon(
-                                                    Icons.chat,
-                                                    size: 14,
-                                                    color: Colors.white,
-                                                  ),
-                                                  SizedBox(width: 4),
-                                                  Text(
-                                                    'WhatsApp',
-                                                    style: TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 11,
-                                                      fontWeight:
-                                                          FontWeight.w700,
+                                                  CircleAvatar(
+                                                    radius: 26,
+                                                    backgroundColor: accent
+                                                        .withOpacity(0.14),
+                                                    child: Text(
+                                                      _initials(data),
+                                                      style: TextStyle(
+                                                        color: accent,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 15,
+                                                      ),
                                                     ),
+                                                  ),
+                                                  const SizedBox(width: 12),
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Text(
+                                                          nombreMostrar
+                                                                  .isEmpty
+                                                              ? 'Prestador'
+                                                              : nombreMostrar,
+                                                          style:
+                                                              const TextStyle(
+                                                            fontWeight:
+                                                                FontWeight
+                                                                    .bold,
+                                                            color: _textColor,
+                                                            fontSize: 15,
+                                                          ),
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                        ),
+                                                        Text(
+                                                          _labelsOficios(
+                                                              profesiones),
+                                                          style: TextStyle(
+                                                            color: Colors
+                                                                .grey.shade600,
+                                                            fontSize: 13,
+                                                          ),
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                        ),
+                                                        if (zona.isNotEmpty)
+                                                          Text(
+                                                            zona,
+                                                            style: TextStyle(
+                                                              color: Colors
+                                                                  .grey
+                                                                  .shade500,
+                                                              fontSize: 11,
+                                                            ),
+                                                            maxLines: 1,
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                          ),
+                                                        _badgeChip(badge),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment.end,
+                                                    children: [
+                                                      Row(
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
+                                                        children: [
+                                                          const Icon(
+                                                            Icons.star_rounded,
+                                                            color: Color(
+                                                                0xFFFFB000),
+                                                            size: 18,
+                                                          ),
+                                                          Text(
+                                                            cantidadEvaluadores >
+                                                                    0
+                                                                ? promedio
+                                                                    .toStringAsFixed(
+                                                                        1)
+                                                                : '—',
+                                                            style:
+                                                                const TextStyle(
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                              fontSize: 14,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      const SizedBox(
+                                                          height: 6),
+                                                      Material(
+                                                        color: puedeWa
+                                                            ? _whatsapp
+                                                            : Colors
+                                                                .grey.shade300,
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(20),
+                                                        child: InkWell(
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(
+                                                                      20),
+                                                          onTap: puedeWa
+                                                              ? () =>
+                                                                  _abrirWhatsApp(
+                                                                      data)
+                                                              : null,
+                                                          child: const Padding(
+                                                            padding:
+                                                                EdgeInsets
+                                                                    .symmetric(
+                                                              horizontal: 10,
+                                                              vertical: 6,
+                                                            ),
+                                                            child: Row(
+                                                              mainAxisSize:
+                                                                  MainAxisSize
+                                                                      .min,
+                                                              children: [
+                                                                Icon(
+                                                                  Icons.chat,
+                                                                  size: 14,
+                                                                  color: Colors
+                                                                      .white,
+                                                                ),
+                                                                SizedBox(
+                                                                    width: 4),
+                                                                Text(
+                                                                  'WhatsApp',
+                                                                  style:
+                                                                      TextStyle(
+                                                                    color: Colors
+                                                                        .white,
+                                                                    fontSize:
+                                                                        11,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w700,
+                                                                  ),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ),
                                                 ],
                                               ),
                                             ),
                                           ),
                                         ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
+                                      );
+                                    },
+                                  ),
                           ),
-                        );
-                      },
-                    );
-                  },
-                ),
               ),
             ],
           ),
