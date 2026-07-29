@@ -17,3 +17,4 @@ import 'theme/app_copy.dart';
 import 'analytics/prox_analytics.dart';
 
 part 'home_impl.dart';
+part 'home_impl2.dart';
