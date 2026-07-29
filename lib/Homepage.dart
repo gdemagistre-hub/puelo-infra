@@ -8,11 +8,13 @@ import 'registroTrabajador.dart';
 import 'tarjetaDigital.dart';
 import 'menuPerfilOpciones.dart';
 import 'datosPersonalesflotante.dart';
+import 'Domicilioflotante.dart';
 import 'ZonaDeTrabajoflotante.dart';
 import 'solicitar_validacion.dart';
 import 'scoring_service.dart';
 import 'config/app_env.dart';
 import 'theme/app_copy.dart';
+import 'analytics/prox_analytics.dart';
 
 class HomePageWidget extends StatefulWidget {
   const HomePageWidget({super.key});
@@ -51,6 +53,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   int _pasosCompletos = 0;
   static const int _pasosTotales = 4;
 
+  /// Banner domicilio (solo vista cliente). Dismiss solo en esta sesión.
+  bool _bannerZonaDescartado = false;
+  bool _bannerZonaTracked = false;
+
   Color get primaryColor =>
       _modoPrestador ? _prestadorPrimary : _clientePrimary;
 
@@ -86,6 +92,29 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     _cargarTopServicios();
   }
 
+  /// Falta zona útil para ranking de búsquedas (provincia/partido/localidad).
+  bool _faltaZonaCliente() {
+    final data = UserSession().datosCompletos;
+    if (data == null) return true;
+    final geo = data['direccion_geo'];
+    if (geo is! Map) return true;
+    final loc = (geo['localidad_id'] ?? geo['localidad_nombre'] ?? '')
+        .toString()
+        .trim();
+    final part =
+        (geo['partido_id'] ?? geo['partido_nombre'] ?? '').toString().trim();
+    final prov = (geo['provincia_id'] ?? geo['provincia_nombre'] ?? '')
+        .toString()
+        .trim();
+    // Con localidad alcanza; si no, al menos provincia + partido.
+    if (loc.isNotEmpty) return false;
+    if (prov.isNotEmpty && part.isNotEmpty) return false;
+    return true;
+  }
+
+  bool get _mostrarBannerZonaCliente =>
+      !_modoPrestador && !_bannerZonaDescartado && _faltaZonaCliente();
+
   void _detectarRol() {
     final data = UserSession().datosCompletos;
     final esPrestador =
@@ -102,6 +131,21 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         _visibilidadCargando = false;
         _consejos = [];
       });
+    }
+  }
+
+  Future<void> _refrescarSesionDesdeFirestore() async {
+    final uid = UserSession().uid;
+    if (uid == null) return;
+    try {
+      final doc =
+          await FirebaseFirestore.instance.collection('usuarios').doc(uid).get();
+      if (doc.exists) {
+        UserSession().iniciarSesion(uid, doc.data()!);
+        if (mounted) setState(() {});
+      }
+    } catch (e) {
+      debugPrint('Error refrescando sesión: $e');
     }
   }
 
@@ -153,6 +197,20 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       MaterialPageRoute(builder: (_) => const RegistroTrabajadorWidget()),
     );
     await _refrescarRolDesdeFirestore();
+  }
+
+  Future<void> _abrirDomicilioDesdeBanner() async {
+    ProxAnalytics.instance.action('banner_zona_cta', screen: '/home');
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const DomicilioFlotanteWidget()),
+    );
+    await _refrescarSesionDesdeFirestore();
+  }
+
+  void _descartarBannerZona() {
+    ProxAnalytics.instance.action('banner_zona_dismiss', screen: '/home');
+    setState(() => _bannerZonaDescartado = true);
   }
 
   /// Solo lee stats/top_servicios. No barre prestadores en horario de uso.
@@ -523,6 +581,13 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         ? UserSession().nombreCompleto.split(' ').first
         : 'Usuario';
 
+    if (_mostrarBannerZonaCliente && !_bannerZonaTracked) {
+      _bannerZonaTracked = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ProxAnalytics.instance.action('banner_zona_shown', screen: '/home');
+      });
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -650,6 +715,111 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     );
   }
 
+  Widget _buildBannerZonaCliente() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F3FF),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: _clientePrimary.withOpacity(0.35)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 14, 8, 0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: _clientePrimary.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.location_on_outlined,
+                      color: _clientePrimary,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '¿Dónde necesitás el servicio?',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            color: Color(0xFF1E293B),
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Si indicás tu zona, te mostramos prestadores cerca y te resulta más fácil contratar.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF475569),
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(Icons.close, size: 20, color: Colors.grey.shade600),
+                    onPressed: _descartarBannerZona,
+                    tooltip: 'Ahora no',
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _descartarBannerZona,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF64748B),
+                        side: BorderSide(color: Colors.grey.shade300),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text('Ahora no'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton(
+                      onPressed: _abrirDomicilioDesdeBanner,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _clientePrimary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text('Indicar mi zona'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildClienteBody({Key? key}) {
     final coloresIcono = [
       _clientePrimary,
@@ -667,6 +837,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (_mostrarBannerZonaCliente) _buildBannerZonaCliente(),
           if (!_puedeSerAmbos)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -777,7 +948,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: _topServicios.length,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate: const NSliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 4,
                   mainAxisSpacing: 12,
                   crossAxisSpacing: 8,
