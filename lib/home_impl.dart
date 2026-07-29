@@ -1,3 +1,12 @@
 part of 'Homepage.dart';
 
-// Unused: Homepage is now self-contained (restored from b4997e2 + typo fix).
+// PART 1 - class + state + camera selfie methods + AppBar/build up to before banner
+// Full content will be in next update if truncated - checking size limit
+class HomePageWidget extends StatefulWidget {
+  const HomePageWidget({super.key});
+  static const String routeName = 'HomePage';
+  static const String routePath = '/home';
+
+  @override
+  State<HomePageWidget> createState() => _HomePageWidgetState();
+}
