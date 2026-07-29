@@ -15,10 +15,21 @@ import 'scoring_service.dart';
 import 'config/app_env.dart';
 import 'theme/app_copy.dart';
 import 'analytics/prox_analytics.dart';
-import 'dart:typed_data';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 
-part 'home_impl.dart';
-part 'home_impl2.dart';
+// RESTORE in progress - full file from artifacts with camera will follow
+class HomePageWidget extends StatefulWidget {
+  const HomePageWidget({super.key});
+  static const String routeName = 'HomePage';
+  static const String routePath = '/home';
+  @override
+  State<HomePageWidget> createState() => _HomePageWidgetState();
+}
+
+class _HomePageWidgetState extends State<HomePageWidget> {
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(child: Text('Cargando homepage...')),
+    );
+  }
+}
