@@ -6,6 +6,7 @@ import 'registroCuenta.dart';
 import 'pantalla_gracias_validacion.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_copy.dart';
+import 'config/app_env.dart';
 import 'analytics/prox_analytics.dart';
 
 class LoginScreenWidget extends StatefulWidget {
@@ -29,9 +30,11 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
   void _irAHome() {
     if (_selectedUserId == null || _selectedUserData == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'Por favor, seleccioná un usuario del listado superior para simular el ingreso.',
+            AppEnv.showDevTools
+                ? 'Seleccioná un usuario del listado superior para simular el ingreso.'
+                : 'El ingreso con redes/email se habilita pronto. Mientras, usá el entorno de prueba.',
           ),
         ),
       );
@@ -62,6 +65,18 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
     }
   }
 
+  void _onSocialTap() {
+    if (AppEnv.showDevTools) {
+      _irAHome();
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Próximamente: ingreso con Google, Apple, Facebook o email.'),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -77,82 +92,84 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: primaryColor.withOpacity(0.3),
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Modo prueba: elegir usuario',
-                          style: TextStyle(
-                            color: primaryColor,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
+                  if (AppEnv.showDevTools) ...[
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: primaryColor.withOpacity(0.3),
                         ),
-                        const SizedBox(height: 8),
-                        StreamBuilder<QuerySnapshot>(
-                          stream: FirebaseFirestore.instance
-                              .collection('usuarios')
-                              .snapshots(),
-                          builder: (context, snapshot) {
-                            if (!snapshot.hasData) {
-                              return const Center(
-                                child: CircularProgressIndicator(
-                                  color: primaryColor,
-                                ),
-                              );
-                            }
-
-                            final items = snapshot.data!.docs;
-                            return DropdownButtonFormField<String>(
-                              decoration: const InputDecoration(
-                                border: OutlineInputBorder(),
-                                contentPadding: EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                              ),
-                              hint: const Text('Seleccionar...'),
-                              value: _selectedUserId,
-                              items: items.map((doc) {
-                                final data =
-                                    doc.data() as Map<String, dynamic>;
-                                final displayName =
-                                    '${data['nombre'] ?? ''} ${data['apellido'] ?? ''}'
-                                        .trim();
-                                return DropdownMenuItem<String>(
-                                  value: doc.id,
-                                  child: Text(
-                                    displayName.isNotEmpty
-                                        ? displayName
-                                        : 'Sin nombre',
-                                    overflow: TextOverflow.ellipsis,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Modo prueba (${AppEnv.label}): elegir usuario',
+                            style: const TextStyle(
+                              color: primaryColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          StreamBuilder<QuerySnapshot>(
+                            stream: FirebaseFirestore.instance
+                                .collection('usuarios')
+                                .snapshots(),
+                            builder: (context, snapshot) {
+                              if (!snapshot.hasData) {
+                                return const Center(
+                                  child: CircularProgressIndicator(
+                                    color: primaryColor,
                                   ),
                                 );
-                              }).toList(),
-                              onChanged: (val) {
-                                setState(() {
-                                  _selectedUserId = val;
-                                  _selectedUserData = items
-                                      .firstWhere((doc) => doc.id == val)
-                                      .data() as Map<String, dynamic>;
-                                });
-                              },
-                            );
-                          },
-                        ),
-                      ],
+                              }
+
+                              final items = snapshot.data!.docs;
+                              return DropdownButtonFormField<String>(
+                                decoration: const InputDecoration(
+                                  border: OutlineInputBorder(),
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
+                                ),
+                                hint: const Text('Seleccionar...'),
+                                value: _selectedUserId,
+                                items: items.map((doc) {
+                                  final data =
+                                      doc.data() as Map<String, dynamic>;
+                                  final displayName =
+                                      '${data['nombre'] ?? ''} ${data['apellido'] ?? ''}'
+                                          .trim();
+                                  return DropdownMenuItem<String>(
+                                    value: doc.id,
+                                    child: Text(
+                                      displayName.isNotEmpty
+                                          ? displayName
+                                          : 'Sin nombre',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  setState(() {
+                                    _selectedUserId = val;
+                                    _selectedUserData = items
+                                        .firstWhere((doc) => doc.id == val)
+                                        .data() as Map<String, dynamic>;
+                                  });
+                                },
+                              );
+                            },
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 40),
+                    const SizedBox(height: 40),
+                  ],
                   Center(
                     child: Image.asset(
                       'assets/images/logo_prox_icon.png.png',
@@ -197,7 +214,7 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                   ),
                   const SizedBox(height: 36),
                   _buildLoginButton(
-                    onPressed: _irAHome,
+                    onPressed: _onSocialTap,
                     icon: _buildIconCircle(
                       backgroundColor: const Color(0xFFF1F5F9),
                       child: const Text(
@@ -216,7 +233,7 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                   ),
                   const SizedBox(height: 14),
                   _buildLoginButton(
-                    onPressed: _irAHome,
+                    onPressed: _onSocialTap,
                     icon: _buildIconCircle(
                       backgroundColor: Colors.white.withOpacity(0.15),
                       child: const Icon(
@@ -231,7 +248,7 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                   ),
                   const SizedBox(height: 14),
                   _buildLoginButton(
-                    onPressed: _irAHome,
+                    onPressed: _onSocialTap,
                     icon: _buildIconCircle(
                       backgroundColor: Colors.white.withOpacity(0.2),
                       child: const Text(
@@ -267,7 +284,7 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                   ),
                   const SizedBox(height: 20),
                   _buildLoginButton(
-                    onPressed: _irAHome,
+                    onPressed: _onSocialTap,
                     icon: _buildIconCircle(
                       backgroundColor: primaryColor.withOpacity(0.1),
                       child: const Icon(
