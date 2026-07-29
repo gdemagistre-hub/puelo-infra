@@ -72,7 +72,7 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
               child: Transform.scale(
                 scale: _scaleAnimation.value,
                 child: Image.asset(
-                  'assets/images/logo_prox_splash.png.png',
+                  'assets/images/logo_prox_splash.png',
                   width: 200,
                   fit: BoxFit.contain,
                   errorBuilder: (_, __, ___) => Image.asset(
