@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
+import 'Homepage.dart';
 import 'loginScreen.dart';
+import 'user_session.dart';
 
 class SplashScreenWidget extends StatefulWidget {
   static const String routePath = '/splash';
@@ -43,13 +46,24 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
     );
 
     _controller.forward();
+    _bootstrap();
+  }
 
-    // Etapa de prueba: siempre al login con dropdown de usuarios
-    Future.delayed(const Duration(milliseconds: 2400), () {
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, LoginScreenWidget.routePath);
-      }
-    });
+  Future<void> _bootstrap() async {
+    // Animación mínima + intento de rehidratación en paralelo.
+    final results = await Future.wait([
+      Future<void>.delayed(const Duration(milliseconds: 1800)),
+      UserSession().restaurarSesion(),
+    ]);
+
+    if (!mounted) return;
+
+    final restored = results[1] as bool;
+    if (restored && UserSession().isLoggedIn) {
+      Navigator.pushReplacementNamed(context, HomePageWidget.routePath);
+    } else {
+      Navigator.pushReplacementNamed(context, LoginScreenWidget.routePath);
+    }
   }
 
   @override
@@ -76,13 +90,18 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
                   width: 200,
                   fit: BoxFit.contain,
                   errorBuilder: (_, __, ___) => Image.asset(
-                    'assets/images/lifewallet.png',
+                    'assets/images/logo_prox_splash.png.png',
                     width: 200,
                     fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const Icon(
-                      Icons.handyman_rounded,
-                      size: 80,
-                      color: Color(0xFF734BE4),
+                    errorBuilder: (_, __, ___) => Image.asset(
+                      'assets/images/lifewallet.png',
+                      width: 200,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const Icon(
+                        Icons.handyman_rounded,
+                        size: 80,
+                        color: Color(0xFF734BE4),
+                      ),
                     ),
                   ),
                 ),
