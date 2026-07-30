@@ -6,6 +6,7 @@ import 'config/app_env.dart';
 import 'theme/app_theme.dart';
 import 'theme/app_copy.dart';
 import 'analytics/prox_analytics.dart';
+import 'user_session.dart';
 
 import 'splashScreen.dart';
 import 'loginScreen.dart';
@@ -60,7 +61,15 @@ class MyApp extends StatelessWidget {
             const RegistroTrabajadorWidget(),
         BuscadorPrestadoresWidget.routePath: (context) =>
             const BuscadorPrestadoresWidget(),
-        ConsolaProxWidget.routePath: (context) => const ConsolaProxWidget(),
+        // Gate client-side: solo es_admin / rol admin (complementar con rules + Auth).
+        ConsolaProxWidget.routePath: (context) {
+          if (!ConsolaProxWidget.puedeAcceder && !UserSession().isAdmin) {
+            return const Scaffold(
+              body: Center(child: Text('Acceso restringido')),
+            );
+          }
+          return const ConsolaProxWidget();
+        },
         '/seleccionRol': (context) => const SeleccionRolWidget(),
       },
       onGenerateRoute: (settings) {
