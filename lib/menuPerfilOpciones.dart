@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'datosPersonalesflotante.dart';
 import 'Domicilioflotante.dart';
 import 'especialidadesLaboralesflotante.dart';
@@ -7,6 +8,8 @@ import 'perfilCompletoflotante.dart';
 import 'registroTrabajador.dart';
 import 'consola_prox.dart';
 import 'user_session.dart';
+import 'auth_service.dart';
+import 'loginScreen.dart';
 import 'theme/app_colors.dart';
 
 class MenuPerfilOpcionesWidget extends StatelessWidget {
@@ -41,6 +44,42 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
         },
         transitionDuration: const Duration(milliseconds: 300),
       ),
+    );
+  }
+
+  Future<void> _cerrarSesion(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cerrar sesión'),
+        content: Text(
+          UserSession().isDevImpersonation
+              ? 'Vas a salir del modo prueba.'
+              : 'Vas a cerrar tu sesión de Puelo.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Salir'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    await AuthService.instance.signOut();
+    if (!context.mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreenWidget()),
+      (_) => false,
     );
   }
 
@@ -105,7 +144,6 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
         onTap: () =>
             _abrirFlotante(context, const PerfilCompletoFlotanteWidget()),
       ),
-      // Solo administradores — gate client-side + reglas Firestore
       if (UserSession().isAdmin)
         _MenuItem(
           icon: Icons.monitor_heart_outlined,
@@ -118,6 +156,14 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
             );
           },
         ),
+      _MenuItem(
+        icon: Icons.logout_rounded,
+        label: 'Cerrar sesión',
+        subtitle: UserSession().isDevImpersonation
+            ? 'Salir del modo prueba'
+            : 'Cerrar sesión de Google / cuenta',
+        onTap: () => _cerrarSesion(context),
+      ),
     ];
 
     return Container(
