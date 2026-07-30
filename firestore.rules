@@ -7,7 +7,8 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Admin vía custom claim (preferido) o documento usuarios/{uid}.es_admin
+    // Admin vía custom claim (preferido) o usuarios/{uid}.es_admin
+    // Solo funciona cuando exista Firebase Auth.
     function isAdmin() {
       return isSignedIn() && (
         request.auth.token.admin == true ||
@@ -25,32 +26,64 @@ service cloud.firestore {
       return request.resource.data.keys().size() <= 24;
     }
 
-    // ---------- analytics (escritura acotada, lectura solo admin) ----------
+    // ---------- analytics ----------
     match /analytics_events/{id} {
-      // Sin Auth en MVP: create abierto pero SIN lectura pública y sin campos PII.
-      // Cuando activen Firebase Auth, preferir: allow create: if isSignedIn() && analyticsKeysOk();
+      // Create abierto pero sin PII y con forma mínima.
+      // Cuando haya Auth: preferir isSignedIn() && analyticsKeysOk().
       allow create: if analyticsKeysOk() && analyticsSizeOk()
         && request.resource.data.type is string
         && request.resource.data.session_id is string;
 
-      allow read: if isAdmin();
+      // TEMP pre-Auth: lectura permitida; ConsolaProx hace gate client-side (es_admin).
+      // Con Auth: allow read: if isAdmin();
+      allow read: if true;
       allow update, delete: if false;
     }
 
-    // Agregados de consola / batch
+    // ---------- stats / batch ----------
     match /stats/{doc} {
-      allow read: if true; // top_servicios es público de producto
-      allow write: if isAdmin();
+      allow read: if true; // top_servicios público de producto
+      // TEMP pre-Auth: write abierto (batch scoring desde cliente dev).
+      // Con Auth: allow write: if isAdmin();
+      allow write: if true;
     }
 
-    // Usuarios: ajustar a su modelo real cuando haya Auth
+    // ---------- catálogos geo (solo lectura) ----------
+    match /cat_paises/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /cat_departamentos/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /cat_localidades/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ---------- usuarios ----------
+    // TEMP pre-Auth (login por dropdown): read/write abiertos.
+    // Con Auth reemplazar por:
+    //   allow read: if true; // o acotar campos públicos vía Cloud Function
+    //   allow create: if isSignedIn();
+    //   allow update, delete: if isSignedIn() && request.auth.uid == userId;
     match /usuarios/{userId} {
       allow read: if true;
-      allow write: if true; // TEMPORAL MVP — reemplazar con isSignedIn() && request.auth.uid == userId
+      allow write: if true;
     }
 
+    // ---------- validaciones / tokens (si existen) ----------
+    match /validaciones/{id} {
+      allow read, write: if true; // TEMP hasta Auth + diseño de tokens
+    }
+    match /validacion_tokens/{id} {
+      allow read, write: if true; // TEMP
+    }
+
+    // ---------- default DENY (reemplaza el antiguo allow-all) ----------
     match /{document=**} {
-      allow read, write: if true; // TEMPORAL: alinear con Auth real antes de producción masiva
+      allow read, write: if false;
     }
   }
 }
