@@ -8,7 +8,6 @@ service cloud.firestore {
     }
 
     // Admin vía custom claim (preferido) o usuarios/{uid}.es_admin
-    // Solo funciona cuando exista Firebase Auth.
     function isAdmin() {
       return isSignedIn() && (
         request.auth.token.admin == true ||
@@ -28,23 +27,19 @@ service cloud.firestore {
 
     // ---------- analytics ----------
     match /analytics_events/{id} {
-      // Create abierto pero sin PII y con forma mínima.
-      // Cuando haya Auth: preferir isSignedIn() && analyticsKeysOk().
       allow create: if analyticsKeysOk() && analyticsSizeOk()
         && request.resource.data.type is string
         && request.resource.data.session_id is string;
-
-      // TEMP pre-Auth: lectura permitida; ConsolaProx hace gate client-side (es_admin).
-      // Con Auth: allow read: if isAdmin();
+      // TEMP: lectura abierta (ConsolaProx gate client-side).
+      // Con Auth estricto: allow read: if isAdmin();
       allow read: if true;
       allow update, delete: if false;
     }
 
     // ---------- stats / batch ----------
     match /stats/{doc} {
-      allow read: if true; // top_servicios público de producto
-      // TEMP pre-Auth: write abierto (batch scoring desde cliente dev).
-      // Con Auth: allow write: if isAdmin();
+      allow read: if true;
+      // TEMP: batch scoring desde cliente. Con Auth: isAdmin()
       allow write: if true;
     }
 
@@ -63,31 +58,38 @@ service cloud.firestore {
     }
 
     // ---------- usuarios ----------
-    // TEMP pre-Auth (login por dropdown): read/write abiertos.
-    // Con Auth reemplazar por:
-    //   allow read: if true; // o acotar campos públicos vía Cloud Function
-    //   allow create: if isSignedIn();
-    //   allow update, delete: if isSignedIn() && request.auth.uid == userId;
+    // Convención con Google Auth (y futuros FB/Apple):
+    //   doc id = Firebase Auth uid
+    //   campos: auth_provider, auth_uid, email, url_foto_perfil, estado, …
+    //
+    // TEMP pre-lanzamiento: write abierto para:
+    //   - ensureUserProfile post-Google
+    //   - impersonación por dropdown (sin request.auth)
+    // Al abrir al público + apagar dropdown:
+    //   allow read: if true;
+    //   allow create: if isSignedIn() && request.auth.uid == userId;
+    //   allow update: if isSignedIn() && request.auth.uid == userId;
+    //   allow delete: if isAdmin();
     match /usuarios/{userId} {
       allow read: if true;
       allow write: if true;
     }
 
-    // ---------- trabajos (portfolio / clientes; batch scoring) ----------
+    // ---------- trabajos ----------
     match /trabajos/{id} {
       allow read: if true;
-      allow write: if true; // TEMP pre-Auth
+      allow write: if true; // TEMP
     }
 
-    // ---------- validaciones / tokens (si existen) ----------
+    // ---------- validaciones / tokens ----------
     match /validaciones/{id} {
-      allow read, write: if true; // TEMP hasta Auth + diseño de tokens
+      allow read, write: if true; // TEMP
     }
     match /validacion_tokens/{id} {
       allow read, write: if true; // TEMP
     }
 
-    // ---------- default DENY (reemplaza el antiguo allow-all) ----------
+    // ---------- default DENY ----------
     match /{document=**} {
       allow read, write: if false;
     }
