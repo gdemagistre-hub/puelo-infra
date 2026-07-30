@@ -79,7 +79,9 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
-    - assets/provincia.json
-    - assets/departamentos.json
-    - assets/localidades.json
+    # Geo vive en Firestore (cat_*); no embeber JSON grandes en el cliente.
+    # - assets/provincia.json
+    # - assets/departamentos.json
+    # - assets/localidades.json
+    # Seed de prueba: se mantiene a pedido (sacar antes de prod masiva).
     - assets/usuarios_dummy_500.json
