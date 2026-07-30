@@ -50,19 +50,36 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
   }
 
   Future<void> _bootstrap() async {
-    // Animación mínima + intento de rehidratación en paralelo.
-    final results = await Future.wait([
-      Future<void>.delayed(const Duration(milliseconds: 1800)),
-      UserSession().restaurarSesion(),
-    ]);
+    // Mínimo de animación visible.
+    await Future<void>.delayed(const Duration(milliseconds: 1600));
+
+    var restored = false;
+    try {
+      // No bloquear el splash si Firestore/prefs tardan o fallan.
+      restored = await UserSession()
+          .restaurarSesion()
+          .timeout(const Duration(seconds: 6), onTimeout: () => false);
+    } catch (e) {
+      debugPrint('Splash restore error: $e');
+      restored = false;
+    }
 
     if (!mounted) return;
 
-    final restored = results[1] as bool;
-    if (restored && UserSession().isLoggedIn) {
-      Navigator.pushReplacementNamed(context, HomePageWidget.routePath);
-    } else {
-      Navigator.pushReplacementNamed(context, LoginScreenWidget.routePath);
+    try {
+      if (restored && UserSession().isLoggedIn) {
+        Navigator.pushReplacementNamed(context, HomePageWidget.routePath);
+      } else {
+        Navigator.pushReplacementNamed(context, LoginScreenWidget.routePath);
+      }
+    } catch (e) {
+      debugPrint('Splash navigate error: $e');
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const LoginScreenWidget()),
+        );
+      }
     }
   }
 
@@ -85,23 +102,19 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
               opacity: _opacityAnimation.value,
               child: Transform.scale(
                 scale: _scaleAnimation.value,
+                // Asset real en repo: logo_prox_splash.png.png
                 child: Image.asset(
-                  'assets/images/logo_prox_splash.png',
+                  'assets/images/logo_prox_splash.png.png',
                   width: 200,
                   fit: BoxFit.contain,
                   errorBuilder: (_, __, ___) => Image.asset(
-                    'assets/images/logo_prox_splash.png.png',
+                    'assets/images/lifewallet.png',
                     width: 200,
                     fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => Image.asset(
-                      'assets/images/lifewallet.png',
-                      width: 200,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const Icon(
-                        Icons.handyman_rounded,
-                        size: 80,
-                        color: Color(0xFF734BE4),
-                      ),
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.handyman_rounded,
+                      size: 80,
+                      color: Color(0xFF734BE4),
                     ),
                   ),
                 ),
