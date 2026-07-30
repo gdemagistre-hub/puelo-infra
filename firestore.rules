@@ -73,6 +73,12 @@ service cloud.firestore {
       allow write: if true;
     }
 
+    // ---------- trabajos (portfolio / clientes; batch scoring) ----------
+    match /trabajos/{id} {
+      allow read: if true;
+      allow write: if true; // TEMP pre-Auth
+    }
+
     // ---------- validaciones / tokens (si existen) ----------
     match /validaciones/{id} {
       allow read, write: if true; // TEMP hasta Auth + diseño de tokens
