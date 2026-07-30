@@ -1,7 +1,19 @@
 [
   {
-    "origin": ["*"],
-    "method": ["GET"],
+    "origin": [
+      "https://lifewalletpuelo.web.app",
+      "https://lifewalletpuelo.firebaseapp.com",
+      "http://localhost:5000",
+      "http://localhost:8080",
+      "http://127.0.0.1:5000",
+      "http://127.0.0.1:8080"
+    ],
+    "method": ["GET", "HEAD", "PUT", "POST", "DELETE", "OPTIONS"],
+    "responseHeader": [
+      "Content-Type",
+      "Authorization",
+      "x-goog-resumable"
+    ],
     "maxAgeSeconds": 3600
   }
 ]
