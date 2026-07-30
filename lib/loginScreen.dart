@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'Homepage.dart';
 import 'user_session.dart';
+import 'auth_service.dart';
 import 'registroCuenta.dart';
 import 'pantalla_gracias_validacion.dart';
 import 'theme/app_colors.dart';
@@ -21,32 +23,83 @@ class LoginScreenWidget extends StatefulWidget {
 class _LoginScreenWidgetState extends State<LoginScreenWidget> {
   String? _selectedUserId;
   Map<String, dynamic>? _selectedUserData;
+  bool _loadingGoogle = false;
+  bool _loadingDev = false;
 
   static const Color primaryColor = AppColors.cliente;
   static const Color textColor = AppColors.text;
   static const Color subTextColor = AppColors.textMuted;
 
-  void _irAHome() {
+  Future<void> _entrarDevDropdown() async {
     if (_selectedUserId == null || _selectedUserData == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Seleccioná un usuario del listado superior para ingresar.',
+            'Seleccioná un usuario del listado para entrar en modo prueba.',
           ),
         ),
       );
       return;
     }
 
-    UserSession().iniciarSesion(_selectedUserId!, _selectedUserData!);
+    setState(() => _loadingDev = true);
+    try {
+      UserSession().iniciarSesion(
+        _selectedUserId!,
+        _selectedUserData!,
+        authProvider: 'dev',
+        isDevImpersonation: true,
+      );
 
-    final esPrestador = _selectedUserData!['es_trabajador'] == true ||
-        _selectedUserData!['rol'] == 'trabajador';
-    ProxAnalytics.instance.startSession(
-      role: esPrestador ? 'prestador' : 'cliente',
+      final esPrestador = _selectedUserData!['es_trabajador'] == true ||
+          _selectedUserData!['rol'] == 'trabajador';
+      ProxAnalytics.instance.startSession(
+        role: esPrestador ? 'prestador' : 'cliente',
+      );
+      ProxAnalytics.instance.action('login_dev_dropdown', screen: '/login');
+
+      if (!mounted) return;
+      _navegarPostLogin();
+    } finally {
+      if (mounted) setState(() => _loadingDev = false);
+    }
+  }
+
+  Future<void> _entrarConGoogle() async {
+    setState(() => _loadingGoogle = true);
+    try {
+      await AuthService.instance.signInWithGoogle();
+      if (!mounted) return;
+      _navegarPostLogin();
+    } on AuthCancelledException {
+      // Usuario cerró el popup: no mostrar error.
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'No se pudo iniciar con Google. '
+            'Verificá que el proveedor esté habilitado en Firebase. ($e)',
+          ),
+          duration: const Duration(seconds: 6),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _loadingGoogle = false);
+    }
+  }
+
+  void _proximamente(String provider) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '$provider se habilita en la siguiente etapa (mismo flujo que Google).',
+        ),
+      ),
     );
-    ProxAnalytics.instance.action('login_dev_dropdown', screen: '/login');
+  }
 
+  void _navegarPostLogin() {
     if (UserSession().pendingValidacionToken != null) {
       Navigator.pushReplacement(
         context,
@@ -64,6 +117,8 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final busy = _loadingGoogle || _loadingDev;
+
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: SafeArea(
@@ -77,7 +132,7 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // MUST: listado de usuarios siempre visible hasta decisión contraria.
+                  // MUST: listado de prueba hasta decisión contraria.
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -91,11 +146,21 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Elegir usuario para ingresar',
+                          'Modo prueba (equipo)',
                           style: TextStyle(
                             color: primaryColor,
                             fontWeight: FontWeight.bold,
                             fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Impersoná un usuario de Firestore sin Google. '
+                          'Se apaga al abrir el servicio al público.',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 11,
+                            height: 1.3,
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -121,7 +186,7 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                                   vertical: 8,
                                 ),
                               ),
-                              hint: const Text('Seleccionar...'),
+                              hint: const Text('Seleccionar usuario…'),
                               value: _selectedUserId,
                               items: items.map((doc) {
                                 final data =
@@ -139,21 +204,50 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                                   ),
                                 );
                               }).toList(),
-                              onChanged: (val) {
-                                setState(() {
-                                  _selectedUserId = val;
-                                  _selectedUserData = items
-                                      .firstWhere((doc) => doc.id == val)
-                                      .data() as Map<String, dynamic>;
-                                });
-                              },
+                              onChanged: busy
+                                  ? null
+                                  : (val) {
+                                      setState(() {
+                                        _selectedUserId = val;
+                                        _selectedUserData = items
+                                            .firstWhere((doc) => doc.id == val)
+                                            .data() as Map<String, dynamic>;
+                                      });
+                                    },
                             );
                           },
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton(
+                            onPressed: busy ? null : _entrarDevDropdown,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: primaryColor,
+                              side: BorderSide(
+                                color: primaryColor.withOpacity(0.5),
+                              ),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: _loadingDev
+                                ? const SizedBox(
+                                    height: 18,
+                                    width: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text('Entrar como este usuario'),
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 32),
                   Center(
                     child: Image.asset(
                       'assets/images/logo_prox_icon.png.png',
@@ -198,7 +292,7 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                   ),
                   const SizedBox(height: 36),
                   _buildLoginButton(
-                    onPressed: _irAHome,
+                    onPressed: busy ? null : _entrarConGoogle,
                     icon: _buildIconCircle(
                       backgroundColor: const Color(0xFFF1F5F9),
                       child: const Text(
@@ -210,14 +304,17 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                         ),
                       ),
                     ),
-                    label: 'Continuar con Google',
+                    label: _loadingGoogle
+                        ? 'Conectando con Google…'
+                        : 'Continuar con Google',
                     backgroundColor: Colors.white,
                     textColor: textColor,
                     hasBorder: true,
+                    loading: _loadingGoogle,
                   ),
                   const SizedBox(height: 14),
                   _buildLoginButton(
-                    onPressed: _irAHome,
+                    onPressed: busy ? null : () => _proximamente('Apple'),
                     icon: _buildIconCircle(
                       backgroundColor: Colors.white.withOpacity(0.15),
                       child: const Icon(
@@ -232,7 +329,7 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                   ),
                   const SizedBox(height: 14),
                   _buildLoginButton(
-                    onPressed: _irAHome,
+                    onPressed: busy ? null : () => _proximamente('Facebook'),
                     icon: _buildIconCircle(
                       backgroundColor: Colors.white.withOpacity(0.2),
                       child: const Text(
@@ -268,7 +365,7 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                   ),
                   const SizedBox(height: 20),
                   _buildLoginButton(
-                    onPressed: _irAHome,
+                    onPressed: busy ? null : () => _proximamente('Email'),
                     icon: _buildIconCircle(
                       backgroundColor: primaryColor.withOpacity(0.1),
                       child: const Icon(
@@ -292,15 +389,17 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                         style: TextStyle(color: subTextColor, fontSize: 14),
                       ),
                       GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  const RegistroCuentaWidget(),
-                            ),
-                          );
-                        },
+                        onTap: busy
+                            ? null
+                            : () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const RegistroCuentaWidget(),
+                                  ),
+                                );
+                              },
                         child: const Text(
                           'Crear usuario',
                           style: TextStyle(
@@ -339,19 +438,21 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
   }
 
   Widget _buildLoginButton({
-    required VoidCallback onPressed,
+    required VoidCallback? onPressed,
     required Widget icon,
     required String label,
     required Color backgroundColor,
     required Color textColor,
     bool hasBorder = false,
     Color? borderColor,
+    bool loading = false,
   }) {
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
         backgroundColor: backgroundColor,
         foregroundColor: textColor,
+        disabledBackgroundColor: backgroundColor.withOpacity(0.7),
         elevation: backgroundColor == Colors.white ? 1 : 0,
         padding: const EdgeInsets.symmetric(vertical: 15),
         shape: RoundedRectangleBorder(
@@ -365,23 +466,30 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
         ),
       ),
       child: Stack(
+        alignment: Alignment.center,
         children: [
           Align(
             alignment: Alignment.centerLeft,
             child: Padding(
               padding: const EdgeInsets.only(left: 16.0),
-              child: icon,
+              child: loading
+                  ? SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: textColor,
+                      ),
+                    )
+                  : icon,
             ),
           ),
-          Align(
-            alignment: Alignment.center,
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.2,
-              ),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.2,
             ),
           ),
         ],
