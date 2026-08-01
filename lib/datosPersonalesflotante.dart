@@ -42,6 +42,9 @@ class _DatosPersonalesFlotanteWidgetState
   DateTime? _fechaNacimiento;
   String? _urlFotoDocumento;
 
+  /// Cómo figura en el documento: mujer | hombre | no_binario
+  String? _generoDocumento;
+
   bool _tieneWhatsapp = false;
   bool _loading = true;
   bool _saving = false;
@@ -64,6 +67,9 @@ class _DatosPersonalesFlotanteWidgetState
   @override
   void initState() {
     super.initState();
+    _docNumeroController.addListener(() {
+      if (mounted) setState(() {});
+    });
     _cargarDatos();
   }
 
@@ -106,6 +112,22 @@ class _DatosPersonalesFlotanteWidgetState
         _tipoDoc = data['tipo_doc'] ?? data['tipo_documento'];
         _paisDoc = data['pais_doc'] ?? data['pais_emision'];
         _urlFotoDocumento = data['url_foto_documento']?.toString();
+        final g = (data['genero_documento'] ?? data['sexo_documento'] ?? '')
+            .toString()
+            .trim()
+            .toLowerCase();
+        if (g == 'mujer' || g == 'hombre' || g == 'no_binario') {
+          _generoDocumento = g;
+        } else if (g == 'f' || g == 'femenino' || g == 'female') {
+          _generoDocumento = 'mujer';
+        } else if (g == 'm' || g == 'masculino' || g == 'male') {
+          _generoDocumento = 'hombre';
+        } else if (g == 'x' ||
+            g == 'nb' ||
+            g == 'no binario' ||
+            g == 'nobinario') {
+          _generoDocumento = 'no_binario';
+        }
         _docValidado = data['doc_validado'] == true;
         _docHashDatos = data['doc_hash_datos']?.toString();
 
@@ -211,12 +233,14 @@ class _DatosPersonalesFlotanteWidgetState
     if (_nombreController.text.trim().isEmpty ||
         _apellidoController.text.trim().isEmpty ||
         _docNumeroController.text.trim().isEmpty ||
+        _generoDocumento == null ||
+        _generoDocumento!.isEmpty ||
         _paisDoc == null ||
         _fechaNacimiento == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Completá nombre, apellido, documento, país y fecha antes de escanear.',
+            'Completá nombre, apellido, documento, identificación (Mujer/Hombre/No binario), país y fecha antes de escanear.',
           ),
         ),
       );
@@ -324,6 +348,7 @@ class _DatosPersonalesFlotanteWidgetState
         'doc_validado_hash': resultado.hash,
         'doc_validado_en': Timestamp.fromDate(resultado.timestamp!),
         'doc_hash_datos': hashAncla,
+        'genero_documento': _generoDocumento,
         'ocr_texto': ocr.textoCrudo,
         'ocr_nombres': ocr.nombres,
         'ocr_apellidos': ocr.apellidos,
@@ -463,6 +488,19 @@ class _DatosPersonalesFlotanteWidgetState
     final uid = UserSession().uid;
     if (uid == null) return;
 
+    final docNum = _docNumeroController.text.trim();
+    if (docNum.isNotEmpty &&
+        (_generoDocumento == null || _generoDocumento!.isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Si cargás número de documento, indicá cómo figura: Mujer, Hombre o No binario.',
+          ),
+        ),
+      );
+      return;
+    }
+
     final email1 = _emailController.text.trim();
     final email2 = _emailConfirmController.text.trim();
     if (email1 != email2) {
@@ -494,6 +532,7 @@ class _DatosPersonalesFlotanteWidgetState
         'tipo_doc': _tipoDoc,
         'pais_doc': _paisDoc,
         'doc_numero': _docNumeroController.text.trim(),
+        'genero_documento': _generoDocumento,
         'fecha_nacimiento': _fechaNacimiento != null
             ? Timestamp.fromDate(_fechaNacimiento!)
             : null,
@@ -668,6 +707,7 @@ class _DatosPersonalesFlotanteWidgetState
                         (v) => setState(() => _paisDoc = v),
                       ),
                       _buildField('Número de documento', _docNumeroController),
+                      _buildGeneroDocumento(),
                       _buildFechaNacimiento(),
                       _buildFotoDocumento(),
                       _buildField(
@@ -793,6 +833,66 @@ class _DatosPersonalesFlotanteWidgetState
         items:
             items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
         onChanged: onChanged,
+      ),
+    );
+  }
+
+  Widget _buildGeneroDocumento() {
+    const opciones = <Map<String, String>>[
+      {'id': 'mujer', 'label': 'Mujer'},
+      {'id': 'hombre', 'label': 'Hombre'},
+      {'id': 'no_binario', 'label': 'No binario'},
+    ];
+    final docTieneNumero = _docNumeroController.text.trim().isNotEmpty;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            docTieneNumero
+                ? 'Cómo figura en el documento *'
+                : 'Cómo figura en el documento',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade700,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Obligatorio si completás el número de documento.',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: opciones.map((o) {
+              final id = o['id']!;
+              final label = o['label']!;
+              final selected = _generoDocumento == id;
+              return ChoiceChip(
+                label: Text(label),
+                selected: selected,
+                onSelected: (_) {
+                  setState(() {
+                    _generoDocumento = selected ? null : id;
+                  });
+                },
+                selectedColor: primaryColor.withOpacity(0.18),
+                labelStyle: TextStyle(
+                  color: selected ? primaryColor : _textColor,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                ),
+                side: BorderSide(
+                  color: selected ? primaryColor : Colors.grey.shade300,
+                ),
+                backgroundColor: Colors.white,
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }
