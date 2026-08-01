@@ -12,7 +12,6 @@ class EspecialidadesLaboralesFlotanteWidget extends StatefulWidget {
 
 class _EspecialidadesLaboralesFlotanteWidgetState
     extends State<EspecialidadesLaboralesFlotanteWidget> {
-  // Look & feel prestador
   static const Color primaryColor = Color(0xFF28B5CD);
   static const Color _bg = Color(0xFFF8FAFC);
   static const Color _textColor = Color(0xFF1E293B);
@@ -22,6 +21,7 @@ class _EspecialidadesLaboralesFlotanteWidgetState
 
   List<String> _oficiosDisponibles = [];
   List<String> _oficiosSeleccionados = [];
+
   bool _loading = true;
   bool _saving = false;
   String? _errorCarga;
@@ -73,14 +73,36 @@ class _EspecialidadesLaboralesFlotanteWidgetState
       }
 
       if (_oficiosDisponibles.isEmpty) {
-        _errorCarga = oficiosSnapshot.docs.isEmpty
-            ? 'La colección cat_oficios está vacía o no hay permisos de lectura.'
-            : 'Ningún documento de cat_oficios tiene el campo lista "maestro".';
+        debugPrint(
+          oficiosSnapshot.docs.isEmpty
+              ? 'cat_oficios vacía; usando catálogo local de oficios.'
+              : 'cat_oficios sin campo maestro; usando catálogo local.',
+        );
+        _oficiosDisponibles = const [
+          'electricidad',
+          'carpinteria',
+          'plomeria',
+          'jardineria',
+          'limpieza',
+          'pintura',
+          'gasista',
+          'albanileria',
+        ];
       }
     } catch (e) {
-      _errorCarga = 'Error leyendo cat_oficios: $e';
-      debugPrint(_errorCarga);
-      rethrow;
+      debugPrint('Error leyendo cat_oficios: $e');
+      // Fallback local si rules aún no permiten cat_oficios o hay fallo de red.
+      _oficiosDisponibles = const [
+        'electricidad',
+        'carpinteria',
+        'plomeria',
+        'jardineria',
+        'limpieza',
+        'pintura',
+        'gasista',
+        'albanileria',
+      ];
+      _errorCarga = null;
     }
   }
 
@@ -103,32 +125,55 @@ class _EspecialidadesLaboralesFlotanteWidgetState
     }
   }
 
-  Future<void> _actualizarDatos() async {
+  String _labelOficio(String clave) {
+    const labels = {
+      'electricidad': 'Electricista',
+      'plomeria': 'Plomería',
+      'gasista': 'Gasista',
+      'carpinteria': 'Carpintería',
+      'pintura': 'Pintura',
+      'albanileria': 'Construcción',
+      'jardineria': 'Jardinería',
+      'limpieza': 'Limpieza',
+    };
+    final k = clave.toLowerCase().trim();
+    return labels[k] ?? clave;
+  }
+
+  Future<void> _guardar() async {
     final uid = UserSession().uid;
     if (uid == null) return;
 
     if (_oficiosSeleccionados.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Seleccioná al menos una especialidad')),
+        const SnackBar(content: Text('Seleccioná al menos un servicio')),
       );
       return;
     }
 
     setState(() => _saving = true);
-
     try {
       await db.collection('usuarios').doc(uid).set({
         'nombre_comercial': _nombreComercialController.text.trim(),
         'profesiones': _oficiosSeleccionados,
         'es_trabajador': true,
-        'rol': 'trabajador',
         'updated_at': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+
+      final session = UserSession();
+      if (session.datosCompletos != null) {
+        session.datosCompletos = {
+          ...session.datosCompletos!,
+          'nombre_comercial': _nombreComercialController.text.trim(),
+          'profesiones': _oficiosSeleccionados,
+          'es_trabajador': true,
+        };
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Especialidades actualizadas'),
+            content: Text('Servicios actualizados'),
             backgroundColor: Colors.green,
           ),
         );
@@ -137,102 +182,101 @@ class _EspecialidadesLaboralesFlotanteWidgetState
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text('Error al guardar: $e')),
         );
       }
     }
-
     if (mounted) setState(() => _saving = false);
   }
 
   void _mostrarSeleccionEspecialidades() {
-    final opciones =
-        _oficiosDisponibles.map((p) => {'id': p, 'nombre': p}).toList();
-    List<Map<String, String>> tempSeleccionadas =
-        _oficiosSeleccionados.map((p) => {'id': p, 'nombre': p}).toList();
-
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (context) {
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
         return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              title: const Text(
-                'Especialidades',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: _textColor,
-                ),
-              ),
-              content: SizedBox(
-                width: double.maxFinite,
-                child: opciones.isEmpty
-                    ? const Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Text(
-                          'No hay especialidades disponibles.',
-                          textAlign: TextAlign.center,
-                        ),
-                      )
-                    : ListView.builder(
+          builder: (context, setModalState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Servicios que ofrezco',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: _textColor,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Podés elegir más de uno',
+                      style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                    ),
+                    const SizedBox(height: 12),
+                    Flexible(
+                      child: ListView(
                         shrinkWrap: true,
-                        itemCount: opciones.length,
-                        itemBuilder: (context, index) {
-                          final item = opciones[index];
-                          final isChecked = tempSeleccionadas
-                              .any((e) => e['id'] == item['id']);
+                        children: _oficiosDisponibles.map((oficio) {
+                          final selected =
+                              _oficiosSeleccionados.contains(oficio);
                           return CheckboxListTile(
-                            title: Text(
-                              item['nombre']!,
-                              style: const TextStyle(color: _textColor),
-                            ),
-                            value: isChecked,
+                            value: selected,
                             activeColor: primaryColor,
-                            onChanged: (checked) {
-                              setDialogState(() {
-                                if (checked == true) {
-                                  tempSeleccionadas.add(item);
+                            title: Text(
+                              _labelOficio(oficio),
+                              style: const TextStyle(fontWeight: FontWeight.w500),
+                            ),
+                            onChanged: (v) {
+                              setModalState(() {
+                                if (v == true) {
+                                  if (!_oficiosSeleccionados.contains(oficio)) {
+                                    _oficiosSeleccionados.add(oficio);
+                                  }
                                 } else {
-                                  tempSeleccionadas.removeWhere(
-                                    (e) => e['id'] == item['id'],
-                                  );
+                                  _oficiosSeleccionados.remove(oficio);
                                 }
                               });
+                              setState(() {});
                             },
                           );
-                        },
+                        }).toList(),
                       ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(
-                    'Cancelar',
-                    style: TextStyle(color: Colors.grey.shade600),
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      _oficiosSeleccionados =
-                          tempSeleccionadas.map((e) => e['nombre']!).toList();
-                    });
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
                     ),
-                  ),
-                  child: const Text('Confirmar'),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Listo'),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             );
           },
         );
@@ -246,7 +290,6 @@ class _EspecialidadesLaboralesFlotanteWidgetState
       hintText: hint,
       filled: true,
       fillColor: Colors.white,
-      labelStyle: TextStyle(color: Colors.grey.shade600),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: Colors.grey.shade200),
@@ -259,7 +302,8 @@ class _EspecialidadesLaboralesFlotanteWidgetState
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: primaryColor, width: 1.5),
       ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     );
   }
 
@@ -277,18 +321,17 @@ class _EspecialidadesLaboralesFlotanteWidgetState
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Especialidades laborales',
+          'Mis servicios',
           style: TextStyle(
             color: _textColor,
             fontWeight: FontWeight.bold,
             fontSize: 18,
           ),
         ),
-        centerTitle: false,
         actions: [
           IconButton(
-            icon: Icon(Icons.refresh, color: Colors.grey.shade600),
-            tooltip: 'Recargar oficios',
+            icon: const Icon(Icons.refresh),
+            color: primaryColor,
             onPressed: _loading ? null : _cargarTodo,
           ),
         ],
@@ -298,16 +341,13 @@ class _EspecialidadesLaboralesFlotanteWidgetState
           : ListView(
               padding: const EdgeInsets.all(20),
               children: [
-                TextFormField(
+                TextField(
                   controller: _nombreComercialController,
-                  decoration: _dec(
-                    'Nombre comercial',
-                    hint: 'Ej: Servicios Eléctricos López',
-                  ),
+                  decoration: _dec('Nombre comercial'),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 const Text(
-                  'Oficios / Especialidades',
+                  'Servicios que ofrezco',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -315,9 +355,9 @@ class _EspecialidadesLaboralesFlotanteWidgetState
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
+                const Text(
                   'Podés elegir más de uno',
-                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                  style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
                 ),
                 const SizedBox(height: 12),
                 InkWell(
@@ -326,18 +366,15 @@ class _EspecialidadesLaboralesFlotanteWidgetState
                       : _mostrarSeleccionEspecialidades,
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
-                    padding: const EdgeInsets.all(16),
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.grey.shade200),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.03),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
                     ),
                     child: Row(
                       children: [
@@ -346,7 +383,7 @@ class _EspecialidadesLaboralesFlotanteWidgetState
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Oficios / Especialidades',
+                                'Servicios que ofrezco',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.grey.shade600,
@@ -355,61 +392,70 @@ class _EspecialidadesLaboralesFlotanteWidgetState
                               const SizedBox(height: 4),
                               Text(
                                 _oficiosSeleccionados.isEmpty
-                                    ? 'Seleccionar especialidades'
-                                    : _oficiosSeleccionados.join(', '),
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: _textColor,
+                                    ? 'Seleccionar servicios'
+                                    : _oficiosSeleccionados
+                                        .map(_labelOficio)
+                                        .join(' · '),
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: _oficiosSeleccionados.isEmpty
+                                      ? Colors.grey.shade500
+                                      : _textColor,
                                 ),
-                                maxLines: 3,
-                                overflow: TextOverflow.ellipsis,
                               ),
                             ],
                           ),
                         ),
-                        Icon(
-                          Icons.arrow_drop_down,
-                          color: Colors.grey.shade500,
-                        ),
+                        Icon(Icons.expand_more, color: Colors.grey.shade600),
                       ],
                     ),
                   ),
                 ),
-                if (_oficiosDisponibles.isEmpty) ...[
+                if (_oficiosSeleccionados.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _oficiosSeleccionados.map((o) {
+                      return Chip(
+                        label: Text(_labelOficio(o)),
+                        backgroundColor: primaryColor.withOpacity(0.12),
+                        labelStyle: const TextStyle(
+                          color: primaryColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        deleteIconColor: primaryColor,
+                        onDeleted: () {
+                          setState(() => _oficiosSeleccionados.remove(o));
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ],
+                if (_errorCarga != null) ...[
                   const SizedBox(height: 16),
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: Colors.orange.shade50,
+                      color: const Color(0xFFFFF7ED),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.orange.shade200),
+                      border: Border.all(color: const Color(0xFFFDBA74)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'No se cargaron oficios desde cat_oficios.maestro',
-                          style: TextStyle(
+                        Text(
+                          _errorCarga!,
+                          style: const TextStyle(
                             fontSize: 13,
-                            fontWeight: FontWeight.w600,
                             color: Color(0xFF9A3412),
                           ),
                         ),
-                        if (_errorCarga != null) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            _errorCarga!,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF9A3412),
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 8),
                         TextButton.icon(
                           onPressed: _cargarTodo,
-                          icon: const Icon(Icons.refresh, size: 18),
+                          icon: const Icon(Icons.refresh, size: 16),
                           label: const Text('Reintentar'),
                           style: TextButton.styleFrom(
                             foregroundColor: primaryColor,
@@ -418,42 +464,13 @@ class _EspecialidadesLaboralesFlotanteWidgetState
                       ],
                     ),
                   ),
-                ] else ...[
-                  const SizedBox(height: 12),
-                  if (_oficiosSeleccionados.isNotEmpty)
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _oficiosSeleccionados.map((o) {
-                        return Chip(
-                          label: Text(o),
-                          deleteIcon: const Icon(Icons.close, size: 16),
-                          onDeleted: () {
-                            setState(() => _oficiosSeleccionados.remove(o));
-                          },
-                          backgroundColor: primaryColor.withOpacity(0.12),
-                          side: BorderSide(
-                            color: primaryColor.withOpacity(0.25),
-                          ),
-                          labelStyle: const TextStyle(
-                            color: primaryColor,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${_oficiosDisponibles.length} especialidades disponibles en catálogo',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                  ),
                 ],
-                const SizedBox(height: 32),
+                const SizedBox(height: 28),
                 SizedBox(
                   width: double.infinity,
                   height: 50,
                   child: ElevatedButton.icon(
-                    onPressed: _saving ? null : _actualizarDatos,
+                    onPressed: _saving ? null : _guardar,
                     icon: _saving
                         ? const SizedBox(
                             width: 20,
@@ -477,7 +494,6 @@ class _EspecialidadesLaboralesFlotanteWidgetState
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
               ],
             ),
     );
