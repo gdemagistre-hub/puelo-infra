@@ -57,6 +57,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ---------- catálogo de oficios / servicios ----------
+    match /cat_oficios/{doc} {
+      allow read: if true;
+      allow write: if false; // solo backend / consola
+    }
+
     // ---------- usuarios ----------
     // Convención con Google Auth (y futuros FB/Apple):
     //   doc id = Firebase Auth uid
