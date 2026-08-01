@@ -16,6 +16,7 @@ import 'menuPerfilOpciones.dart';
 import 'datosPersonalesflotante.dart';
 import 'Domicilioflotante.dart';
 import 'ZonaDeTrabajoflotante.dart';
+import 'especialidadesLaboralesflotante.dart';
 import 'solicitar_validacion.dart';
 import 'scoring_service.dart';
 import 'config/app_env.dart';
@@ -298,7 +299,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           body: 'Sin oficios no aparecés cuando alguien busca un servicio.',
           icon: Icons.handyman_outlined,
           onTap: () {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const RegistroTrabajadorWidget()))
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const EspecialidadesLaboralesFlotanteWidget()))
                 .then((_) => _cargarEstadoVisibilidadYConsejos());
           },
         ));
@@ -362,32 +363,59 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 40, height: 4,
-                  decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
                 const SizedBox(height: 16),
-                const Text('Foto de perfil', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                const Text(
+                  'Foto de perfil',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
                 const SizedBox(height: 6),
-                Text('Una selfie ayuda a que te reconozcan y generen confianza.', textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.35)),
+                Text(
+                  'Una selfie ayuda a que te reconozcan y generen confianza.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.35),
+                ),
                 const SizedBox(height: 20),
                 ListTile(
                   leading: Icon(Icons.photo_camera_outlined, color: primaryColor),
                   title: const Text('Tomar selfie'),
                   subtitle: Text(kIsWeb ? 'En web se abre el selector de archivos' : 'Cámara frontal'),
-                  onTap: () { Navigator.pop(ctx); _elegirYSubirFoto(ImageSource.camera); },
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _elegirYSubirFoto(ImageSource.camera);
+                  },
                 ),
                 ListTile(
                   leading: Icon(Icons.photo_library_outlined, color: primaryColor),
                   title: const Text('Elegir de galería'),
-                  onTap: () { Navigator.pop(ctx); _elegirYSubirFoto(ImageSource.gallery); },
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _elegirYSubirFoto(ImageSource.gallery);
+                  },
                 ),
                 if (_urlFotoPerfil != null && _urlFotoPerfil!.isNotEmpty)
                   ListTile(
                     leading: const Icon(Icons.delete_outline, color: Colors.red),
                     title: const Text('Quitar foto'),
-                    onTap: () { Navigator.pop(ctx); _quitarFotoPerfil(); },
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _quitarFotoPerfil();
+                    },
                   ),
-                TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Ahora no', style: TextStyle(color: Colors.grey.shade600))),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text('Ahora no', style: TextStyle(color: Colors.grey.shade600)),
+                ),
               ],
             ),
           ),
@@ -401,28 +429,61 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     if (uid == null) return;
     try {
       final picker = ImagePicker();
-      final XFile? file = await picker.pickImage(source: source, maxWidth: 800, maxHeight: 800, imageQuality: 85, preferredCameraDevice: CameraDevice.front);
+      final XFile? file = await picker.pickImage(
+        source: source,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+        preferredCameraDevice: CameraDevice.front,
+      );
       if (file == null) return;
       if (!mounted) return;
       setState(() => _subiendoFoto = true);
+
       final bytes = await file.readAsBytes();
-      final ref = FirebaseStorage.instance.ref().child('usuarios').child(uid).child('foto_perfil.jpg');
-      final upload = await ref.putData(Uint8List.fromList(bytes), SettableMetadata(contentType: 'image/jpeg'));
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('usuarios')
+          .child(uid)
+          .child('foto_perfil.jpg');
+      final upload = await ref.putData(
+        Uint8List.fromList(bytes),
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
       final url = await upload.ref.getDownloadURL();
-      await FirebaseFirestore.instance.collection('usuarios').doc(uid).set({'url_foto_perfil': url, 'updated_at': FieldValue.serverTimestamp()}, SetOptions(merge: true));
+
+      await FirebaseFirestore.instance.collection('usuarios').doc(uid).set({
+        'url_foto_perfil': url,
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
       final session = UserSession();
       if (session.datosCompletos != null) {
-        session.datosCompletos = {...session.datosCompletos!, 'url_foto_perfil': url};
+        session.datosCompletos = {
+          ...session.datosCompletos!,
+          'url_foto_perfil': url,
+        };
       }
+
       if (mounted) {
-        setState(() { _urlFotoPerfil = url; _subiendoFoto = false; });
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('¡Listo! Tu foto de perfil quedó actualizada.'), backgroundColor: Colors.green));
+        setState(() {
+          _urlFotoPerfil = url;
+          _subiendoFoto = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('¡Listo! Tu foto de perfil quedó actualizada.'),
+            backgroundColor: Colors.green,
+          ),
+        );
       }
     } catch (e) {
       debugPrint('Error subiendo foto perfil: $e');
       if (mounted) {
         setState(() => _subiendoFoto = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No se pudo subir la foto: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No se pudo subir la foto: $e')),
+        );
       }
     }
   }
@@ -432,9 +493,17 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     if (uid == null) return;
     try {
       setState(() => _subiendoFoto = true);
-      await FirebaseFirestore.instance.collection('usuarios').doc(uid).set({'url_foto_perfil': FieldValue.delete(), 'updated_at': FieldValue.serverTimestamp()}, SetOptions(merge: true));
+      await FirebaseFirestore.instance.collection('usuarios').doc(uid).set({
+        'url_foto_perfil': FieldValue.delete(),
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
       UserSession().datosCompletos?.remove('url_foto_perfil');
-      if (mounted) setState(() { _urlFotoPerfil = null; _subiendoFoto = false; });
+      if (mounted) {
+        setState(() {
+          _urlFotoPerfil = null;
+          _subiendoFoto = false;
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _subiendoFoto = false);
@@ -446,10 +515,16 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   void _compartirTarjeta() async {
     final userId = UserSession().uid;
     if (userId == null || userId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error: No se encontró la sesión activa.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error: No se encontró la sesión activa.')),
+      );
       return;
     }
-    showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator()));
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
     try {
       final doc = await FirebaseFirestore.instance.collection('usuarios').doc(userId).get();
       if (context.mounted) Navigator.pop(context);
@@ -461,11 +536,21 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       final esTrabajador = data['es_trabajador'] == true;
       if (profesiones.isEmpty || localidades.isEmpty || !esTrabajador) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Para que te contacten, primero cargá oficios y zona.')));
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const RegistroTrabajadorWidget())).then((_) => _refrescarRolDesdeFirestore());
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Para que te contacten, primero cargá oficios y zona.')),
+          );
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const RegistroTrabajadorWidget()))
+              .then((_) => _refrescarRolDesdeFirestore());
         }
       } else if (context.mounted) {
-        Navigator.push(context, MaterialPageRoute(builder: (_) => TarjetaDigitalWidget(usuarioRef: FirebaseFirestore.instance.collection('usuarios').doc(userId))));
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TarjetaDigitalWidget(
+              usuarioRef: FirebaseFirestore.instance.collection('usuarios').doc(userId),
+            ),
+          ),
+        );
       }
     } catch (e) {
       if (context.mounted) {
@@ -477,15 +562,28 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
   void _irABuscador([String? query]) {
     final texto = (query ?? _searchController.text).trim();
-    Navigator.push(context, MaterialPageRoute(builder: (_) => BuscadorPrestadoresWidget(initialQuery: texto.isEmpty ? null : texto)));
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BuscadorPrestadoresWidget(initialQuery: texto.isEmpty ? null : texto),
+      ),
+    );
   }
 
   Widget _buildAvatarHeader() {
     final initials = _getInitials();
-    final initialsStyle = const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16);
+    final initialsStyle = const TextStyle(
+      color: Colors.white,
+      fontWeight: FontWeight.bold,
+      fontSize: 16,
+    );
     final hasPhoto = _urlFotoPerfil != null && _urlFotoPerfil!.isNotEmpty;
     if (!hasPhoto) {
-      return CircleAvatar(radius: 20, backgroundColor: primaryColor, child: Text(initials, style: initialsStyle));
+      return CircleAvatar(
+        radius: 20,
+        backgroundColor: primaryColor,
+        child: Text(initials, style: initialsStyle),
+      );
     }
     return CircleAvatar(
       radius: 20,
@@ -497,13 +595,19 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           height: 40,
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => Container(
-            width: 40, height: 40, color: primaryColor, alignment: Alignment.center,
+            width: 40,
+            height: 40,
+            color: primaryColor,
+            alignment: Alignment.center,
             child: Text(initials, style: initialsStyle),
           ),
           loadingBuilder: (context, child, progress) {
             if (progress == null) return child;
             return Container(
-              width: 40, height: 40, color: primaryColor, alignment: Alignment.center,
+              width: 40,
+              height: 40,
+              color: primaryColor,
+              alignment: Alignment.center,
               child: Text(initials, style: initialsStyle),
             );
           },
@@ -521,7 +625,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   }
 
   void _onBottomNavTap(int index) {
-    if (index == 0) { setState(() => _currentIndex = 0); return; }
+    if (index == 0) {
+      setState(() => _currentIndex = 0);
+      return;
+    }
     if (index == 1) {
       setState(() => _currentIndex = 0);
       Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()));
@@ -551,8 +658,12 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Hola $nombreMostrar', style: const TextStyle(color: Colors.black, fontSize: 20, fontWeight: FontWeight.bold)),
-            Text(_modoPrestador ? AppCopy.homePrestadorHint : AppCopy.homeClienteHint, style: const TextStyle(color: Colors.grey, fontSize: 14)),
+            Text('Hola $nombreMostrar',
+                style: const TextStyle(color: Colors.black, fontSize: 20, fontWeight: FontWeight.bold)),
+            Text(
+              _modoPrestador ? AppCopy.homePrestadorHint : AppCopy.homeClienteHint,
+              style: const TextStyle(color: Colors.grey, fontSize: 14),
+            ),
           ],
         ),
         actions: [
@@ -574,9 +685,11 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(_modoPrestador ? Icons.handyman_outlined : Icons.search_rounded, size: 16, color: primaryColor),
+                      Icon(_modoPrestador ? Icons.handyman_outlined : Icons.search_rounded,
+                          size: 16, color: primaryColor),
                       const SizedBox(width: 6),
-                      Text(_modoPrestador ? 'Ofrezco trabajo' : 'Busco trabajo', style: TextStyle(color: primaryColor, fontWeight: FontWeight.w600, fontSize: 12)),
+                      Text(_modoPrestador ? 'Ofrezco trabajo' : 'Busco trabajo',
+                          style: TextStyle(color: primaryColor, fontWeight: FontWeight.w600, fontSize: 12)),
                     ],
                   ),
                 ),
@@ -600,10 +713,19 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                         color: Colors.white,
                         shape: BoxShape.circle,
                         border: Border.all(color: primaryColor.withOpacity(0.35), width: 1.2),
-                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 3, offset: const Offset(0, 1))],
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.12),
+                            blurRadius: 3,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
                       ),
                       child: _subiendoFoto
-                          ? Padding(padding: const EdgeInsets.all(3), child: CircularProgressIndicator(strokeWidth: 1.5, color: primaryColor))
+                          ? Padding(
+                              padding: const EdgeInsets.all(3),
+                              child: CircularProgressIndicator(strokeWidth: 1.5, color: primaryColor),
+                            )
                           : Icon(Icons.photo_camera_rounded, size: 11, color: primaryColor),
                     ),
                   ),
@@ -660,9 +782,15 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                   const Icon(Icons.location_on_outlined, color: _clientePrimary, size: 24),
                   const SizedBox(width: 12),
                   const Expanded(
-                    child: Text('Si indicás tu zona, te mostramos prestadores cerca.', style: TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.35)),
+                    child: Text(
+                      'Si indicás tu zona, te mostramos prestadores cerca.',
+                      style: TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.35),
+                    ),
                   ),
-                  IconButton(icon: Icon(Icons.close, size: 20, color: Colors.grey.shade600), onPressed: _descartarBannerZona),
+                  IconButton(
+                    icon: Icon(Icons.close, size: 20, color: Colors.grey.shade600),
+                    onPressed: _descartarBannerZona,
+                  ),
                 ],
               ),
             ),
@@ -670,13 +798,21 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
               child: Row(
                 children: [
-                  Expanded(child: OutlinedButton(onPressed: _descartarBannerZona, child: const Text('Ahora no'))),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _descartarBannerZona,
+                      child: const Text('Ahora no'),
+                    ),
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     flex: 2,
                     child: ElevatedButton(
                       onPressed: _abrirDomicilioDesdeBanner,
-                      style: ElevatedButton.styleFrom(backgroundColor: _clientePrimary, foregroundColor: Colors.white),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _clientePrimary,
+                        foregroundColor: Colors.white,
+                      ),
                       child: const Text('Indicar mi zona'),
                     ),
                   ),
@@ -690,7 +826,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   }
 
   Widget _buildClienteBody({Key? key}) {
-    final colores = [_clientePrimary, _accentCoral, _accentLightBlue, _prestadorPrimary, _dark, _clientePrimary, _accentCoral, _prestadorPrimary];
+    final colores = [
+      _clientePrimary, _accentCoral, _accentLightBlue, _prestadorPrimary,
+      _dark, _clientePrimary, _accentCoral, _prestadorPrimary,
+    ];
     return SingleChildScrollView(
       key: key,
       child: Column(
@@ -712,7 +851,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                       children: [
                         Icon(Icons.handyman_outlined, color: Colors.white, size: 26),
                         SizedBox(width: 14),
-                        Expanded(child: Text('¿Ofrecés un oficio? Empezá en 3 pasos', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                        Expanded(
+                          child: Text('¿Ofrecés un oficio? Empezá en 3 pasos',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        ),
                         Icon(Icons.chevron_right_rounded, color: Colors.white),
                       ],
                     ),
@@ -730,18 +872,25 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                 prefixIcon: const Icon(Icons.search, color: Colors.grey),
                 filled: true,
                 fillColor: Colors.white,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: BorderSide.none,
+                ),
               ),
               onSubmitted: _irABuscador,
             ),
           ),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Text(AppCopy.seccionServiciosBuscados, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            child: Text(AppCopy.seccionServiciosBuscados,
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           ),
           const SizedBox(height: 12),
           if (_cargandoServicios)
-            const Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator()))
+            const Padding(
+              padding: EdgeInsets.all(32),
+              child: Center(child: CircularProgressIndicator()),
+            )
           else
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -765,11 +914,17 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                         Container(
                           width: 64,
                           height: 64,
-                          decoration: BoxDecoration(color: const Color(0xFFF0F7FF), borderRadius: BorderRadius.circular(16)),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF0F7FF),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
                           child: Icon(s.icon, size: 30, color: color),
                         ),
                         const SizedBox(height: 8),
-                        Text(s.label, style: const TextStyle(fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        Text(s.label,
+                            style: const TextStyle(fontSize: 12),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
                       ],
                     ),
                   );
@@ -781,11 +936,14 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
               children: [
-                Expanded(child: _quickAction(Icons.search, 'Buscar prestadores', () => _irABuscador())),
+                Expanded(
+                  child: _quickAction(Icons.search, 'Buscar prestadores', () => _irABuscador()),
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: _quickAction(Icons.check_circle_outline, 'Evaluar trabajos', () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()));
+                    Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()));
                   }),
                 ),
               ],
@@ -826,21 +984,57 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (_visibilidadCargando)
-            const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator()))
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(child: CircularProgressIndicator()),
+            )
           else
-            Container(
-              margin: const EdgeInsets.all(16),
+            Padding(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
+              child: Material(
                 color: _estaVisible ? const Color(0xFFECFDF5) : const Color(0xFFFFF7ED),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: _estaVisible ? const Color(0xFF6EE7B7) : const Color(0xFFFDBA74)),
-              ),
-              child: Text(
-                _estaVisible
-                    ? 'Estás visible · $_resumenOficios · $_resumenZona'
-                    : 'Todavía no aparecés en búsquedas. Completá oficios, zona y teléfono.',
-                style: const TextStyle(fontSize: 13, height: 1.35),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const EspecialidadesLaboralesFlotanteWidget(),
+                      ),
+                    );
+                    await _cargarEstadoVisibilidadYConsejos();
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: _estaVisible
+                            ? const Color(0xFF6EE7B7)
+                            : const Color(0xFFFDBA74),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _estaVisible
+                                ? 'Estás visible · $_resumenOficios · $_resumenZona'
+                                : 'Todavía no aparecés en búsquedas. Completá oficios, zona y teléfono.',
+                            style: const TextStyle(fontSize: 13, height: 1.35),
+                          ),
+                        ),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color: _estaVisible
+                              ? const Color(0xFF059669)
+                              : const Color(0xFFEA580C),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
           Padding(
@@ -857,7 +1051,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                     children: [
                       Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 28),
                       SizedBox(width: 14),
-                      Expanded(child: Text('Tu tarjeta para que te contacten', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                      Expanded(
+                        child: Text('Tu tarjeta para que te contacten',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      ),
                       Icon(Icons.chevron_right_rounded, color: Colors.white),
                     ],
                   ),
@@ -867,10 +1064,14 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           ),
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 20, 16, 8),
-            child: Text(AppCopy.seccionConsejos, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            child: Text(AppCopy.seccionConsejos,
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           ),
           if (_cargandoConsejos)
-            const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()))
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator()),
+            )
           else
             ..._consejos.map((c) => ListTile(
                   leading: Icon(c.icon, color: primaryColor),
@@ -890,7 +1091,12 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                         try {
                           final r = await ScoringService.ejecutarBatchDiario();
                           if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Badges: ${r.actualizados}/${r.procesados}')));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                    'Badges: ${r.actualizados}/${r.procesados}'),
+                              ),
+                            );
                           }
                         } finally {
                           if (mounted) setState(() => _corriendoBatch = false);
