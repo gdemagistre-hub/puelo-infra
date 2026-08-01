@@ -26,6 +26,35 @@ class AuthService {
   /// true si hay sesión Firebase Auth (no impersonación dev).
   bool get hasFirebaseAuth => currentUser != null;
 
+  /// Datos que expone Firebase Auth / Google (referencia).
+  ///
+  /// Desde [User]:
+  /// - uid, email, displayName, photoURL, emailVerified
+  /// - phoneNumber (casi siempre null con Google)
+  /// - metadata.creationTime / lastSignInTime
+  /// - providerData[] (providerId, uid, email, displayName, photoURL)
+  ///
+  /// No entrega: DNI, teléfono verificado, domicilio, oficios, zona.
+  static Map<String, dynamic> snapshotFromUser(User user) {
+    return {
+      'uid': user.uid,
+      'email': user.email,
+      'displayName': user.displayName,
+      'photoURL': user.photoURL,
+      'emailVerified': user.emailVerified,
+      'phoneNumber': user.phoneNumber,
+      'providers': user.providerData
+          .map((p) => {
+                'providerId': p.providerId,
+                'uid': p.uid,
+                'email': p.email,
+                'displayName': p.displayName,
+                'photoURL': p.photoURL,
+              })
+          .toList(),
+    };
+  }
+
   /// Google Sign-In → perfil Firestore → UserSession.
   Future<void> signInWithGoogle() async {
     final UserCredential cred;
@@ -53,6 +82,8 @@ class AuthService {
     if (user == null) {
       throw StateError('Google Auth no devolvió usuario');
     }
+
+    debugPrint('Google user: ${snapshotFromUser(user)}');
 
     final data = await ensureUserProfile(
       user,
@@ -91,11 +122,9 @@ class AuthService {
 
   /// Crea o actualiza `usuarios/{uid}` con datos del provider.
   ///
-  /// Convención DB:
-  /// - doc id = Firebase Auth uid
-  /// - `auth_provider`: google | facebook | apple | email | dev
-  /// - `auth_uid`: mismo uid
-  /// - `email`, `url_foto_perfil` desde el provider si faltan
+  /// En cada login con Google sincronizamos nombre/apellido/foto/email del
+  /// provider (no solo si el campo estaba vacío), para no quedar con un doc
+  /// viejo a medias.
   Future<Map<String, dynamic>> ensureUserProfile(
     User user, {
     required String providerId,
@@ -114,13 +143,36 @@ class AuthService {
       }
     }
 
+    // Preferir displayName del providerData de Google si viene más completo.
+    for (final p in user.providerData) {
+      if (p.providerId == 'google.com' &&
+          (p.displayName ?? '').trim().isNotEmpty) {
+        final d = p.displayName!.trim();
+        final parts = d.split(RegExp(r'\s+'));
+        nombre = parts.first;
+        apellido = parts.length > 1 ? parts.sublist(1).join(' ') : apellido;
+        break;
+      }
+    }
+
+    final photo = (user.photoURL ?? '').trim().isNotEmpty
+        ? user.photoURL!.trim()
+        : user.providerData
+            .map((p) => (p.photoURL ?? '').trim())
+            .firstWhere((u) => u.isNotEmpty, orElse: () => '');
+
+    final email = (user.email ?? '').trim().isNotEmpty
+        ? user.email!.trim()
+        : user.providerData
+            .map((p) => (p.email ?? '').trim())
+            .firstWhere((e) => e.isNotEmpty, orElse: () => '');
+
     if (!snap.exists) {
       final data = <String, dynamic>{
         'nombre': nombre,
         'apellido': apellido,
-        'email': user.email ?? '',
-        if (user.photoURL != null && user.photoURL!.isNotEmpty)
-          'url_foto_perfil': user.photoURL,
+        'email': email,
+        if (photo.isNotEmpty) 'url_foto_perfil': photo,
         'auth_provider': providerId,
         'auth_uid': user.uid,
         'es_trabajador': false,
@@ -130,7 +182,7 @@ class AuthService {
       };
       await ref.set(data);
       final created = await ref.get();
-      return created.data() ?? data;
+      return Map<String, dynamic>.from(created.data() ?? data);
     }
 
     final existing = Map<String, dynamic>.from(snap.data()!);
@@ -140,28 +192,12 @@ class AuthService {
       'updated_at': FieldValue.serverTimestamp(),
     };
 
-    final existingEmail = (existing['email'] ?? '').toString().trim();
-    if (existingEmail.isEmpty && (user.email ?? '').isNotEmpty) {
-      patch['email'] = user.email;
-    }
+    // Siempre refrescar identidad desde Google si viene dato.
+    if (nombre.isNotEmpty) patch['nombre'] = nombre;
+    if (apellido.isNotEmpty) patch['apellido'] = apellido;
+    if (email.isNotEmpty) patch['email'] = email;
+    if (photo.isNotEmpty) patch['url_foto_perfil'] = photo;
 
-    final existingNombre = (existing['nombre'] ?? '').toString().trim();
-    if (existingNombre.isEmpty && nombre.isNotEmpty) {
-      patch['nombre'] = nombre;
-    }
-    final existingApellido = (existing['apellido'] ?? '').toString().trim();
-    if (existingApellido.isEmpty && apellido.isNotEmpty) {
-      patch['apellido'] = apellido;
-    }
-
-    final existingFoto = (existing['url_foto_perfil'] ?? '').toString().trim();
-    if (existingFoto.isEmpty &&
-        user.photoURL != null &&
-        user.photoURL!.isNotEmpty) {
-      patch['url_foto_perfil'] = user.photoURL;
-    }
-
-    // Si estaba pendiente de validación manual, al entrar con Google lo activamos.
     final estado = (existing['estado'] ?? '').toString();
     if (estado == 'pendiente_validacion' || estado.isEmpty) {
       patch['estado'] = 'activo';
@@ -169,7 +205,7 @@ class AuthService {
 
     await ref.set(patch, SetOptions(merge: true));
     final updated = await ref.get();
-    return updated.data() ?? {...existing, ...patch};
+    return Map<String, dynamic>.from(updated.data() ?? {...existing, ...patch});
   }
 
   /// Cierra Firebase Auth + Google Sign-In (si aplica) + UserSession.
