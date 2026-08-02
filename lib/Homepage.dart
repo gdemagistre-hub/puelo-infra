@@ -649,16 +649,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   }
 
   void _onBottomNavTap(int index) {
-    if (index == 0) {
-      setState(() => _currentIndex = 0);
-      return;
-    }
-    if (index == 1) {
-      setState(() => _currentIndex = 0);
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()));
-      return;
-    }
-    if (index == 2) setState(() => _currentIndex = 2);
+    setState(() => _currentIndex = index);
   }
 
   @override
@@ -761,19 +752,24 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       ),
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 280),
-        child: _currentIndex == 2
-            ? MenuPerfilOpcionesWidget(
-                key: ValueKey('perfil_$_modoPrestador'),
-                modoPrestador: _modoPrestador,
-                onClose: () => setState(() => _currentIndex = 0),
-                onRolPuedeHaberCambiado: _refrescarRolDesdeFirestore,
+        child: _currentIndex == 1
+            ? const MenuEvaluacionesWidget(
+                key: ValueKey('evaluar'),
+                embedded: true,
               )
-            : (_modoPrestador
-                ? _buildPrestadorBody(key: const ValueKey('prestador'))
-                : _buildClienteBody(key: const ValueKey('cliente'))),
+            : _currentIndex == 2
+                ? MenuPerfilOpcionesWidget(
+                    key: ValueKey('perfil_$_modoPrestador'),
+                    modoPrestador: _modoPrestador,
+                    onClose: () => setState(() => _currentIndex = 0),
+                    onRolPuedeHaberCambiado: _refrescarRolDesdeFirestore,
+                  )
+                : (_modoPrestador
+                    ? _buildPrestadorBody(key: const ValueKey('prestador'))
+                    : _buildClienteBody(key: const ValueKey('cliente'))),
       ),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex == 2 ? 2 : 0,
+        currentIndex: _currentIndex,
         selectedItemColor: primaryColor,
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
