@@ -19,6 +19,7 @@ import 'ZonaDeTrabajoflotante.dart';
 import 'especialidadesLaboralesflotante.dart';
 import 'solicitar_validacion.dart';
 import 'scoring_service.dart';
+import 'catalogo_oficios.dart';
 import 'config/app_env.dart';
 import 'theme/app_copy.dart';
 import 'analytics/prox_analytics.dart';
@@ -275,7 +276,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       final nombre = (data['nombre'] ?? '').toString().trim();
       final apellido = (data['apellido'] ?? '').toString().trim();
       final labelsOficios = profesiones
-          .map((k) => _metaServicios[k]?.label ?? k)
+          .map((k) => _metaServicios[k]?.label ?? CatalogoOficios.label(k))
           .take(3)
           .join(' · ');
       int pasos = 0;
