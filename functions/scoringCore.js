@@ -102,8 +102,38 @@ function calcularScoreIdentidad(data, fotosPortfolio = 0) {
     add("zona_cobertura", locs.length > 0, 2);
     detalle.fotos_trabajos_propias = Math.min(5, fotosPortfolio || 0);
   }
-  const raw = Object.values(detalle).reduce((a, b) => a + b, 0);
-  return { raw, score: normalizar(raw, TECHO_IDENTIDAD), detalle };
+  let raw = Object.values(detalle).reduce((a, b) => a + b, 0);
+  let score = normalizar(raw, TECHO_IDENTIDAD);
+
+  // Techo por antigüedad
+  const alta = fechaAlta(data);
+  let dias = alta ? Math.floor((Date.now() - alta.getTime()) / 86400000) : null;
+  let techoEdad = 100;
+  if (dias === null) techoEdad = 50;
+  else if (dias < 7) techoEdad = 40;
+  else if (dias < 30) techoEdad = 70;
+  if (score > techoEdad) {
+    detalle.techo_antiguedad = techoEdad;
+    score = techoEdad;
+  }
+  if (dias !== null && dias < 3) {
+    const fuertes = (detalle.doc_ocr_validado || 0) + (detalle.foto_perfil || 0) + (detalle.foto_documento || 0);
+    if (fuertes > 0) {
+      const rawMaduro = Math.max(0, raw - Math.round(fuertes * 0.5));
+      score = normalizar(rawMaduro, TECHO_IDENTIDAD);
+      if (score > techoEdad) score = techoEdad;
+      detalle.maduracion_3d = 1;
+    }
+  }
+  const riesgo = String(data.riesgo_fraude || "");
+  if (riesgo === "alto" && score > 25) {
+    detalle.techo_fraude = 25;
+    score = 25;
+  } else if (riesgo === "medio" && score > 50) {
+    detalle.techo_fraude = 50;
+    score = 50;
+  }
+  return { raw, score, detalle };
 }
 
 function multiplicadorEvaluador({
@@ -298,9 +328,11 @@ async function publicarVencidas() {
     const d = doc.data();
     const estado = String(d.estado || "").toLowerCase();
     const ambos = d.par_completo === true || d.tiene_respuesta_prestador === true;
+    const aceptadoPrestador = d.aceptado_por_prestador === true;
     const pendientePar =
       estado === "par_completo_pendiente_pub" ||
-      (ambos && ESTADOS_PENDIENTES.has(estado));
+      (ambos && ESTADOS_PENDIENTES.has(estado)) ||
+      (aceptadoPrestador && ESTADOS_PENDIENTES.has(estado));
     let fecha = null;
     const f = d.fecha || d.created_at || d.fecha_calificacion || d.creado_en;
     if (f && f.toDate) fecha = f.toDate();
@@ -377,8 +409,16 @@ async function runScoringBatch({ trigger = "scheduler", force = false } = {}) {
     const pub = await publicarVencidas();
     evalsPublicadasTimeout = pub.porTimeout;
     evalsParCompleto = pub.parCompleto;
+    await recalcularPromediosPublicados();
   } catch (e) {
     errores.push(`F1: ${e.message || e}`);
+  }
+
+  let flagsFraude = 0;
+  try {
+    flagsFraude = await detectarPatronesFraude();
+  } catch (e) {
+    errores.push(`F1_5_fraude: ${e.message || e}`);
   }
 
   const fotosPortfolio = {};
@@ -597,6 +637,7 @@ async function runScoringBatch({ trigger = "scheduler", force = false } = {}) {
       usuarios_actualizados: escritos,
       evals_publicadas_timeout: evalsPublicadasTimeout,
       evals_par_completo: evalsParCompleto,
+      flags_fraude: flagsFraude,
       fuente: trigger,
       model_version: MODEL_VERSION,
       last_run_id: runId,
@@ -637,5 +678,144 @@ async function runScoringBatch({ trigger = "scheduler", force = false } = {}) {
   };
 }
 
+
+
+async function recalcularPromediosPublicados() {
+  const snap = await db.collection("calificaciones").get();
+  const por = {};
+  for (const doc of snap.docs) {
+    const d = doc.data();
+    if (!esPublicada(d)) continue;
+    const pid = String(d.prestador_id || d.trabajador_id || d.evaluado_id || "");
+    if (!pid) continue;
+    const est = d.estrellas ?? d.rating ?? d.puntaje;
+    if (typeof est !== "number") continue;
+    (por[pid] ||= []).push(Math.round(est));
+  }
+  let batch = db.batch();
+  let n = 0;
+  for (const [pid, votos] of Object.entries(por)) {
+    const suma = votos.reduce((a, b) => a + b, 0);
+    const prom = votos.length ? suma / votos.length : 0;
+    batch.set(
+      db.collection("usuarios").doc(pid),
+      { sumaEstrellas: suma, cantidadEvaluadores: votos.length, promedioEstrellas: prom },
+      { merge: true }
+    );
+    n++;
+    if (n >= 400) {
+      await batch.commit();
+      batch = db.batch();
+      n = 0;
+    }
+  }
+  if (n > 0) await batch.commit();
+}
+
+async function detectarPatronesFraude() {
+  const users = await db.collection("usuarios").get();
+  const edges = {};
+  const recibidos = {};
+  const altaMs = {};
+  const now = Date.now();
+  for (const doc of users.docs) {
+    const d = doc.data();
+    const uid = doc.id;
+    const alta = fechaAlta(d);
+    if (alta) altaMs[uid] = alta.getTime();
+    const vals = d.validaciones_recibidas || [];
+    for (const v of vals) {
+      if (!v || typeof v !== "object") continue;
+      const vid = String(v.validadorId || v.validador_id || v.usuario_id || "");
+      if (!vid) continue;
+      (edges[vid] ||= new Set()).add(uid);
+      (recibidos[uid] ||= new Set()).add(vid);
+    }
+    const emitidas = d.validaciones_emitidas || [];
+    for (const v of emitidas) {
+      if (!v || typeof v !== "object") continue;
+      const tid = String(v.target_id || v.targetUserId || "");
+      if (!tid) continue;
+      (edges[uid] ||= new Set()).add(tid);
+      (recibidos[tid] ||= new Set()).add(uid);
+    }
+  }
+  const flagsByUser = {};
+  const flag = (uid, code) => {
+    (flagsByUser[uid] ||= []);
+    if (!flagsByUser[uid].includes(code)) flagsByUser[uid].push(code);
+  };
+  for (const a of Object.keys(edges)) {
+    for (const b of edges[a]) {
+      if (edges[b] && edges[b].has(a)) {
+        flag(a, "anillo_mutual");
+        flag(b, "anillo_mutual");
+      }
+    }
+  }
+  for (const [uid, set] of Object.entries(edges)) {
+    const alta = altaMs[uid];
+    if (alta == null) continue;
+    const ageH = (now - alta) / 3600000;
+    if (set.size >= 3 && ageH < 48) flag(uid, "rafaga_cuenta_nueva");
+    if (set.size >= 5) flag(uid, "volumen_alto_saliente");
+  }
+  for (const doc of users.docs) {
+    const uid = doc.id;
+    const d = doc.data();
+    const sal = edges[uid] ? edges[uid].size : 0;
+    const rec = recibidos[uid] ? recibidos[uid].size : 0;
+    const scoreId = d.scoring && typeof d.scoring.score_identidad === "number" ? d.scoring.score_identidad : 0;
+    if (sal >= 2 && rec === 0 && scoreId < 30) flag(uid, "solo_validador");
+  }
+  for (const [uid, set] of Object.entries(edges)) {
+    const aAlta = altaMs[uid];
+    if (aAlta == null) continue;
+    const aDay = new Date(aAlta);
+    for (const t of set) {
+      const tAlta = altaMs[t];
+      if (tAlta == null) continue;
+      const tDay = new Date(tAlta);
+      if (aDay.getFullYear() === tDay.getFullYear() && aDay.getMonth() === tDay.getMonth() && aDay.getDate() === tDay.getDate()) {
+        flag(uid, "mismo_dia_alta");
+        flag(t, "mismo_dia_alta");
+      }
+    }
+  }
+  let batch = db.batch();
+  let n = 0;
+  let totalFlags = 0;
+  for (const [uid, codes] of Object.entries(flagsByUser)) {
+    totalFlags += codes.length;
+    const nivel = codes.length >= 3 ? "alto" : codes.length === 2 ? "medio" : "bajo";
+    batch.set(
+      db.collection("usuarios").doc(uid),
+      {
+        riesgo_fraude: nivel,
+        riesgo_fraude_flags: codes,
+        riesgo_fraude_en: admin.firestore.FieldValue.serverTimestamp(),
+        ...(nivel === "alto" ? { scoring_stale: true } : {}),
+      },
+      { merge: true }
+    );
+    n++;
+    if (n >= 400) {
+      await batch.commit();
+      batch = db.batch();
+      n = 0;
+    }
+  }
+  if (n > 0) await batch.commit();
+  await db.collection("stats").doc("fraud_flags").set(
+    {
+      ultima_corrida: admin.firestore.FieldValue.serverTimestamp(),
+      usuarios_flaggeados: Object.keys(flagsByUser).length,
+      flags_totales: totalFlags,
+      model: "heuristics_v1",
+    },
+    { merge: true }
+  );
+  return Object.keys(flagsByUser).length;
+}
 
 module.exports = { runScoringBatch, MODEL_VERSION };
