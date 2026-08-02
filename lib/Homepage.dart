@@ -57,6 +57,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   String? _nivelConfianza;
   int? _scoreIdentidad;
   int _tipsTotales = 0;
+  final Set<String> _tipsLeidos = {};
   int _pasosCompletos = 0;
   static const int _pasosTotales = 4;
   bool _bannerZonaDescartado = false;
@@ -287,11 +288,18 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       final consejos = <_ConsejoItem>[];
 
       // Confianza de perfil: checklist accionable (scoring v1)
+      final leidosRaw = data['tips_confianza_leidos'];
+      if (leidosRaw is List) {
+        _tipsLeidos
+          ..clear()
+          ..addAll(leidosRaw.map((e) => e.toString()));
+      }
+
       final tipsConf = ScoringService.generarConsejosConfianza(data);
       for (final t in tipsConf) {
         final id = t['id'] ?? '';
         IconData icon = Icons.trending_up_rounded;
-        VoidCallback onTap = () {
+        VoidCallback action = () {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const DatosPersonalesFlotanteWidget()),
@@ -299,7 +307,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         };
         if (id == 'zona') {
           icon = Icons.map_outlined;
-          onTap = () {
+          action = () {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const ZonaDeTrabajoFlotanteWidget()),
@@ -307,7 +315,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           };
         } else if (id == 'oficios') {
           icon = Icons.handyman_outlined;
-          onTap = () {
+          action = () {
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -317,19 +325,23 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           };
         } else if (id == 'foto_perfil') {
           icon = Icons.camera_alt_outlined;
-          onTap = () => _mostrarOpcionesSelfie();
+          action = () => _mostrarOpcionesSelfie();
         } else if (id == 'evals' || id == 'tiempo') {
           icon = id == 'evals' ? Icons.star_outline_rounded : Icons.schedule_rounded;
-          onTap = _compartirTarjeta;
+          action = _compartirTarjeta;
         } else if (id == 'fotos_trabajo') {
           icon = Icons.photo_library_outlined;
-          onTap = _compartirTarjeta;
+          action = _compartirTarjeta;
         }
         consejos.add(_ConsejoItem(
+          id: id.isEmpty ? t['title'] ?? '' : id,
           title: t['title'] ?? '',
           body: t['body'] ?? '',
           icon: icon,
-          onTap: onTap,
+          onTap: () => _abrirConsejoConfianza(
+            id.isEmpty ? (t['title'] ?? '') : id,
+            action,
+          ),
         ));
       }
 
@@ -338,6 +350,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         final nivel = sc is Map ? (sc['nivel_confianza'] as String?) : null;
         final score = sc is Map ? (sc['score_identidad'] as num?)?.toInt() : null;
         consejos.add(_ConsejoItem(
+          id: 'compartir',
           title: nivel == 'muy_alto'
               ? 'Excelente confianza de perfil'
               : 'Vas bien: compartí tu tarjeta',
@@ -345,7 +358,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               ? 'Confianza ${ScoringService.labelNivel(nivel)} ($score/100). Pasale tu tarjeta y pedí evaluaciones reales de clientes.'
               : 'Pasale tu tarjeta por WhatsApp y pedí evaluaciones de trabajos reales.',
           icon: Icons.emoji_events_outlined,
-          onTap: _compartirTarjeta,
+          onTap: () => _abrirConsejoConfianza('compartir', _compartirTarjeta),
         ));
       }
 
@@ -1008,6 +1021,165 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     );
   }
 
+
+  Future<void> _abrirConsejoConfianza(String id, VoidCallback action) async {
+    if (id.isNotEmpty) {
+      setState(() => _tipsLeidos.add(id));
+      final uid = UserSession().uid;
+      if (uid != null) {
+        try {
+          await FirebaseFirestore.instance.collection('usuarios').doc(uid).set({
+            'tips_confianza_leidos': FieldValue.arrayUnion([id]),
+          }, SetOptions(merge: true));
+        } catch (_) {}
+      }
+    }
+    action();
+  }
+
+  void _mostrarExplicacionConfianza() {
+    final score = _scoreIdentidad;
+    final nivel = _nivelConfianza != null
+        ? ScoringService.labelNivel(_nivelConfianza)
+        : null;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Icon(Icons.verified_user_outlined, color: _prestadorPrimary),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        '¿Qué es la confianza de perfil?',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  score != null
+                      ? 'Tu puntaje actual: ${score}/100${nivel != null ? ' · $nivel' : ''}'
+                      : 'Es un número de 0 a 100 sobre cuán confiable se ve tu perfil.',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF334155),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Se arma con el tiempo a partir de:',
+                  style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                ),
+                const SizedBox(height: 12),
+                _explicacionFila(Icons.badge_outlined, 'Datos del perfil',
+                    'Documento, foto, contacto y domicilio completos.'),
+                _explicacionFila(Icons.handyman_outlined, 'Servicios ofrecidos',
+                    'Oficios, zona y evidencias de trabajos.'),
+                _explicacionFila(Icons.people_outline, 'Calificación cruzada',
+                    'Validaciones y evaluaciones de otras personas reales.'),
+                _explicacionFila(Icons.schedule_rounded, 'Tiempo',
+                    'Las cuentas nuevas no llegan al máximo de un día para el otro.'),
+                const SizedBox(height: 16),
+                Text(
+                  'No es un score de crédito. Solo muestra confianza dentro de Puelo.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _prestadorPrimary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text('Entendido',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _explicacionFila(IconData icon, String title, String body) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: _prestadorPrimary.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 18, color: _prestadorPrimary),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        color: Color(0xFF0F172A))),
+                Text(body,
+                    style: const TextStyle(
+                        fontSize: 12, height: 1.3, color: Color(0xFF64748B))),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPrestadorBody({Key? key}) {
     final confLabel = _nivelConfianza != null
         ? ScoringService.labelNivel(_nivelConfianza)
@@ -1141,68 +1313,89 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           if (confLabel != null || _scoreIdentidad != null)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE6F7FA),
+              child: Material(
+                color: const Color(0xFFE6F7FA),
+                borderRadius: BorderRadius.circular(20),
+                child: InkWell(
+                  onTap: _mostrarExplicacionConfianza,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: _prestadorPrimary.withOpacity(0.18)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.verified_user_outlined,
-                        color: _prestadorPrimary, size: 22),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Confianza de perfil',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: _prestadorPrimary.withOpacity(0.9),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Text(
-                            confLabel != null && _scoreIdentidad != null
-                                ? '$confLabel · $_scoreIdentidad/100'
-                                : (confLabel ?? '$_scoreIdentidad/100'),
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF0F172A),
-                            ),
-                          ),
-                        ],
-                      ),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: _prestadorPrimary.withOpacity(0.18)),
                     ),
-                    // mini progress
-                    SizedBox(
-                      width: 40,
-                      height: 40,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          CircularProgressIndicator(
-                            value: ((_scoreIdentidad ?? 0) / 100).clamp(0.0, 1.0),
-                            strokeWidth: 4,
-                            backgroundColor: Colors.white,
-                            color: _prestadorPrimary,
+                    child: Row(
+                      children: [
+                        Icon(Icons.verified_user_outlined,
+                            color: _prestadorPrimary, size: 22),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    'Confianza de perfil',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: _prestadorPrimary.withOpacity(0.9),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Icon(Icons.info_outline_rounded,
+                                      size: 14,
+                                      color: _prestadorPrimary.withOpacity(0.75)),
+                                ],
+                              ),
+                              Text(
+                                confLabel != null && _scoreIdentidad != null
+                                    ? '$confLabel · $_scoreIdentidad/100'
+                                    : (confLabel ?? '$_scoreIdentidad/100'),
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                              const Text(
+                                'Tocá para ver cómo se calcula',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
                           ),
-                          Text(
-                            '${_scoreIdentidad ?? 0}',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              color: _prestadorPrimary,
-                            ),
+                        ),
+                        SizedBox(
+                          width: 40,
+                          height: 40,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              CircularProgressIndicator(
+                                value: ((_scoreIdentidad ?? 0) / 100).clamp(0.0, 1.0),
+                                strokeWidth: 4,
+                                backgroundColor: Colors.white,
+                                color: _prestadorPrimary,
+                              ),
+                              Text(
+                                '${_scoreIdentidad ?? 0}',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: _prestadorPrimary,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -1351,6 +1544,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                       item: _consejos[i],
                       accent: _prestadorPrimary,
                       index: i + 1,
+                      leido: _tipsLeidos.contains(_consejos[i].id),
                     ),
                   ],
                 ],
@@ -1404,17 +1598,24 @@ class _ConsejoCard extends StatelessWidget {
   final _ConsejoItem item;
   final Color accent;
   final int index;
+  final bool leido;
 
   const _ConsejoCard({
     required this.item,
     required this.accent,
     required this.index,
+    this.leido = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final titleColor = leido ? const Color(0xFF94A3B8) : const Color(0xFF0F172A);
+    final bodyColor = leido ? const Color(0xFFCBD5E1) : const Color(0xFF64748B);
+    final iconBg = leido ? const Color(0xFFF1F5F9) : accent.withOpacity(0.12);
+    final iconColor = leido ? const Color(0xFF94A3B8) : accent;
+
     return Material(
-      color: Colors.white,
+      color: leido ? const Color(0xFFF8FAFC) : Colors.white,
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         onTap: item.onTap,
@@ -1423,7 +1624,9 @@ class _ConsejoCard extends StatelessWidget {
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(
+              color: leido ? const Color(0xFFE2E8F0) : const Color(0xFFE2E8F0),
+            ),
           ),
           child: Row(
             children: [
@@ -1431,40 +1634,71 @@ class _ConsejoCard extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: accent.withOpacity(0.12),
+                  color: iconBg,
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(item.icon, color: accent, size: 22),
+                child: Icon(
+                  leido ? Icons.check_circle_outline_rounded : item.icon,
+                  color: iconColor,
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      item.title,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF0F172A),
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.title,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: titleColor,
+                            ),
+                          ),
+                        ),
+                        if (leido)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE2E8F0),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Text(
+                              'Leído',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.2,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 2),
                     Text(
                       item.body,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         height: 1.3,
-                        color: Color(0xFF64748B),
+                        color: bodyColor,
                       ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 6),
-              Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
+              Icon(
+                leido ? Icons.done_rounded : Icons.chevron_right_rounded,
+                color: leido ? const Color(0xFFCBD5E1) : Colors.grey.shade400,
+              ),
             ],
           ),
         ),
@@ -1487,9 +1721,16 @@ class _ServicioItem {
 }
 
 class _ConsejoItem {
+  final String id;
   final String title;
   final String body;
   final IconData icon;
   final VoidCallback onTap;
-  _ConsejoItem({required this.title, required this.body, required this.icon, required this.onTap});
+  _ConsejoItem({
+    required this.id,
+    required this.title,
+    required this.body,
+    required this.icon,
+    required this.onTap,
+  });
 }
