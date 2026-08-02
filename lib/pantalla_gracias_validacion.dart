@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_session.dart';
 import 'Homepage.dart';
 import 'theme/app_colors.dart';
+import 'scoring_service.dart';
 
 class PantallaGraciasValidacionWidget extends StatefulWidget {
   const PantallaGraciasValidacionWidget({super.key});
@@ -47,25 +48,56 @@ class _PantallaGraciasValidacionWidgetState
           final String targetUserId = pend['targetUserId'] ?? '';
           final String validadorId = UserSession().uid!;
 
-          await pendRef.update({
-            'validadorId': validadorId,
-            'estado': 'completado',
-            'procesado_en': FieldValue.serverTimestamp(),
-          });
-
-          if (targetUserId.isNotEmpty) {
-            final Map<String, dynamic> registro = {
-              'validadorId': validadorId,
-              'conoce': pend['conoce'] ?? false,
-              'domicilioSeleccionado': pend['domicilioSeleccionado'] ?? '',
-              'esCorrecto': pend['esCorrecto'] ?? false,
-              'tiempoViviendo': pend['tiempoViviendo'] ?? '',
-              'fecha': FieldValue.serverTimestamp(),
-            };
-
-            await db.collection('usuarios').doc(targetUserId).update({
-              'validaciones_recibidas': FieldValue.arrayUnion([registro]),
+          // Anti-granja: límites de emisión de validaciones
+          final valSnap = await db.collection('usuarios').doc(validadorId).get();
+          final valData = valSnap.data() ?? {};
+          final gate = ScoringService.canEmitirValidacion(valData);
+          if (!gate.allowed) {
+            await pendRef.update({
+              'estado': 'rechazado_limite',
+              'motivo_rechazo': gate.reason,
+              'procesado_en': FieldValue.serverTimestamp(),
             });
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(gate.reason), duration: const Duration(seconds: 6)),
+              );
+            }
+          } else {
+            await pendRef.update({
+              'validadorId': validadorId,
+              'estado': 'completado',
+              'procesado_en': FieldValue.serverTimestamp(),
+            });
+
+            if (targetUserId.isNotEmpty) {
+              final Map<String, dynamic> registro = {
+                'validadorId': validadorId,
+                'validador_id': validadorId,
+                'conoce': pend['conoce'] ?? false,
+                'domicilioSeleccionado': pend['domicilioSeleccionado'] ?? '',
+                'esCorrecto': pend['esCorrecto'] ?? false,
+                'tiempoViviendo': pend['tiempoViviendo'] ?? '',
+                'fecha': FieldValue.serverTimestamp(),
+                'tipo': 'identidad',
+              };
+
+              await db.collection('usuarios').doc(targetUserId).update({
+                'validaciones_recibidas': FieldValue.arrayUnion([registro]),
+              });
+
+              await db.collection('usuarios').doc(validadorId).update({
+                'validaciones_emitidas_count': FieldValue.increment(1),
+                'validaciones_emitidas': FieldValue.arrayUnion([
+                  {
+                    'target_id': targetUserId,
+                    'token': token,
+                    'fecha': DateTime.now().toIso8601String(),
+                  }
+                ]),
+                'ultima_validacion_emitida_en': FieldValue.serverTimestamp(),
+              });
+            }
           }
         }
       }
