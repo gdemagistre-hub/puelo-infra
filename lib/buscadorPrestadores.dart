@@ -8,6 +8,7 @@ import 'scoring_service.dart';
 import 'theme/app_copy.dart';
 import 'user_session.dart';
 import 'catalogo_geo_cache.dart';
+import 'catalogo_oficios.dart';
 
 /// Buscador optimizado para pico laboral:
 /// - get() + RefreshIndicator (no stream de 400)
@@ -49,39 +50,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
   bool _filtrosAbiertos = false;
 
   String _selectedRubro = 'Todos';
-  final List<String> _rubros = const [
-    'Todos',
-    'Electricista',
-    'Plomero',
-    'Gasista',
-    'Carpintero',
-    'Pintor',
-    'Construcción',
-    'Jardinería',
-    'Limpieza',
-  ];
-
-  static const Map<String, String> _rubroToProfesion = {
-    'Electricista': 'electricidad',
-    'Plomero': 'plomeria',
-    'Gasista': 'gasista',
-    'Carpintero': 'carpinteria',
-    'Pintor': 'pintura',
-    'Construcción': 'albanileria',
-    'Jardinería': 'jardineria',
-    'Limpieza': 'limpieza',
-  };
-
-  static const Map<String, String> _labelOficio = {
-    'electricidad': 'Electricista',
-    'plomeria': 'Plomería',
-    'gasista': 'Gasista',
-    'carpinteria': 'Carpintería',
-    'pintura': 'Pintura',
-    'albanileria': 'Construcción',
-    'jardineria': 'Jardinería',
-    'limpieza': 'Limpieza',
-  };
+  List<String> get _rubros => CatalogoOficios.chipsBuscador();
 
   String? selectedProvinciaId;
   String? selectedPartidoId;
@@ -135,18 +104,16 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     for (final r in _rubros) {
       if (r.toLowerCase() == t) return r;
     }
-    for (final e in _labelOficio.entries) {
-      if (e.value.toLowerCase() == t || e.key == t) {
-        for (final r in _rubros) {
-          if (r.toLowerCase() == e.value.toLowerCase() ||
-              (_rubroToProfesion[r] ?? '') == e.key) {
-            return r;
-          }
-        }
-      }
+    for (final c in CatalogoOficios.categorias) {
+      if (c.label.toLowerCase() == t || c.id == t) return c.label;
     }
-    for (final e in _rubroToProfesion.entries) {
-      if (e.value == t || e.key.toLowerCase() == t) return e.key;
+    for (final e in CatalogoOficios.especialidades) {
+      if (e.id == t || e.label.toLowerCase() == t) {
+        return CatalogoOficios.categoria(e.categoriaId)?.label ?? 'Todos';
+      }
+      if (e.sinonimos.any((s) => s == t || t.contains(s))) {
+        return CatalogoOficios.categoria(e.categoriaId)?.label ?? 'Todos';
+      }
     }
     return 'Todos';
   }
@@ -255,12 +222,8 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
           .collection('usuarios')
           .where('es_trabajador', isEqualTo: true);
 
-      if (_selectedRubro != 'Todos') {
-        final clave = _rubroToProfesion[_selectedRubro] ??
-            _selectedRubro.toLowerCase();
-        query = query.where('profesiones', arrayContains: clave);
-      }
-
+      // Oficio/categoría se filtra en cliente (categoría ⊃ especialidades + sinónimos)
+      // para no dejar prestadores invisibles por granularidad.
       query = query.limit(_pageSize);
       if (!reset && _lastDoc != null) {
         query = query.startAfterDocument(_lastDoc!);
@@ -315,7 +278,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
   String _labelsOficios(List<dynamic> profesiones) {
     if (profesiones.isEmpty) return 'Prestador';
     return profesiones
-        .map((e) => _labelOficio[e.toString().toLowerCase().trim()] ?? e.toString())
+        .map((e) => CatalogoOficios.label(e.toString()))
         .join(', ');
   }
 
@@ -472,26 +435,42 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
   }
 
   List<QueryDocumentSnapshot> get _filtrados {
+    final catId = CatalogoOficios.categoriaIdDesdeChip(_selectedRubro);
     var list = _docs.where((doc) {
       final data = doc.data() as Map<String, dynamic>;
       if (!_pasaFiltrosZona(data)) return false;
-      if (_searchQuery.isEmpty) return true;
       final profesiones = (data['profesiones'] as List<dynamic>? ?? [])
-          .map((e) => e.toString().toLowerCase())
+          .map((e) => e.toString())
           .toList();
+      // también categorías guardadas
+      final cats = (data['categorias_servicio'] as List<dynamic>? ?? [])
+          .map((e) => e.toString())
+          .toList();
+      final allKeys = [...profesiones, ...cats];
+
+      if (catId != null) {
+        if (!CatalogoOficios.coincide(
+          profesiones: allKeys,
+          categoriaId: catId,
+        )) {
+          return false;
+        }
+      }
+
+      if (_searchQuery.isEmpty) return true;
       final nombre = (data['nombre'] ?? '').toString().toLowerCase();
       final apellido = (data['apellido'] ?? '').toString().toLowerCase();
       final comercial =
           (data['nombre_comercial'] ?? '').toString().toLowerCase();
-      final labels = profesiones
-          .map((k) => _labelOficio[k] ?? k)
-          .join(' ')
-          .toLowerCase();
-      return nombre.contains(_searchQuery) ||
+      if (nombre.contains(_searchQuery) ||
           apellido.contains(_searchQuery) ||
-          comercial.contains(_searchQuery) ||
-          profesiones.join(' ').contains(_searchQuery) ||
-          labels.contains(_searchQuery);
+          comercial.contains(_searchQuery)) {
+        return true;
+      }
+      return CatalogoOficios.coincide(
+        profesiones: allKeys,
+        texto: _searchQuery,
+      );
     }).toList();
 
     list.sort((a, b) {
