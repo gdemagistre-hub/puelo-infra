@@ -310,6 +310,13 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
         final List<dynamic> profesiones = datos['profesiones'] ?? [];
         final String docId = snapshot.data!.id;
         final String? badge = datos['badge_prestador'] as String?;
+        final scoringMap = datos['scoring'];
+        final String? nivelConfianza = scoringMap is Map
+            ? (scoringMap['nivel_confianza'] as String?)
+            : null;
+        final int? scoreIdentidad = scoringMap is Map
+            ? (scoringMap['score_identidad'] as num?)?.toInt()
+            : null;
         final String? urlFoto =
             (datos['url_foto_perfil'] ?? datos['foto_perfil'])?.toString();
 
@@ -537,6 +544,18 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                                               .isNotEmpty) ...[
                                         const SizedBox(height: 8),
                                         _buildBadgeChip(badge),
+                                      ],
+                                      if (nivelConfianza != null) ...[
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          'Confianza de perfil: ${ScoringService.labelNivel(nivelConfianza)}'
+                                          '${scoreIdentidad != null ? ' ($scoreIdentidad)' : ''}',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: AppColors.textMuted,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
                                       ],
                                     ],
                                   ),
