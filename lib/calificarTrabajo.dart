@@ -65,61 +65,47 @@ class _CalificarTrabajoWidgetState extends State<CalificarTrabajoWidget> {
         .doc(widget.trabajadorId);
 
     try {
+      // 1) Marca el trabajo (sin publicar estrellas al perfil todavía)
       await FirebaseFirestore.instance.runTransaction((transaction) async {
-        final trabajadorSnapshot = await transaction.get(trabajadorRef);
-
-        if (!trabajadorSnapshot.exists) return;
-
-        final trabajadorData =
-            trabajadorSnapshot.data() as Map<String, dynamic>;
-
-        final historialVotos = trabajadorData['historialVotos'] != null
-            ? Map<String, dynamic>.from(trabajadorData['historialVotos'])
-            : <String, dynamic>{};
-
-        final votosAnteriores =
-            (trabajadorData['cantidadEvaluadores'] as num?)?.toInt() ?? 0;
-        final sumaAnterior =
-            (trabajadorData['sumaEstrellas'] as num?)?.toInt() ?? 0;
-
-        int nuevaSuma = sumaAnterior;
-        int nuevosVotos = votosAnteriores;
-
-        if (historialVotos.containsKey(widget.clienteId)) {
-          final votoViejo =
-              (historialVotos[widget.clienteId] as num).toInt();
-          nuevaSuma = (sumaAnterior - votoViejo) + _estrellasSeleccionadas;
-        } else {
-          nuevosVotos = votosAnteriores + 1;
-          nuevaSuma = sumaAnterior + _estrellasSeleccionadas;
-        }
-
-        historialVotos[widget.clienteId] = _estrellasSeleccionadas;
-
-        final nuevoPromedio =
-            nuevosVotos > 0 ? (nuevaSuma / nuevosVotos) : 0.0;
-
         transaction.update(trabajoRef, {
           'comentarioCliente': _comentarioController.text.trim(),
           'estrellas': _estrellasSeleccionadas,
           'clienteUid': widget.clienteId,
           'calificado': true,
           'tipo': 'evaluacion',
+          'calificacion_estado': 'pendiente_respuesta_prestador',
         });
+      });
 
-        transaction.update(trabajadorRef, {
-          'sumaEstrellas': nuevaSuma,
-          'cantidadEvaluadores': nuevosVotos,
-          'promedioEstrellas': nuevoPromedio,
-          'historialVotos': historialVotos,
-        });
+      // 2) Calificación en cuarentena: visible en score/perfil solo cuando
+      //    - el prestador acepta / responde, o
+      //    - pasan 7 días (batch scoring F1)
+      await FirebaseFirestore.instance.collection('calificaciones').add({
+        'prestador_id': widget.trabajadorId,
+        'trabajador_id': widget.trabajadorId,
+        'cliente_id': widget.clienteId,
+        'trabajo_id': widget.trabajoId,
+        'estrellas': _estrellasSeleccionadas,
+        'rating': _estrellasSeleccionadas,
+        'comentario': _comentarioController.text.trim(),
+        'estado': 'pendiente_respuesta_prestador',
+        'tipo': 'trabajo',
+        'con_foto': false,
+        'par_completo': false,
+        'aceptado_por_prestador': false,
+        'created_at': FieldValue.serverTimestamp(),
+        'fecha': FieldValue.serverTimestamp(),
       });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Gracias. Tu opinión ayuda a otros a confiar.'),
+            content: Text(
+              'Gracias. Tu evaluación queda registrada y se publica '
+              'cuando el prestador responda o a los 7 días.',
+            ),
             backgroundColor: AppColors.success,
+            duration: Duration(seconds: 5),
           ),
         );
         _volverAPrincipal();
