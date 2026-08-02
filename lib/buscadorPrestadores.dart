@@ -440,6 +440,15 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     if (badge == 'bronce_plus' || badge == 'bronce+') s += 10;
     if (badge == 'bronce') s += 6;
     if (badge == 'registrado') s += 3;
+    // Scoring v1: calidad de servicio (0–100) aporta al orden, sin mostrar crédito
+    final scoring = data['scoring'];
+    if (scoring is Map) {
+      final ss = (scoring['score_servicio'] as num?)?.toInt() ?? 0;
+      s += (ss / 5).round(); // 0–20
+      final conf = (scoring['nivel_confianza'] ?? '').toString();
+      if (conf == 'muy_alto') s += 4;
+      if (conf == 'alto') s += 2;
+    }
     return s;
   }
 
