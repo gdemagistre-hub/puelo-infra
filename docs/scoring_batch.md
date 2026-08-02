@@ -1,34 +1,46 @@
-# Batch de scoring — operación
+# Batch de scoring — operación (cloud)
+
+## Cómo ejecutarlo **sin consola local** (recomendado)
+
+### GitHub Actions (1 clic)
+
+1. Abrí el repo: https://github.com/gdemagistre-hub/puelo-infra  
+2. Pestaña **Actions**  
+3. Workflow **“Run scoring batch”** (columna izquierda)  
+4. Botón **Run workflow** → branch `main`  
+5. Opcional: marcar **force** si la corrida anterior quedó trabada  
+6. **Run workflow**  
+7. Esperá el job verde  
+8. En Firebase → Firestore → `stats/scoring_job` y `stats/scoring_job/runs/...`
+
+El job usa el secret ya existente `FIREBASE_SERVICE_ACCOUNT_LIFEWALLETPUELO` (el mismo del deploy de Hosting).
+
+### Cloud Shell (navegador Google, si preferís terminal en la nube)
+
+1. https://console.cloud.google.com → proyecto `lifewalletpuelo`  
+2. Ícono **Cloud Shell** (arriba a la derecha)  
+3. ```bash
+   git clone https://github.com/gdemagistre-hub/puelo-infra.git
+   cd puelo-infra/functions && npm install
+   # autenticación: Cloud Shell ya está en el proyecto
+   gcloud auth application-default login   # solo la 1ª vez
+   node run_once.js
+   ```
 
 ## Pipeline (F0–F5)
 
-1. **F0 Lock** — evita corridas solapadas (`stats/scoring_job.lock`, TTL 15 min)
-2. **F1 Publicar** — calificaciones `pendiente_*` con >7 días → `publicada` (`publica_por_timeout`)
-3. **F2 Indexar** — `trabajos` + `calificaciones` publicadas
-4. **F3 Cache** — identidad de evaluadores (multiplicadores)
-5. **F4 Score** — escribe `scoring{}`, `badge_prestador`, compat `score_credito`
-6. **F5 Stats** — `stats/scoring_job` + `stats/scoring_job/runs/{runId}`
+1. Lock → 2. Publicar evals >7d → 3. Indexar → 4. Cache identidad → 5. Score → 6. Stats/runs  
 
-## Cómo disparar
+## Cloud Functions (opcional, cron 02:30 ART)
 
-| Modo | Cómo |
-|------|------|
-| Dev (app) | Home → “Correr batch scoring (dev)” (si `AppEnv.showDevTools`) |
-| HTTP | `POST https://southamerica-east1-<PROJECT>.cloudfunctions.net/scoringBatchHttp` header `X-Batch-Secret` |
-| Cron | Function `scoringBatchDaily` 02:30 ART |
+Workflow **Deploy Cloud Functions** (Actions) o:
 
-## Qué tenés que hacer vos (una vez)
+```bash
+firebase deploy --only functions --project lifewalletpuelo
+```
 
-Ver checklist en el mensaje del agente / abajo en “Deploy functions”.
+Requiere plan Blaze. Tras deploy: `scoringBatchDaily` + HTTP `scoringBatchHttp`.
 
-## Estados de calificación
+## App (solo debug/staging)
 
-| estado | Entra al score |
-|--------|----------------|
-| *(vacío / legacy)* | Sí |
-| `publicada` | Sí |
-| `pendiente_respuesta_prestador` | No (hasta timeout o par) |
-| `anulada` | No |
-
-Al crear una eval de cliente→prestador, setear:
-`estado: pendiente_respuesta_prestador`, `created_at`, `prestador_id`, `cliente_id`, `estrellas`, `comentario`.
+Home → “Correr batch scoring (dev)” — no aparece en prod release.
