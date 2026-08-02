@@ -547,308 +547,570 @@ class ScoringService {
   }
 
   // ---------------------------------------------------------------------------
-  // BATCH DIARIO
+
+  // ---------------------------------------------------------------------------
+  // BATCH DIARIO — pipeline F0…F5
   // ---------------------------------------------------------------------------
 
-  /// Recorre usuarios, calcula capas A/B/C + badge y escribe en Firestore.
-  /// Llamar 1× día (Cloud Function o disparo manual admin/dev).
+  static const Duration ventanaRespuestaPrestador = Duration(days: 7);
+  static const Duration lockTtl = Duration(minutes: 15);
+
+  static const List<String> _estadosPendientes = [
+    'pendiente_respuesta_prestador',
+    'borrador_par',
+    'borrador_cliente',
+    'pendiente',
+  ];
+
+  static const List<String> _estadosPublicados = [
+    'publicada',
+    'publicado',
+    'published',
+  ];
+
+  /// Pipeline completo:
+  /// F0 lock → F1 publicar vencidas → F2 indexar → F3 cache → F4 score → F5 stats.
+  ///
+  /// [trigger]: `manual_dev` | `manual_admin` | `scheduler` | `app_batch`
   static Future<BatchScoringResult> ejecutarBatchDiario({
     void Function(int hechos, int total)? onProgress,
     int pageSize = 200,
+    String trigger = 'app_batch',
+    bool force = false,
   }) async {
-    // 1) Pre-agregar trabajos (fotos portfolio vs clientes)
-    final fotosPortfolio = <String, int>{};
-    final fotosClientes = <String, int>{};
-
-    final trabajosSnap = await _db.collection('trabajos').get();
-    for (final t in trabajosSnap.docs) {
-      final d = t.data();
-      final uid = _resolverUsuarioId(d);
-      if (uid == null) continue;
-
-      final imgs = d['imagenes'] as List<dynamic>? ?? [];
-      final n = imgs.length;
-      if (n == 0) continue;
-
-      final esPortfolio = d['tipo'] == 'portfolio' ||
-          d['cuenta_como_experiencia'] == false ||
-          d['cargadoPor'] == 'Trabajador';
-
-      if (esPortfolio) {
-        fotosPortfolio[uid] = (fotosPortfolio[uid] ?? 0) + n;
-      } else {
-        fotosClientes[uid] = (fotosClientes[uid] ?? 0) + n;
-      }
-    }
-
-    // 2) Indexar calificaciones por usuario evaluado
-    final califPorUsuario = <String, List<Map<String, dynamic>>>{};
-    final califComoCliente = <String, List<Map<String, dynamic>>>{};
-    try {
-      final califSnap = await _db.collection('calificaciones').get();
-      for (final c in califSnap.docs) {
-        final d = c.data();
-        final map = Map<String, dynamic>.from(d);
-        map['_id'] = c.id;
-
-        // Prestador evaluado (cliente → prestador)
-        final prestadorId = (d['prestador_id'] ??
-                d['trabajador_id'] ??
-                d['evaluado_id'] ??
-                d['usuario_evaluado'] ??
-                '')
-            .toString();
-        final rolEval = (d['rol_evaluado'] ?? d['tipo'] ?? '').toString();
-        if (prestadorId.isNotEmpty &&
-            !rolEval.toLowerCase().contains('cliente')) {
-          califPorUsuario.putIfAbsent(prestadorId, () => []).add(map);
-        }
-
-        // Cliente evaluado (prestador → cliente)
-        final clienteId = (d['cliente_id'] ?? d['usuario_cliente'] ?? '')
-            .toString();
-        if (clienteId.isNotEmpty) {
-          califComoCliente.putIfAbsent(clienteId, () => []).add(map);
-        } else if (rolEval.toLowerCase().contains('cliente') &&
-            prestadorId.isNotEmpty) {
-          califComoCliente.putIfAbsent(prestadorId, () => []).add(map);
-        }
-      }
-    } catch (_) {
-      // Colección vacía o sin permisos: score_servicio queda en 0
-    }
-
-    // 3) Primera pasada liviana: cache identidad + flags de evaluadores
-    final scoreIdentidadCache = <String, int>{};
-    final esNuevoCache = <String, bool>{};
-    final tieneHistorialCache = <String, bool>{};
-
-    // 4) Paginar usuarios
-    Query<Map<String, dynamic>> query =
-        _db.collection('usuarios').orderBy(FieldPath.documentId).limit(pageSize);
-
+    final started = DateTime.now();
+    final runId =
+        '${started.toUtc().toIso8601String().replaceAll(':', '-')}_${trigger}';
+    final errores = <String>[];
+    int evalsPublicadasTimeout = 0;
+    int evalsParCompleto = 0;
     int totalProcesados = 0;
     int escritos = 0;
-    DocumentSnapshot? last;
 
-    // Pre-cargar todos los docs de usuarios para multiplicadores (paginado)
-    final allUserDocs = <String, Map<String, dynamic>>{};
-    DocumentSnapshot? lastPre;
-    while (true) {
-      final snap = lastPre == null
-          ? await query.get()
-          : await query.startAfterDocument(lastPre).get();
-      if (snap.docs.isEmpty) break;
-      for (final doc in snap.docs) {
-        allUserDocs[doc.id] = doc.data();
-      }
-      lastPre = snap.docs.last;
-      if (snap.docs.length < pageSize) break;
-    }
+    // ----- F0: lock + run metadata -----
+    final jobRef = _db.collection('stats').doc('scoring_job');
+    final runRef = _db.collection('stats').doc('scoring_job').collection('runs').doc(runId);
 
-    for (final entry in allUserDocs.entries) {
-      final uid = entry.key;
-      final data = entry.value;
-      final idLayer = calcularScoreIdentidad(
-        data,
-        fotosPortfolio: fotosPortfolio[uid] ?? 0,
+    try {
+      final acquired = await _adquirirLock(
+        jobRef: jobRef,
+        runId: runId,
+        trigger: trigger,
+        force: force,
       );
-      scoreIdentidadCache[uid] = idLayer.score;
-      final alta = _fechaAlta(data);
-      esNuevoCache[uid] =
-          alta != null && DateTime.now().difference(alta).inDays < 30;
-      final nEval = (data['cantidadEvaluadores'] as num?)?.toInt() ?? 0;
-      final nVal = (data['validaciones_recibidas'] as List?)?.length ?? 0;
-      tieneHistorialCache[uid] = nEval > 0 || nVal > 0;
-    }
+      if (!acquired) {
+        await runRef.set({
+          'run_id': runId,
+          'started_at': FieldValue.serverTimestamp(),
+          'trigger': trigger,
+          'model_version': modelVersion,
+          'status': 'aborted_lock',
+          'error_message': 'Otra corrida en curso (lock activo)',
+          'finished_at': FieldValue.serverTimestamp(),
+        });
+        return BatchScoringResult(
+          procesados: 0,
+          actualizados: 0,
+          runId: runId,
+          status: 'aborted_lock',
+          evalsPublicadasTimeout: 0,
+          evalsParCompleto: 0,
+          errores: const ['lock_activo'],
+          duracionMs: DateTime.now().difference(started).inMilliseconds,
+        );
+      }
 
-    // 5) Segunda pasada: escribir scores
-    last = null;
-    while (true) {
-      final snap = last == null
-          ? await query.get()
-          : await query.startAfterDocument(last).get();
+      await runRef.set({
+        'run_id': runId,
+        'started_at': FieldValue.serverTimestamp(),
+        'trigger': trigger,
+        'model_version': modelVersion,
+        'status': 'running',
+      });
 
-      if (snap.docs.isEmpty) break;
+      // ----- F1: publicar calificaciones vencidas (7 días) -----
+      try {
+        final pub = await _publicarCalificacionesVencidas();
+        evalsPublicadasTimeout = pub.porTimeout;
+        evalsParCompleto = pub.parCompleto;
+      } catch (e) {
+        errores.add('F1_publicar: $e');
+      }
 
-      WriteBatch batch = _db.batch();
-      int enBatch = 0;
-
-      for (final doc in snap.docs) {
-        final data = doc.data();
-        final uid = doc.id;
-
-        final fp = fotosPortfolio[uid] ?? 0;
-        final fc = fotosClientes[uid] ?? 0;
-
-        final identidad = calcularScoreIdentidad(data, fotosPortfolio: fp);
-
-        // Eventos de servicio: calificaciones + validaciones_recibidas
-        final eventosServicio = <Map<String, dynamic>>[
-          ...?califPorUsuario[uid],
-        ];
-        final vals = data['validaciones_recibidas'] as List<dynamic>? ?? [];
-        for (final v in vals) {
-          if (v is Map) {
-            eventosServicio.add(Map<String, dynamic>.from(v));
+      // ----- F2: indexar trabajos -----
+      final fotosPortfolio = <String, int>{};
+      final fotosClientes = <String, int>{};
+      try {
+        final trabajosSnap = await _db.collection('trabajos').get();
+        for (final t in trabajosSnap.docs) {
+          final d = t.data();
+          final uid = _resolverUsuarioId(d);
+          if (uid == null) continue;
+          final imgs = d['imagenes'] as List<dynamic>? ?? [];
+          final n = imgs.length;
+          if (n == 0) continue;
+          final esPortfolio = d['tipo'] == 'portfolio' ||
+              d['cuenta_como_experiencia'] == false ||
+              d['cargadoPor'] == 'Trabajador';
+          if (esPortfolio) {
+            fotosPortfolio[uid] = (fotosPortfolio[uid] ?? 0) + n;
+          } else {
+            fotosClientes[uid] = (fotosClientes[uid] ?? 0) + n;
           }
         }
+      } catch (e) {
+        errores.add('F2_trabajos: $e');
+      }
 
-        final servicio = calcularScoreServicio(
-          eventos: eventosServicio,
-          scoreIdentidadEvaluadores: scoreIdentidadCache,
-          evaluadorTieneHistorial: tieneHistorialCache,
-          evaluadorEsNuevo: esNuevoCache,
-          scoreIdentidadReceptor: identidad.score,
-        );
+      // ----- F2b: indexar calificaciones (solo publicadas / legacy) -----
+      final califPorUsuario = <String, List<Map<String, dynamic>>>{};
+      final califComoCliente = <String, List<Map<String, dynamic>>>{};
+      try {
+        final califSnap = await _db.collection('calificaciones').get();
+        for (final c in califSnap.docs) {
+          final d = c.data();
+          if (!_esCalificacionPublicada(d)) continue;
+          final map = Map<String, dynamic>.from(d);
+          map['_id'] = c.id;
 
-        final eventosCliente = <Map<String, dynamic>>[
-          ...?califComoCliente[uid],
-        ];
-        final cliente = calcularScoreCliente(
-          eventos: eventosCliente,
-          scoreIdentidadEvaluadores: scoreIdentidadCache,
-          evaluadorTieneHistorial: tieneHistorialCache,
-          evaluadorEsNuevo: esNuevoCache,
-          scoreIdentidadReceptor: identidad.score,
-        );
-
-        final esTrabajador =
-            data['es_trabajador'] == true || data['rol'] == 'trabajador';
-        final creditoPreview = calcularScoreCreditoPreview(
-          scoreIdentidad: identidad.score,
-          scoreServicio: servicio.score,
-          scoreCliente: cliente.score,
-          esTrabajador: esTrabajador,
-        );
-
-        // Validaciones 6m para badge (compat)
-        final corte = DateTime.now().subtract(const Duration(days: 183));
-        final idsVal = <String>{};
-        for (final v in vals) {
-          if (v is! Map) continue;
-          DateTime? fecha;
-          final f = v['fecha'] ?? v['created_at'] ?? v['fecha_validacion'];
-          if (f is Timestamp) fecha = f.toDate();
-          if (f is String) fecha = DateTime.tryParse(f);
-          if (fecha != null && fecha.isBefore(corte)) continue;
-          final vid = (v['validador_id'] ?? v['usuario_id'] ?? v['uid'] ?? '')
+          final prestadorId = (d['prestador_id'] ??
+                  d['trabajador_id'] ??
+                  d['evaluado_id'] ??
+                  d['usuario_evaluado'] ??
+                  '')
               .toString();
-          if (vid.isNotEmpty) idsVal.add(vid);
-        }
-        // También contar evaluadores de calificaciones recientes
-        for (final e in eventosServicio) {
-          final f = e['fecha'] ?? e['created_at'] ?? e['fecha_calificacion'];
-          DateTime? fecha;
-          if (f is Timestamp) fecha = f.toDate();
-          if (f is String) fecha = DateTime.tryParse(f);
-          if (fecha != null && fecha.isBefore(corte)) continue;
-          final vid =
-              (e['evaluador_id'] ?? e['validador_id'] ?? e['usuario_id'] ?? '')
-                  .toString();
-          if (vid.isNotEmpty) idsVal.add(vid);
-        }
+          final rolEval = (d['rol_evaluado'] ?? d['tipo'] ?? '').toString();
+          if (prestadorId.isNotEmpty &&
+              !rolEval.toLowerCase().contains('cliente')) {
+            califPorUsuario.putIfAbsent(prestadorId, () => []).add(map);
+          }
 
-        int validadoresConCalif = 0;
-        for (final vid in idsVal) {
-          if (tieneHistorialCache[vid] == true) validadoresConCalif++;
+          final clienteId =
+              (d['cliente_id'] ?? d['usuario_cliente'] ?? '').toString();
+          if (clienteId.isNotEmpty) {
+            califComoCliente.putIfAbsent(clienteId, () => []).add(map);
+          } else if (rolEval.toLowerCase().contains('cliente') &&
+              prestadorId.isNotEmpty) {
+            califComoCliente.putIfAbsent(prestadorId, () => []).add(map);
+          }
         }
+      } catch (e) {
+        errores.add('F2_calificaciones: $e');
+      }
 
-        final badge = calcularBadgePrestador(
+      // ----- F3: precargar usuarios + cache identidad -----
+      final scoreIdentidadCache = <String, int>{};
+      final esNuevoCache = <String, bool>{};
+      final tieneHistorialCache = <String, bool>{};
+      final allUserDocs = <String, Map<String, dynamic>>{};
+      final allUserRefs = <String, DocumentReference<Map<String, dynamic>>>{};
+
+      Query<Map<String, dynamic>> query = _db
+          .collection('usuarios')
+          .orderBy(FieldPath.documentId)
+          .limit(pageSize);
+
+      DocumentSnapshot? lastPre;
+      try {
+        while (true) {
+          final snap = lastPre == null
+              ? await query.get()
+              : await query.startAfterDocument(lastPre).get();
+          if (snap.docs.isEmpty) break;
+          for (final doc in snap.docs) {
+            allUserDocs[doc.id] = doc.data();
+            allUserRefs[doc.id] = doc.reference;
+          }
+          lastPre = snap.docs.last;
+          if (snap.docs.length < pageSize) break;
+        }
+      } catch (e) {
+        errores.add('F3_usuarios: $e');
+      }
+
+      for (final entry in allUserDocs.entries) {
+        final uid = entry.key;
+        final data = entry.value;
+        final idLayer = calcularScoreIdentidad(
           data,
-          fotosPortfolio: fp,
-          fotosClientes: fc,
-          validaciones6mDistintas: idsVal.length,
-          validadoresConCalificacion: validadoresConCalif,
-          nEvalTrabajo: servicio.nEventos,
+          fotosPortfolio: fotosPortfolio[uid] ?? 0,
         );
+        scoreIdentidadCache[uid] = idLayer.score;
+        final alta = _fechaAlta(data);
+        esNuevoCache[uid] =
+            alta != null && DateTime.now().difference(alta).inDays < 30;
+        final nEval = (data['cantidadEvaluadores'] as num?)?.toInt() ?? 0;
+        final nVal = (data['validaciones_recibidas'] as List?)?.length ?? 0;
+        tieneHistorialCache[uid] = nEval > 0 || nVal > 0;
+      }
 
-        final estrellas = estrellasFromServicio(
-          servicio.score,
-          servicio.nEventos,
-        );
+      // ----- F4: calcular y escribir -----
+      WriteBatch batch = _db.batch();
+      int enBatch = 0;
+      final totalUsers = allUserDocs.length;
 
-        // Compat: score_credito plano = raw identidad (como antes tendía a ser)
-        final scoreCreditoCompat = calcularScoreCredito(
-          data,
-          fotosClientes: fc,
-        );
+      for (final entry in allUserDocs.entries) {
+        final uid = entry.key;
+        final data = entry.value;
+        final ref = allUserRefs[uid]!;
 
-        batch.set(
-          doc.reference,
-          {
-            // --- compat campos planos ---
-            'score_credito': scoreCreditoCompat.total,
-            'score_credito_detalle': scoreCreditoCompat.detalle,
-            'badge_prestador': badge,
-            'score_actualizado_en': FieldValue.serverTimestamp(),
-            'badge_actualizado_en': FieldValue.serverTimestamp(),
-            // --- modelo v1 capas ---
-            'scoring': {
-              'model_version': modelVersion,
-              'score_identidad': identidad.score,
-              'score_identidad_raw': identidad.raw,
-              'score_identidad_detalle': identidad.detalle,
-              'score_servicio': servicio.score,
-              'score_servicio_raw': servicio.raw,
-              'score_servicio_detalle': {
-                'n_eval': servicio.nEventos,
-                'n_con_foto': servicio.nConFoto,
-                'n_con_comentario': servicio.nConComentario,
+        try {
+          final fp = fotosPortfolio[uid] ?? 0;
+          final fc = fotosClientes[uid] ?? 0;
+
+          final identidad = calcularScoreIdentidad(data, fotosPortfolio: fp);
+
+          final eventosServicio = <Map<String, dynamic>>[
+            ...?califPorUsuario[uid],
+          ];
+          final vals = data['validaciones_recibidas'] as List<dynamic>? ?? [];
+          for (final v in vals) {
+            if (v is Map) {
+              eventosServicio.add(Map<String, dynamic>.from(v));
+            }
+          }
+
+          final servicio = calcularScoreServicio(
+            eventos: eventosServicio,
+            scoreIdentidadEvaluadores: scoreIdentidadCache,
+            evaluadorTieneHistorial: tieneHistorialCache,
+            evaluadorEsNuevo: esNuevoCache,
+            scoreIdentidadReceptor: identidad.score,
+          );
+
+          final eventosCliente = <Map<String, dynamic>>[
+            ...?califComoCliente[uid],
+          ];
+          final cliente = calcularScoreCliente(
+            eventos: eventosCliente,
+            scoreIdentidadEvaluadores: scoreIdentidadCache,
+            evaluadorTieneHistorial: tieneHistorialCache,
+            evaluadorEsNuevo: esNuevoCache,
+            scoreIdentidadReceptor: identidad.score,
+          );
+
+          final esTrabajador =
+              data['es_trabajador'] == true || data['rol'] == 'trabajador';
+          final creditoPreview = calcularScoreCreditoPreview(
+            scoreIdentidad: identidad.score,
+            scoreServicio: servicio.score,
+            scoreCliente: cliente.score,
+            esTrabajador: esTrabajador,
+          );
+
+          final corte = DateTime.now().subtract(const Duration(days: 183));
+          final idsVal = <String>{};
+          for (final v in vals) {
+            if (v is! Map) continue;
+            DateTime? fecha;
+            final f = v['fecha'] ?? v['created_at'] ?? v['fecha_validacion'];
+            if (f is Timestamp) fecha = f.toDate();
+            if (f is String) fecha = DateTime.tryParse(f);
+            if (fecha != null && fecha.isBefore(corte)) continue;
+            final vid =
+                (v['validador_id'] ?? v['usuario_id'] ?? v['uid'] ?? '')
+                    .toString();
+            if (vid.isNotEmpty) idsVal.add(vid);
+          }
+          for (final e in eventosServicio) {
+            final f = e['fecha'] ?? e['created_at'] ?? e['fecha_calificacion'];
+            DateTime? fecha;
+            if (f is Timestamp) fecha = f.toDate();
+            if (f is String) fecha = DateTime.tryParse(f);
+            if (fecha != null && fecha.isBefore(corte)) continue;
+            final vid = (e['evaluador_id'] ??
+                    e['validador_id'] ??
+                    e['usuario_id'] ??
+                    '')
+                .toString();
+            if (vid.isNotEmpty) idsVal.add(vid);
+          }
+
+          int validadoresConCalif = 0;
+          for (final vid in idsVal) {
+            if (tieneHistorialCache[vid] == true) validadoresConCalif++;
+          }
+
+          final badge = calcularBadgePrestador(
+            data,
+            fotosPortfolio: fp,
+            fotosClientes: fc,
+            validaciones6mDistintas: idsVal.length,
+            validadoresConCalificacion: validadoresConCalif,
+            nEvalTrabajo: servicio.nEventos,
+          );
+
+          final estrellas = estrellasFromServicio(
+            servicio.score,
+            servicio.nEventos,
+          );
+
+          final scoreCreditoCompat = calcularScoreCredito(
+            data,
+            fotosClientes: fc,
+          );
+
+          batch.set(
+            ref,
+            {
+              'score_credito': scoreCreditoCompat.total,
+              'score_credito_detalle': scoreCreditoCompat.detalle,
+              'badge_prestador': badge,
+              'score_actualizado_en': FieldValue.serverTimestamp(),
+              'badge_actualizado_en': FieldValue.serverTimestamp(),
+              'scoring_stale': false,
+              'scoring': {
+                'model_version': modelVersion,
+                'score_identidad': identidad.score,
+                'score_identidad_raw': identidad.raw,
+                'score_identidad_detalle': identidad.detalle,
+                'score_servicio': servicio.score,
+                'score_servicio_raw': servicio.raw,
+                'score_servicio_detalle': {
+                  'n_eval': servicio.nEventos,
+                  'n_con_foto': servicio.nConFoto,
+                  'n_con_comentario': servicio.nConComentario,
+                },
+                'score_cliente': cliente.score,
+                'score_cliente_raw': cliente.raw,
+                'score_cliente_detalle': {
+                  'n_eval': cliente.nEventos,
+                },
+                'nivel_confianza': nivelFromScore(identidad.score),
+                'nivel_cliente': nivelFromScore(cliente.score),
+                'n_eval_trabajo': servicio.nEventos,
+                'n_eval_cliente': cliente.nEventos,
+                'rating_promedio': servicio.ratingPromedio ?? estrellas,
+                'score_credito_preview': creditoPreview,
+                'actualizado_en': FieldValue.serverTimestamp(),
+                'last_run_id': runId,
               },
-              'score_cliente': cliente.score,
-              'score_cliente_raw': cliente.raw,
-              'score_cliente_detalle': {
-                'n_eval': cliente.nEventos,
+              'stats_scoring': {
+                'fotos_portfolio': fp,
+                'fotos_clientes': fc,
+                'validaciones_6m': idsVal.length,
+                'validadores_con_calificacion': validadoresConCalif,
+                'model_version': modelVersion,
               },
-              'nivel_confianza': nivelFromScore(identidad.score),
-              'nivel_cliente': nivelFromScore(cliente.score),
-              'n_eval_trabajo': servicio.nEventos,
-              'n_eval_cliente': cliente.nEventos,
-              'rating_promedio': servicio.ratingPromedio ?? estrellas,
-              'score_credito_preview': creditoPreview,
-              'actualizado_en': FieldValue.serverTimestamp(),
             },
-            'stats_scoring': {
-              'fotos_portfolio': fp,
-              'fotos_clientes': fc,
-              'validaciones_6m': idsVal.length,
-              'validadores_con_calificacion': validadoresConCalif,
-              'model_version': modelVersion,
-            },
-          },
-          SetOptions(merge: true),
-        );
+            SetOptions(merge: true),
+          );
 
-        enBatch++;
-        escritos++;
-        totalProcesados++;
-        onProgress?.call(totalProcesados, allUserDocs.length);
+          enBatch++;
+          escritos++;
+          totalProcesados++;
+          onProgress?.call(totalProcesados, totalUsers);
 
-        if (enBatch >= 400) {
-          await batch.commit();
-          batch = _db.batch();
-          enBatch = 0;
+          if (enBatch >= 400) {
+            await batch.commit();
+            batch = _db.batch();
+            enBatch = 0;
+          }
+        } catch (e) {
+          errores.add('F4_$uid: $e');
         }
       }
 
       if (enBatch > 0) await batch.commit();
 
-      last = snap.docs.last;
-      if (snap.docs.length < pageSize) break;
+      // ----- F5: stats + unlock -----
+      final duracionMs = DateTime.now().difference(started).inMilliseconds;
+      final status = errores.isEmpty ? 'ok' : 'ok_with_errors';
+
+      await jobRef.set({
+        'ultima_corrida': FieldValue.serverTimestamp(),
+        'usuarios_procesados': totalProcesados,
+        'usuarios_actualizados': escritos,
+        'evals_publicadas_timeout': evalsPublicadasTimeout,
+        'evals_par_completo': evalsParCompleto,
+        'fuente': trigger,
+        'model_version': modelVersion,
+        'last_run_id': runId,
+        'status': status,
+        'duracion_ms': duracionMs,
+        'errores_count': errores.length,
+        'lock': FieldValue.delete(),
+      }, SetOptions(merge: true));
+
+      await runRef.set({
+        'status': status,
+        'finished_at': FieldValue.serverTimestamp(),
+        'duracion_ms': duracionMs,
+        'metrics': {
+          'usuarios_procesados': totalProcesados,
+          'usuarios_actualizados': escritos,
+          'evals_publicadas_timeout': evalsPublicadasTimeout,
+          'evals_par_completo': evalsParCompleto,
+          'errores_count': errores.length,
+        },
+        'errores': errores.take(50).toList(),
+        'model_version': modelVersion,
+      }, SetOptions(merge: true));
+
+      return BatchScoringResult(
+        procesados: totalProcesados,
+        actualizados: escritos,
+        runId: runId,
+        status: status,
+        evalsPublicadasTimeout: evalsPublicadasTimeout,
+        evalsParCompleto: evalsParCompleto,
+        errores: errores,
+        duracionMs: duracionMs,
+      );
+    } catch (e, st) {
+      final duracionMs = DateTime.now().difference(started).inMilliseconds;
+      errores.add('FATAL: $e');
+      try {
+        await jobRef.set({
+          'status': 'error',
+          'error_message': e.toString(),
+          'ultima_corrida': FieldValue.serverTimestamp(),
+          'last_run_id': runId,
+          'lock': FieldValue.delete(),
+        }, SetOptions(merge: true));
+        await runRef.set({
+          'status': 'error',
+          'finished_at': FieldValue.serverTimestamp(),
+          'error_message': e.toString(),
+          'stack': st.toString().length > 1500
+              ? st.toString().substring(0, 1500)
+              : st.toString(),
+          'duracion_ms': duracionMs,
+          'errores': errores.take(50).toList(),
+        }, SetOptions(merge: true));
+      } catch (_) {}
+      return BatchScoringResult(
+        procesados: totalProcesados,
+        actualizados: escritos,
+        runId: runId,
+        status: 'error',
+        evalsPublicadasTimeout: evalsPublicadasTimeout,
+        evalsParCompleto: evalsParCompleto,
+        errores: errores,
+        duracionMs: duracionMs,
+      );
     }
+  }
 
-    await _db.collection('stats').doc('scoring_job').set({
-      'ultima_corrida': FieldValue.serverTimestamp(),
-      'usuarios_procesados': totalProcesados,
-      'fuente': 'app_batch',
-      'model_version': modelVersion,
-    }, SetOptions(merge: true));
+  // ---------- F0 helpers ----------
 
-    return BatchScoringResult(
-      procesados: totalProcesados,
-      actualizados: escritos,
-    );
+  static Future<bool> _adquirirLock({
+    required DocumentReference<Map<String, dynamic>> jobRef,
+    required String runId,
+    required String trigger,
+    required bool force,
+  }) async {
+    return _db.runTransaction<bool>((tx) async {
+      final snap = await tx.get(jobRef);
+      final data = snap.data();
+      final lock = data?['lock'];
+      if (!force && lock is Map) {
+        final untilRaw = lock['until'];
+        DateTime? until;
+        if (untilRaw is Timestamp) until = untilRaw.toDate();
+        if (untilRaw is String) until = DateTime.tryParse(untilRaw);
+        if (until != null && until.isAfter(DateTime.now())) {
+          return false;
+        }
+      }
+      tx.set(
+        jobRef,
+        {
+          'lock': {
+            'holder': runId,
+            'trigger': trigger,
+            'acquired_at': FieldValue.serverTimestamp(),
+            'until': Timestamp.fromDate(DateTime.now().add(lockTtl)),
+          },
+          'status': 'running',
+        },
+        SetOptions(merge: true),
+      );
+      return true;
+    });
+  }
+
+  // ---------- F1 helpers ----------
+
+  static Future<({int porTimeout, int parCompleto})>
+      _publicarCalificacionesVencidas() async {
+    int porTimeout = 0;
+    int parCompleto = 0;
+    final corte = DateTime.now().subtract(ventanaRespuestaPrestador);
+
+    final snap = await _db.collection('calificaciones').get();
+    WriteBatch batch = _db.batch();
+    int enBatch = 0;
+
+    for (final doc in snap.docs) {
+      final d = doc.data();
+      final estado = (d['estado'] ?? '').toString().toLowerCase();
+
+      // Par ya listo para publicar
+      final ambos =
+          d['par_completo'] == true || d['tiene_respuesta_prestador'] == true;
+      final pendientePar = estado == 'par_completo_pendiente_pub' ||
+          (ambos && _estadosPendientes.contains(estado));
+
+      DateTime? fecha;
+      final f = d['fecha'] ??
+          d['created_at'] ??
+          d['fecha_calificacion'] ??
+          d['creado_en'];
+      if (f is Timestamp) fecha = f.toDate();
+      if (f is String) fecha = DateTime.tryParse(f);
+
+      if (pendientePar) {
+        batch.set(
+          doc.reference,
+          {
+            'estado': 'publicada',
+            'par_completo': true,
+            'publicada_en': FieldValue.serverTimestamp(),
+            'publica_por_timeout': false,
+          },
+          SetOptions(merge: true),
+        );
+        parCompleto++;
+        enBatch++;
+      } else if (_estadosPendientes.contains(estado) &&
+          fecha != null &&
+          fecha.isBefore(corte)) {
+        batch.set(
+          doc.reference,
+          {
+            'estado': 'publicada',
+            'publicada_en': FieldValue.serverTimestamp(),
+            'publica_por_timeout': true,
+            'par_completo': false,
+          },
+          SetOptions(merge: true),
+        );
+        porTimeout++;
+        enBatch++;
+      }
+
+      if (enBatch >= 400) {
+        await batch.commit();
+        batch = _db.batch();
+        enBatch = 0;
+      }
+    }
+    if (enBatch > 0) await batch.commit();
+    return (porTimeout: porTimeout, parCompleto: parCompleto);
+  }
+
+  /// Legacy (sin estado) cuenta como publicada. Pendientes no suman al score.
+  static bool _esCalificacionPublicada(Map<String, dynamic> d) {
+    final estado = (d['estado'] ?? '').toString().toLowerCase().trim();
+    if (estado.isEmpty) return true; // legacy
+    if (_estadosPublicados.contains(estado)) return true;
+    if (_estadosPendientes.contains(estado)) return false;
+    if (estado == 'anulada' || estado == 'cancelada' || estado == 'borrador') {
+      return false;
+    }
+    // desconocido → no sumar (seguro)
+    return false;
   }
 
   static String? _resolverUsuarioId(Map<String, dynamic> trabajo) {
@@ -893,10 +1155,26 @@ class LayerScoreResult {
 class BatchScoringResult {
   final int procesados;
   final int actualizados;
+  final String runId;
+  final String status;
+  final int evalsPublicadasTimeout;
+  final int evalsParCompleto;
+  final List<String> errores;
+  final int duracionMs;
+
   const BatchScoringResult({
     required this.procesados,
     required this.actualizados,
+    this.runId = '',
+    this.status = 'ok',
+    this.evalsPublicadasTimeout = 0,
+    this.evalsParCompleto = 0,
+    this.errores = const [],
+    this.duracionMs = 0,
   });
+
+  String get resumen =>
+      '[$status] $actualizados/$procesados users · timeout=$evalsPublicadasTimeout · ${duracionMs}ms';
 }
 
 class ColorBadge {
