@@ -1,0 +1,59 @@
+name: Run scoring batch
+
+# Se dispara solo a mano desde la pestaña Actions de GitHub (sin consola local).
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Forzar aunque haya lock activo"
+        type: boolean
+        default: false
+      trigger_label:
+        description: "Etiqueta de la corrida"
+        type: string
+        default: "github_actions"
+
+jobs:
+  batch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: functions/package.json
+
+      - name: Install function deps
+        working-directory: functions
+        run: npm install --omit=dev
+
+      - name: Write service account
+        env:
+          SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_LIFEWALLETPUELO }}
+        run: |
+          if [ -z "$SA_JSON" ]; then
+            echo "Falta el secret FIREBASE_SERVICE_ACCOUNT_LIFEWALLETPUELO"
+            exit 1
+          fi
+          echo "$SA_JSON" > "$RUNNER_TEMP/sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+          # project id from SA if present
+          echo "GCLOUD_PROJECT=lifewalletpuelo" >> "$GITHUB_ENV"
+          echo "GOOGLE_CLOUD_PROJECT=lifewalletpuelo" >> "$GITHUB_ENV"
+
+      - name: Run scoring batch
+        working-directory: functions
+        env:
+          FORCE: ${{ inputs.force && '1' || '0' }}
+          TRIGGER: ${{ inputs.trigger_label }}
+        run: node run_once.js
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "### Scoring batch" >> "$GITHUB_STEP_SUMMARY"
+          echo "Proyecto: \`lifewalletpuelo\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Revisá en Firestore: \`stats/scoring_job\` y \`stats/scoring_job/runs\`" >> "$GITHUB_STEP_SUMMARY"
