@@ -1,0 +1,681 @@
+{
+  "version": "2.0",
+  "maestro": [
+    "plomeria",
+    "gasista",
+    "destapaciones",
+    "calefones",
+    "bombas_agua",
+    "tanques_agua",
+    "electricidad",
+    "portero_electrico",
+    "iluminacion",
+    "albanileria",
+    "techista",
+    "impermeabilizacion",
+    "colocacion_pisos",
+    "drywall",
+    "aberturas_aluminio",
+    "herreria",
+    "vidrieria",
+    "piletas_construccion",
+    "pintura",
+    "empapelado",
+    "revestimientos",
+    "carpinteria",
+    "muebles_medida",
+    "tapiceria",
+    "decks",
+    "jardineria",
+    "poda",
+    "paisajismo",
+    "riego",
+    "cercos",
+    "piletas_mantenimiento",
+    "limpieza",
+    "limpieza_postobra",
+    "limpieza_alfombras",
+    "fumigacion",
+    "vidrios",
+    "aire_acondicionado",
+    "calefaccion",
+    "ventilacion",
+    "cctv",
+    "alarmas",
+    "cerrajeria",
+    "redes_wifi",
+    "soporte_pc",
+    "domotica",
+    "mudanzas",
+    "fletes",
+    "retiro_escombros",
+    "paseador_perros",
+    "peluqueria_canina",
+    "pet_sitting",
+    "persianas",
+    "toldos",
+    "portones_automaticos",
+    "electrodomesticos",
+    "costura",
+    "organizacion_hogar"
+  ],
+  "categorias": [
+    {
+      "id": "plomeria_gas",
+      "label": "Plomería y gas"
+    },
+    {
+      "id": "electricidad",
+      "label": "Electricidad"
+    },
+    {
+      "id": "construccion",
+      "label": "Construcción"
+    },
+    {
+      "id": "pintura_acabados",
+      "label": "Pintura y acabados"
+    },
+    {
+      "id": "madera_muebles",
+      "label": "Madera y muebles"
+    },
+    {
+      "id": "jardin_exterior",
+      "label": "Jardín y exterior"
+    },
+    {
+      "id": "limpieza",
+      "label": "Limpieza"
+    },
+    {
+      "id": "clima",
+      "label": "Clima y calefacción"
+    },
+    {
+      "id": "seguridad_tech",
+      "label": "Seguridad y tech"
+    },
+    {
+      "id": "mudanzas",
+      "label": "Mudanzas y fletes"
+    },
+    {
+      "id": "mascotas",
+      "label": "Mascotas"
+    },
+    {
+      "id": "hogar_varios",
+      "label": "Hogar y varios"
+    }
+  ],
+  "especialidades": [
+    {
+      "id": "plomeria",
+      "label": "Plomería",
+      "categoria_id": "plomeria_gas",
+      "sinonimos": [
+        "plomero",
+        "caños",
+        "canos",
+        "sanitarista",
+        "griferia"
+      ]
+    },
+    {
+      "id": "gasista",
+      "label": "Gasista",
+      "categoria_id": "plomeria_gas",
+      "sinonimos": [
+        "gas",
+        "matriculado gas",
+        "instalacion gas"
+      ]
+    },
+    {
+      "id": "destapaciones",
+      "label": "Destapaciones",
+      "categoria_id": "plomeria_gas",
+      "sinonimos": [
+        "desagote",
+        "cloaca",
+        "destape",
+        "taponamiento"
+      ]
+    },
+    {
+      "id": "calefones",
+      "label": "Calefones y termotanques",
+      "categoria_id": "plomeria_gas",
+      "sinonimos": [
+        "termotanque",
+        "calefon",
+        "agua caliente"
+      ]
+    },
+    {
+      "id": "bombas_agua",
+      "label": "Bombas de agua",
+      "categoria_id": "plomeria_gas",
+      "sinonimos": [
+        "bomba",
+        "presurizador"
+      ]
+    },
+    {
+      "id": "tanques_agua",
+      "label": "Tanques de agua",
+      "categoria_id": "plomeria_gas",
+      "sinonimos": [
+        "tanque",
+        "cisterna"
+      ]
+    },
+    {
+      "id": "electricidad",
+      "label": "Electricista",
+      "categoria_id": "electricidad",
+      "sinonimos": [
+        "electrico",
+        "instalacion electrica",
+        "tablero"
+      ]
+    },
+    {
+      "id": "portero_electrico",
+      "label": "Portero eléctrico",
+      "categoria_id": "electricidad",
+      "sinonimos": [
+        "videoportero",
+        "portero"
+      ]
+    },
+    {
+      "id": "iluminacion",
+      "label": "Iluminación",
+      "categoria_id": "electricidad",
+      "sinonimos": [
+        "luces",
+        "led",
+        "lamparas"
+      ]
+    },
+    {
+      "id": "albanileria",
+      "label": "Albañilería",
+      "categoria_id": "construccion",
+      "sinonimos": [
+        "albanil",
+        "construccion",
+        "obra",
+        "revoque"
+      ]
+    },
+    {
+      "id": "techista",
+      "label": "Techista",
+      "categoria_id": "construccion",
+      "sinonimos": [
+        "techo",
+        "techos",
+        "gotera",
+        "chapa"
+      ]
+    },
+    {
+      "id": "impermeabilizacion",
+      "label": "Impermeabilización",
+      "categoria_id": "construccion",
+      "sinonimos": [
+        "humedad",
+        "filtracion",
+        "membrana"
+      ]
+    },
+    {
+      "id": "colocacion_pisos",
+      "label": "Colocación de pisos",
+      "categoria_id": "construccion",
+      "sinonimos": [
+        "ceramicos",
+        "porcelanato",
+        "piso",
+        "azulejos"
+      ]
+    },
+    {
+      "id": "drywall",
+      "label": "Durlock / drywall",
+      "categoria_id": "construccion",
+      "sinonimos": [
+        "durlock",
+        "yeso",
+        "cielorraso",
+        "placas"
+      ]
+    },
+    {
+      "id": "aberturas_aluminio",
+      "label": "Aberturas de aluminio",
+      "categoria_id": "construccion",
+      "sinonimos": [
+        "ventana",
+        "aberturas",
+        "aluminio"
+      ]
+    },
+    {
+      "id": "herreria",
+      "label": "Herrería",
+      "categoria_id": "construccion",
+      "sinonimos": [
+        "rejas",
+        "porton",
+        "hierro",
+        "soldadura"
+      ]
+    },
+    {
+      "id": "vidrieria",
+      "label": "Vidriería",
+      "categoria_id": "construccion",
+      "sinonimos": [
+        "vidrio",
+        "cristal",
+        "mampara"
+      ]
+    },
+    {
+      "id": "piletas_construccion",
+      "label": "Piletas (construcción)",
+      "categoria_id": "construccion",
+      "sinonimos": [
+        "piscina obra",
+        "pileta obra"
+      ]
+    },
+    {
+      "id": "pintura",
+      "label": "Pintura",
+      "categoria_id": "pintura_acabados",
+      "sinonimos": [
+        "pintor",
+        "pintar",
+        "latex"
+      ]
+    },
+    {
+      "id": "empapelado",
+      "label": "Empapelado",
+      "categoria_id": "pintura_acabados",
+      "sinonimos": [
+        "papel mural",
+        "wallpaper"
+      ]
+    },
+    {
+      "id": "revestimientos",
+      "label": "Revestimientos",
+      "categoria_id": "pintura_acabados",
+      "sinonimos": [
+        "enducido",
+        "texturado"
+      ]
+    },
+    {
+      "id": "carpinteria",
+      "label": "Carpintería",
+      "categoria_id": "madera_muebles",
+      "sinonimos": [
+        "carpintero",
+        "madera"
+      ]
+    },
+    {
+      "id": "muebles_medida",
+      "label": "Muebles a medida",
+      "categoria_id": "madera_muebles",
+      "sinonimos": [
+        "amoblamiento",
+        "placard",
+        "cocina a medida"
+      ]
+    },
+    {
+      "id": "tapiceria",
+      "label": "Tapicería",
+      "categoria_id": "madera_muebles",
+      "sinonimos": [
+        "sillones",
+        "tapizado"
+      ]
+    },
+    {
+      "id": "decks",
+      "label": "Decks y pergolas",
+      "categoria_id": "madera_muebles",
+      "sinonimos": [
+        "deck",
+        "pergola",
+        "quincho madera"
+      ]
+    },
+    {
+      "id": "jardineria",
+      "label": "Jardinería",
+      "categoria_id": "jardin_exterior",
+      "sinonimos": [
+        "jardinero",
+        "jardin",
+        "cesped"
+      ]
+    },
+    {
+      "id": "poda",
+      "label": "Poda de árboles",
+      "categoria_id": "jardin_exterior",
+      "sinonimos": [
+        "podar",
+        "arboles",
+        "ramas"
+      ]
+    },
+    {
+      "id": "paisajismo",
+      "label": "Paisajismo",
+      "categoria_id": "jardin_exterior",
+      "sinonimos": [
+        "paisajista",
+        "diseño jardin"
+      ]
+    },
+    {
+      "id": "riego",
+      "label": "Riego automático",
+      "categoria_id": "jardin_exterior",
+      "sinonimos": [
+        "riego",
+        "aspersores"
+      ]
+    },
+    {
+      "id": "cercos",
+      "label": "Cercos y alambrados",
+      "categoria_id": "jardin_exterior",
+      "sinonimos": [
+        "alambrado",
+        "cerco",
+        "perimetral"
+      ]
+    },
+    {
+      "id": "piletas_mantenimiento",
+      "label": "Piletas (mantenimiento)",
+      "categoria_id": "jardin_exterior",
+      "sinonimos": [
+        "pileta",
+        "piscina",
+        "cloro",
+        "mantenimiento pileta"
+      ]
+    },
+    {
+      "id": "limpieza",
+      "label": "Limpieza",
+      "categoria_id": "limpieza",
+      "sinonimos": [
+        "limpiar",
+        "empleada",
+        "limpieza hogar"
+      ]
+    },
+    {
+      "id": "limpieza_postobra",
+      "label": "Limpieza post-obra",
+      "categoria_id": "limpieza",
+      "sinonimos": [
+        "post obra",
+        "final de obra"
+      ]
+    },
+    {
+      "id": "limpieza_alfombras",
+      "label": "Alfombras y tapizados",
+      "categoria_id": "limpieza",
+      "sinonimos": [
+        "alfombra",
+        "sillones lavado",
+        "tapizados"
+      ]
+    },
+    {
+      "id": "fumigacion",
+      "label": "Fumigación / plagas",
+      "categoria_id": "limpieza",
+      "sinonimos": [
+        "plagas",
+        "desinsectacion",
+        "desratizacion",
+        "cucarachas"
+      ]
+    },
+    {
+      "id": "vidrios",
+      "label": "Limpieza de vidrios",
+      "categoria_id": "limpieza",
+      "sinonimos": [
+        "vidrios",
+        "cristales"
+      ]
+    },
+    {
+      "id": "aire_acondicionado",
+      "label": "Aire acondicionado",
+      "categoria_id": "clima",
+      "sinonimos": [
+        "aire",
+        "aa",
+        "split",
+        "climatizacion"
+      ]
+    },
+    {
+      "id": "calefaccion",
+      "label": "Calefacción",
+      "categoria_id": "clima",
+      "sinonimos": [
+        "caldera",
+        "radiador",
+        "estufa",
+        "calefaccion"
+      ]
+    },
+    {
+      "id": "ventilacion",
+      "label": "Ventilación",
+      "categoria_id": "clima",
+      "sinonimos": [
+        "extractor",
+        "campana"
+      ]
+    },
+    {
+      "id": "cctv",
+      "label": "Cámaras / CCTV",
+      "categoria_id": "seguridad_tech",
+      "sinonimos": [
+        "camaras",
+        "seguridad",
+        "videovigilancia"
+      ]
+    },
+    {
+      "id": "alarmas",
+      "label": "Alarmas",
+      "categoria_id": "seguridad_tech",
+      "sinonimos": [
+        "alarma",
+        "monitoreo"
+      ]
+    },
+    {
+      "id": "cerrajeria",
+      "label": "Cerrajería",
+      "categoria_id": "seguridad_tech",
+      "sinonimos": [
+        "cerrajero",
+        "cerradura",
+        "llaves",
+        "apertura"
+      ]
+    },
+    {
+      "id": "redes_wifi",
+      "label": "Redes / Wi‑Fi",
+      "categoria_id": "seguridad_tech",
+      "sinonimos": [
+        "wifi",
+        "red",
+        "router",
+        "cableado"
+      ]
+    },
+    {
+      "id": "soporte_pc",
+      "label": "Soporte PC",
+      "categoria_id": "seguridad_tech",
+      "sinonimos": [
+        "computadora",
+        "notebook",
+        "tecnico pc",
+        "formateo"
+      ]
+    },
+    {
+      "id": "domotica",
+      "label": "Domótica básica",
+      "categoria_id": "seguridad_tech",
+      "sinonimos": [
+        "automatizacion",
+        "smart home"
+      ]
+    },
+    {
+      "id": "mudanzas",
+      "label": "Mudanzas",
+      "categoria_id": "mudanzas",
+      "sinonimos": [
+        "mudanza",
+        "mudar"
+      ]
+    },
+    {
+      "id": "fletes",
+      "label": "Fletes",
+      "categoria_id": "mudanzas",
+      "sinonimos": [
+        "flete",
+        "transporte",
+        "envio"
+      ]
+    },
+    {
+      "id": "retiro_escombros",
+      "label": "Retiro de escombros",
+      "categoria_id": "mudanzas",
+      "sinonimos": [
+        "escombros",
+        "escombro",
+        "descartes"
+      ]
+    },
+    {
+      "id": "paseador_perros",
+      "label": "Paseador de perros",
+      "categoria_id": "mascotas",
+      "sinonimos": [
+        "paseador",
+        "perro",
+        "mascota"
+      ]
+    },
+    {
+      "id": "peluqueria_canina",
+      "label": "Peluquería canina",
+      "categoria_id": "mascotas",
+      "sinonimos": [
+        "grooming",
+        "baño perro"
+      ]
+    },
+    {
+      "id": "pet_sitting",
+      "label": "Cuidado de mascotas",
+      "categoria_id": "mascotas",
+      "sinonimos": [
+        "petsitter",
+        "cuidado perros",
+        "guarderia"
+      ]
+    },
+    {
+      "id": "persianas",
+      "label": "Persianas y cortinas",
+      "categoria_id": "hogar_varios",
+      "sinonimos": [
+        "persiana",
+        "cortina",
+        "roller"
+      ]
+    },
+    {
+      "id": "toldos",
+      "label": "Toldos",
+      "categoria_id": "hogar_varios",
+      "sinonimos": [
+        "toldo",
+        "lonas"
+      ]
+    },
+    {
+      "id": "portones_automaticos",
+      "label": "Portones automáticos",
+      "categoria_id": "hogar_varios",
+      "sinonimos": [
+        "porton",
+        "motor porton",
+        "automatizacion porton"
+      ]
+    },
+    {
+      "id": "electrodomesticos",
+      "label": "Service electrodomésticos",
+      "categoria_id": "hogar_varios",
+      "sinonimos": [
+        "heladera",
+        "lavarropas",
+        "cocina",
+        "horno"
+      ]
+    },
+    {
+      "id": "costura",
+      "label": "Costura y arreglos",
+      "categoria_id": "hogar_varios",
+      "sinonimos": [
+        "modista",
+        "arreglo ropa",
+        "costurera"
+      ]
+    },
+    {
+      "id": "organizacion_hogar",
+      "label": "Organización del hogar",
+      "categoria_id": "hogar_varios",
+      "sinonimos": [
+        "organizer",
+        "orden"
+      ]
+    }
+  ]
+}
