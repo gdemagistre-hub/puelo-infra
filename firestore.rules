@@ -48,8 +48,11 @@ service cloud.firestore {
     // ---------- stats / batch ----------
     match /stats/{doc} {
       allow read: if true;
-      // TEMP: batch scoring desde cliente. Luego: isAdmin()
+      // TEMP: batch scoring desde cliente (+ subcolección runs). Luego: isAdmin()
       allow write: if true;
+      match /{document=**} {
+        allow read, write: if true;
+      }
     }
 
     // ---------- catálogos (solo lectura pública) ----------
@@ -96,7 +99,9 @@ service cloud.firestore {
 
     match /calificaciones/{id} {
       allow read, create: if true;
-      allow update, delete: if isAdmin();
+      // TEMP: F1 del batch publica estados (timeout 7d). Luego: isAdmin() o Function only
+      allow update: if true;
+      allow delete: if isAdmin();
     }
 
     // ---------- validaciones / tokens ----------
