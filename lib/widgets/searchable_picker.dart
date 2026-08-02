@@ -118,179 +118,231 @@ class _SearchableSheetState extends State<_SearchableSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final height = MediaQuery.of(context).size.height * 0.75;
+    final media = MediaQuery.of(context);
+    final keyboard = media.viewInsets.bottom;
+    final height = media.size.height * (widget.multi ? 0.88 : 0.75);
     final filtradas = _filtradas;
 
-    return SafeArea(
-      child: SizedBox(
-        height: height,
-        child: Column(
-          children: [
-            const SizedBox(height: 10),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      widget.titulo,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: TextField(
-                controller: _filterCtrl,
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: widget.hintBuscar,
-                  prefixIcon: Icon(Icons.search, color: Colors.grey.shade500),
-                  suffixIcon: _query.isEmpty
-                      ? null
-                      : IconButton(
-                          icon: const Icon(Icons.clear, size: 20),
-                          onPressed: () {
-                            _filterCtrl.clear();
-                            setState(() => _query = '');
-                          },
-                        ),
-                  filled: true,
-                  fillColor: const Color(0xFFF8FAFC),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-                onChanged: (v) => setState(() => _query = v),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  filtradas.isEmpty
-                      ? 'Sin resultados'
-                      : '${filtradas.length} resultado${filtradas.length == 1 ? '' : 's'}'
-                          '${widget.opciones.length != filtradas.length ? ' de ${widget.opciones.length}' : ''}',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+    return Padding(
+      padding: EdgeInsets.only(bottom: keyboard),
+      child: SafeArea(
+        child: SizedBox(
+          height: height - (keyboard > 0 ? keyboard * 0.15 : 0),
+          child: Column(
+            children: [
+              const SizedBox(height: 10),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-            ),
-            const SizedBox(height: 4),
-            Expanded(
-              child: filtradas.isEmpty
-                  ? Center(
-                      child: Text(
-                        'No hay coincidencias.\nProbá con otra palabra.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.grey.shade600),
-                      ),
-                    )
-                  : ListView.builder(
-                      itemCount: filtradas.length,
-                      itemBuilder: (context, index) {
-                        final item = filtradas[index];
-                        final id = item['id'] ?? '';
-                        final nombre = item['nombre'] ?? '';
-
-                        if (widget.multi) {
-                          final checked =
-                              _tempSelected.any((e) => e['id'] == id);
-                          return CheckboxListTile(
-                            value: checked,
-                            activeColor: widget.accent,
-                            title: Text(
-                              nombre,
-                              style: const TextStyle(
-                                color: Color(0xFF1E293B),
-                                fontSize: 15,
-                              ),
-                            ),
-                            onChanged: (v) {
-                              setState(() {
-                                if (v == true) {
-                                  if (!_tempSelected.any((e) => e['id'] == id)) {
-                                    _tempSelected.add(item);
-                                  }
-                                } else {
-                                  _tempSelected
-                                      .removeWhere((e) => e['id'] == id);
-                                }
-                              });
-                            },
-                          );
-                        }
-
-                        final isSelected = widget.selectedIds.contains(id);
-                        return ListTile(
-                          title: Text(
-                            nombre,
-                            style: TextStyle(
-                              color: const Color(0xFF1E293B),
-                              fontWeight: isSelected
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                            ),
-                          ),
-                          trailing: isSelected
-                              ? Icon(Icons.check_circle, color: widget.accent)
-                              : null,
-                          onTap: () => Navigator.pop(context, item),
-                        );
-                      },
-                    ),
-            ),
-            if (widget.multi)
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                padding: const EdgeInsets.fromLTRB(20, 12, 8, 8),
                 child: Row(
                   children: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancelar'),
-                    ),
-                    const Spacer(),
-                    ElevatedButton(
-                      onPressed: () =>
-                          Navigator.pop(context, List.from(_tempSelected)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: widget.accent,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                    Expanded(
+                      child: Text(
+                        widget.titulo,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF1E293B),
                         ),
                       ),
-                      child: Text(
-                        'Confirmar (${_tempSelected.length})',
+                    ),
+                    if (widget.multi)
+                      IconButton(
+                        tooltip: 'Aceptar selección',
+                        icon: Icon(Icons.check_circle_rounded,
+                            color: widget.accent, size: 28),
+                        onPressed: () => Navigator.pop(
+                          context,
+                          List<Map<String, String>>.from(_tempSelected),
+                        ),
                       ),
+                    IconButton(
+                      tooltip: 'Cerrar',
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
                     ),
                   ],
                 ),
               ),
-          ],
+              if (widget.multi && _tempSelected.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '${_tempSelected.length} seleccionado${_tempSelected.length == 1 ? '' : 's'}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: widget.accent,
+                      ),
+                    ),
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: TextField(
+                  controller: _filterCtrl,
+                  // multi: no autofocus para no tapar el botón Aceptar con el teclado
+                  autofocus: !widget.multi,
+                  decoration: InputDecoration(
+                    hintText: widget.hintBuscar,
+                    prefixIcon:
+                        Icon(Icons.search, color: Colors.grey.shade500),
+                    suffixIcon: _query.isEmpty
+                        ? null
+                        : IconButton(
+                            icon: const Icon(Icons.clear, size: 20),
+                            onPressed: () {
+                              _filterCtrl.clear();
+                              setState(() => _query = '');
+                            },
+                          ),
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onChanged: (v) => setState(() => _query = v),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    filtradas.isEmpty
+                        ? 'Sin resultados'
+                        : '${filtradas.length} resultado${filtradas.length == 1 ? '' : 's'}'
+                            '${widget.opciones.length != filtradas.length ? ' de ${widget.opciones.length}' : ''}',
+                    style:
+                        TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Expanded(
+                child: filtradas.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No hay coincidencias.\nProbá con otra palabra.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey.shade600),
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        itemCount: filtradas.length,
+                        itemBuilder: (context, index) {
+                          final item = filtradas[index];
+                          final id = item['id'] ?? '';
+                          final nombre = item['nombre'] ?? '';
+
+                          if (widget.multi) {
+                            final checked =
+                                _tempSelected.any((e) => e['id'] == id);
+                            return CheckboxListTile(
+                              value: checked,
+                              activeColor: widget.accent,
+                              title: Text(
+                                nombre,
+                                style: const TextStyle(
+                                  color: Color(0xFF1E293B),
+                                  fontSize: 15,
+                                ),
+                              ),
+                              onChanged: (v) {
+                                setState(() {
+                                  if (v == true) {
+                                    if (!_tempSelected
+                                        .any((e) => e['id'] == id)) {
+                                      _tempSelected.add(item);
+                                    }
+                                  } else {
+                                    _tempSelected
+                                        .removeWhere((e) => e['id'] == id);
+                                  }
+                                });
+                              },
+                            );
+                          }
+
+                          final isSelected = widget.selectedIds.contains(id);
+                          return ListTile(
+                            title: Text(
+                              nombre,
+                              style: TextStyle(
+                                color: const Color(0xFF1E293B),
+                                fontWeight: isSelected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                              ),
+                            ),
+                            trailing: isSelected
+                                ? Icon(Icons.check_circle,
+                                    color: widget.accent)
+                                : null,
+                            onTap: () => Navigator.pop(context, item),
+                          );
+                        },
+                      ),
+              ),
+              if (widget.multi)
+                Material(
+                  elevation: 8,
+                  color: Colors.white,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                    child: Row(
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancelar'),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () => Navigator.pop(
+                              context,
+                              List<Map<String, String>>.from(_tempSelected),
+                            ),
+                            icon: const Icon(Icons.check_rounded, size: 20),
+                            label: Text(
+                              _tempSelected.isEmpty
+                                  ? 'Aceptar'
+                                  : 'Aceptar (${_tempSelected.length})',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700, fontSize: 15),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: widget.accent,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
