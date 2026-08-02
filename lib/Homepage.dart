@@ -54,6 +54,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   bool _estaVisible = false;
   String _resumenOficios = '';
   String _resumenZona = '';
+  String? _nivelConfianza;
+  int? _scoreIdentidad;
+  int _tipsTotales = 0;
   int _pasosCompletos = 0;
   static const int _pasosTotales = 4;
   bool _bannerZonaDescartado = false;
@@ -355,7 +358,16 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               ? 'Sin zona de trabajo'
               : '${localidades.length} zona${localidades.length == 1 ? '' : 's'}';
           _pasosCompletos = pasos;
-          _consejos = consejos.take(4).toList();
+          _tipsTotales = consejos.length;
+          _consejos = consejos.take(3).toList();
+          final sc = data['scoring'];
+          if (sc is Map) {
+            _nivelConfianza = sc['nivel_confianza'] as String?;
+            _scoreIdentidad = (sc['score_identidad'] as num?)?.toInt();
+          } else {
+            _nivelConfianza = null;
+            _scoreIdentidad = null;
+          }
           _cargandoConsejos = false;
           _visibilidadCargando = false;
         });
@@ -997,111 +1009,357 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   }
 
   Widget _buildPrestadorBody({Key? key}) {
+    final confLabel = _nivelConfianza != null
+        ? ScoringService.labelNivel(_nivelConfianza)
+        : null;
     return SingleChildScrollView(
       key: key,
+      padding: const EdgeInsets.only(bottom: 28),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (_visibilidadCargando)
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Material(
-                color: _estaVisible ? const Color(0xFFECFDF5) : const Color(0xFFFFF7ED),
-                borderRadius: BorderRadius.circular(16),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(16),
-                  onTap: () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const EspecialidadesLaboralesFlotanteWidget(),
-                      ),
-                    );
-                    await _cargarEstadoVisibilidadYConsejos();
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: _estaVisible
-                            ? const Color(0xFF6EE7B7)
-                            : const Color(0xFFFDBA74),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            _estaVisible
-                                ? 'Estás visible · $_resumenOficios · $_resumenZona'
-                                : 'Todavía no aparecés en búsquedas. Completá oficios, zona y teléfono.',
-                            style: const TextStyle(fontSize: 13, height: 1.35),
+          // —— Estado de visibilidad (estilo tarjeta) ——
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: _visibilidadCargando
+                ? const SizedBox(
+                    height: 72,
+                    child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                  )
+                : Material(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    elevation: 0,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                const EspecialidadesLaboralesFlotanteWidget(),
                           ),
+                        );
+                        await _cargarEstadoVisibilidadYConsejos();
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          color: Colors.white,
                         ),
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          color: _estaVisible
-                              ? const Color(0xFF059669)
-                              : const Color(0xFFEA580C),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: _estaVisible
+                                    ? const Color(0xFFECFDF5)
+                                    : const Color(0xFFFFF7ED),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Icon(
+                                _estaVisible
+                                    ? Icons.visibility_rounded
+                                    : Icons.visibility_off_outlined,
+                                color: _estaVisible
+                                    ? const Color(0xFF059669)
+                                    : const Color(0xFFEA580C),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 3,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: _estaVisible
+                                              ? const Color(0xFFD1FAE5)
+                                              : const Color(0xFFFFEDD5),
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: Text(
+                                          _estaVisible ? 'Visible' : 'Oculto',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w800,
+                                            color: _estaVisible
+                                                ? const Color(0xFF047857)
+                                                : const Color(0xFFC2410C),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Flexible(
+                                        child: Text(
+                                          _estaVisible
+                                              ? _resumenOficios
+                                              : 'Completá perfil para aparecer',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF0F172A),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _estaVisible
+                                        ? _resumenZona
+                                        : 'Oficios · zona · teléfono',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF64748B),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(Icons.chevron_right_rounded,
+                                color: Color(0xFF94A3B8)),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
+          ),
+
+          // —— Confianza compacta ——
+          if (confLabel != null || _scoreIdentidad != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE6F7FA),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: _prestadorPrimary.withOpacity(0.18)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.verified_user_outlined,
+                        color: _prestadorPrimary, size: 22),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Confianza de perfil',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: _prestadorPrimary.withOpacity(0.9),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            confLabel != null && _scoreIdentidad != null
+                                ? '$confLabel · $_scoreIdentidad/100'
+                                : (confLabel ?? '$_scoreIdentidad/100'),
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // mini progress
+                    SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          CircularProgressIndicator(
+                            value: ((_scoreIdentidad ?? 0) / 100).clamp(0.0, 1.0),
+                            strokeWidth: 4,
+                            backgroundColor: Colors.white,
+                            color: _prestadorPrimary,
+                          ),
+                          Text(
+                            '${_scoreIdentidad ?? 0}',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: _prestadorPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
+
+          // —— CTA tarjeta ——
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: Material(
               color: _prestadorPrimary,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(20),
               child: InkWell(
                 onTap: _compartirTarjeta,
-                borderRadius: BorderRadius.circular(16),
-                child: const Padding(
-                  padding: EdgeInsets.all(18),
+                borderRadius: BorderRadius.circular(20),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
                   child: Row(
                     children: [
-                      Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 28),
-                      SizedBox(width: 14),
-                      Expanded(
-                        child: Text('Tu tarjeta para que te contacten',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(Icons.qr_code_2_rounded,
+                            color: Colors.white, size: 26),
                       ),
-                      Icon(Icons.chevron_right_rounded, color: Colors.white),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Tu tarjeta digital',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 15,
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Compartila para que te contacten',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.ios_share_rounded, color: Colors.white70),
                     ],
                   ),
                 ),
               ),
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 20, 16, 8),
-            child: Text(AppCopy.seccionConsejos,
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+
+          // —— Mejorá tu perfil (compacto, estilo tarjeta) ——
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 22, 16, 10),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Para subir tu confianza',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                ),
+                if (_tipsTotales > 0)
+                  Text(
+                    '$_tipsTotales pendiente${_tipsTotales == 1 ? '' : 's'}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF64748B),
+                    ),
+                  )
+                else if (!_cargandoConsejos)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD1FAE5),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Text(
+                      'Al día',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF047857),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
+
           if (_cargandoConsejos)
             const Padding(
               padding: EdgeInsets.all(24),
-              child: Center(child: CircularProgressIndicator()),
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            )
+          else if (_consejos.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.emoji_events_outlined, color: _prestadorPrimary),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Perfil sólido. Pedí evaluaciones reales de clientes.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          height: 1.35,
+                          color: Color(0xFF334155),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             )
           else
-            ..._consejos.map((c) => ListTile(
-                  leading: Icon(c.icon, color: primaryColor),
-                  title: Text(c.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text(c.body),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: c.onTap,
-                )),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                children: [
+                  for (var i = 0; i < _consejos.length; i++) ...[
+                    if (i > 0) const SizedBox(height: 10),
+                    _ConsejoCard(
+                      item: _consejos[i],
+                      accent: _prestadorPrimary,
+                      index: i + 1,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
           if (AppEnv.showDevTools)
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
               child: OutlinedButton.icon(
                 onPressed: _corriendoBatch
                     ? null
@@ -1125,15 +1383,91 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                             );
                           }
                         } finally {
-                          if (mounted) setState(() => _corriendoBatch = false);
+                          if (mounted) {
+                            setState(() => _corriendoBatch = false);
+                          }
                         }
                       },
                 icon: const Icon(Icons.refresh),
-                label: Text(_corriendoBatch ? 'Batch scoring…' : 'Correr batch scoring (dev)'),
+                label: Text(
+                  _corriendoBatch ? 'Batch scoring…' : 'Correr batch scoring (dev)',
+                ),
               ),
             ),
-          const SizedBox(height: 24),
         ],
+      ),
+    );
+  }
+}
+
+class _ConsejoCard extends StatelessWidget {
+  final _ConsejoItem item;
+  final Color accent;
+  final int index;
+
+  const _ConsejoCard({
+    required this.item,
+    required this.accent,
+    required this.index,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: item.onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: accent.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(item.icon, color: accent, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      item.body,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        height: 1.3,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
+            ],
+          ),
+        ),
       ),
     );
   }
