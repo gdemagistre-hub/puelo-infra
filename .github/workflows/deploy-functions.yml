@@ -1,0 +1,31 @@
+name: Deploy Cloud Functions
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "functions/**"
+      - "firebase.json"
+      - ".firebaserc"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install deps
+        working-directory: functions
+        run: npm install
+
+      - name: Deploy functions
+        uses: w9jds/firebase-action@master
+        with:
+          args: deploy --only functions --project lifewalletpuelo
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_LIFEWALLETPUELO }}
