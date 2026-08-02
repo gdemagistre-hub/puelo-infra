@@ -1089,12 +1089,19 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                     : () async {
                         setState(() => _corriendoBatch = true);
                         try {
-                          final r = await ScoringService.ejecutarBatchDiario();
+                          final r = await ScoringService.ejecutarBatchDiario(
+                            trigger: 'manual_dev',
+                          );
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
-                                    'Badges: ${r.actualizados}/${r.procesados}'),
+                                  'Scoring ${r.status}: ${r.actualizados}/${r.procesados}'
+                                  ' · timeout ${r.evalsPublicadasTimeout}'
+                                  ' · ${r.duracionMs}ms'
+                                  '${r.errores.isEmpty ? '' : ' · errs ${r.errores.length}'}',
+                                ),
+                                duration: const Duration(seconds: 6),
                               ),
                             );
                           }
@@ -1103,7 +1110,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                         }
                       },
                 icon: const Icon(Icons.refresh),
-                label: Text(_corriendoBatch ? 'Recalculando…' : 'Recalcular badges (dev)'),
+                label: Text(_corriendoBatch ? 'Batch scoring…' : 'Correr batch scoring (dev)'),
               ),
             ),
           const SizedBox(height: 24),
