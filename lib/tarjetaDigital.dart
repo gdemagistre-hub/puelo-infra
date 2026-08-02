@@ -236,6 +236,105 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
     );
   }
 
+
+  Future<List<_TrabajoFotoItem>> _cargarFotosTrabajos(String userId) async {
+    final items = <_TrabajoFotoItem>[];
+
+    void absorb(QuerySnapshot snap) {
+      for (final doc in snap.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final rawRef = data['trabajadorRef'];
+        final uidCampo = data['usuario_id']?.toString();
+        bool coincide = uidCampo == userId;
+        if (!coincide && rawRef is DocumentReference) {
+          coincide = rawRef.id == userId;
+        } else if (!coincide && rawRef is String) {
+          coincide = rawRef == userId || rawRef.endsWith('/$userId');
+        }
+        if (!coincide) continue;
+        final imgs = (data['imagenes'] as List<dynamic>? ?? [])
+            .map((e) => e.toString())
+            .where((s) => s.isNotEmpty)
+            .toList();
+        if (imgs.isEmpty) continue;
+        final servicio = (data['profesion'] ??
+                data['oficio'] ??
+                data['servicio'] ??
+                data['nombre_servicio'] ??
+                '')
+            .toString()
+            .trim();
+        DateTime? fecha;
+        final f = data['fechaCarga'] ??
+            data['fecha'] ??
+            data['created_at'] ??
+            data['fecha_evaluacion'];
+        if (f is Timestamp) fecha = f.toDate();
+        if (f is String) fecha = DateTime.tryParse(f);
+        final mesAnio = fecha != null ? _formatoMesAnio(fecha) : '';
+        for (final url in imgs) {
+          items.add(_TrabajoFotoItem(
+            url: url,
+            servicio: servicio.isEmpty ? 'Servicio' : _labelServicio(servicio),
+            mesAnio: mesAnio,
+            trabajoId: doc.id,
+          ));
+        }
+      }
+    }
+
+    try {
+      final q1 = await FirebaseFirestore.instance
+          .collection('trabajos')
+          .where('usuario_id', isEqualTo: userId)
+          .get();
+      absorb(q1);
+      if (items.isEmpty) {
+        final q2 = await FirebaseFirestore.instance
+            .collection('trabajos')
+            .limit(100)
+            .get();
+        absorb(q2);
+      }
+    } catch (e) {
+      debugPrint('Error cargando trabajos: $e');
+    }
+    return items;
+  }
+
+  String _formatoMesAnio(DateTime d) {
+    const meses = [
+      'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+      'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic',
+    ];
+    return '${meses[d.month - 1]} ${d.year}';
+  }
+
+  String _labelServicio(String raw) {
+    if (raw.isEmpty) return 'Servicio';
+    // si viene clave tipo "jardineria"
+    final t = raw.replaceAll('_', ' ').trim();
+    if (t.isEmpty) return 'Servicio';
+    return t[0].toUpperCase() + t.substring(1);
+  }
+
+  void _abrirFotoGrande(
+    BuildContext context,
+    List<_TrabajoFotoItem> items,
+    int index,
+  ) {
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.92),
+      builder: (ctx) {
+        return _FotoGrandeViewer(
+          items: items,
+          initialIndex: index,
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -700,13 +799,10 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                       ),
                       const SizedBox(height: 28),
 
-                      FutureBuilder<QuerySnapshot>(
-                        future: FirebaseFirestore.instance
-                            .collection('trabajos')
-                            .where('usuario_id', isEqualTo: _resolvedRef!.id)
-                            .get(),
-                        builder: (context, trabajosSnapshot) {
-                          if (trabajosSnapshot.connectionState ==
+                      FutureBuilder<List<_TrabajoFotoItem>>(
+                        future: _cargarFotosTrabajos(_resolvedRef!.id),
+                        builder: (context, snap) {
+                          if (snap.connectionState ==
                               ConnectionState.waiting) {
                             return const Center(
                               child: CircularProgressIndicator(
@@ -714,149 +810,83 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                               ),
                             );
                           }
-
-                          final List<String> todasLasImagenes = [];
-
-                          if (trabajosSnapshot.hasData) {
-                            for (final doc in trabajosSnapshot.data!.docs) {
-                              final data =
-                                  doc.data() as Map<String, dynamic>;
-                              if (data['imagenes'] != null) {
-                                final imgs =
-                                    data['imagenes'] as List<dynamic>;
-                                todasLasImagenes.addAll(
-                                  imgs.map((e) => e.toString()),
-                                );
-                              }
-                            }
-                          }
-
-                          return FutureBuilder<QuerySnapshot?>(
-                            future: todasLasImagenes.isNotEmpty
-                                ? Future.value(null)
-                                : FirebaseFirestore.instance
-                                    .collection('trabajos')
-                                    .limit(80)
-                                    .get(),
-                            builder: (context, fallbackSnap) {
-                              if (todasLasImagenes.isEmpty &&
-                                  fallbackSnap.hasData) {
-                                final currentId = _resolvedRef!.id;
-                                for (final doc
-                                    in fallbackSnap.data!.docs) {
-                                  final data =
-                                      doc.data() as Map<String, dynamic>;
-                                  final rawRef = data['trabajadorRef'];
-                                  final uidCampo =
-                                      data['usuario_id']?.toString();
-                                  bool coincide = false;
-                                  if (uidCampo != null &&
-                                      uidCampo == currentId) {
-                                    coincide = true;
-                                  } else if (rawRef is DocumentReference) {
-                                    coincide = rawRef.id == currentId;
-                                  } else if (rawRef is String) {
-                                    coincide = rawRef == currentId ||
-                                        rawRef.endsWith('/$currentId');
-                                  }
-                                  if (coincide &&
-                                      data['imagenes'] != null) {
-                                    final imgs =
-                                        data['imagenes'] as List<dynamic>;
-                                    todasLasImagenes.addAll(
-                                      imgs.map((e) => e.toString()),
-                                    );
-                                  }
-                                }
-                              }
-
-                              return Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.stretch,
+                          final items = snap.data ?? const <_TrabajoFotoItem>[];
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      const Text(
-                                        'Trabajos mostrados',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          color: textColor,
-                                        ),
-                                      ),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: accentColor,
-                                          borderRadius:
-                                              BorderRadius.circular(6),
-                                        ),
-                                        child: Text(
-                                          '${todasLasImagenes.length} FOTOS',
-                                          style: const TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w800,
-                                            color: primaryColor,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  if (todasLasImagenes.isEmpty)
-                                    Container(
-                                      padding: const EdgeInsets.all(32),
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey[100],
-                                        borderRadius:
-                                            BorderRadius.circular(16),
-                                      ),
-                                      child: const Text(
-                                        'Todavía no hay fotos de trabajos en el portfolio.',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(color: Colors.grey),
-                                      ),
-                                    )
-                                  else
-                                    GridView.builder(
-                                      shrinkWrap: true,
-                                      physics:
-                                          const NeverScrollableScrollPhysics(),
-                                      gridDelegate:
-                                          const SliverGridDelegateWithFixedCrossAxisCount(
-                                        crossAxisCount: 2,
-                                        crossAxisSpacing: 12,
-                                        mainAxisSpacing: 12,
-                                        childAspectRatio: 1.1,
-                                      ),
-                                      itemCount: todasLasImagenes.length,
-                                      itemBuilder: (context, index) {
-                                        return ClipRRect(
-                                          borderRadius:
-                                              BorderRadius.circular(16),
-                                          child: Image.network(
-                                            todasLasImagenes[index],
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (_, __, ___) =>
-                                                Container(
-                                              color: Colors.grey[300],
-                                              child: const Icon(
-                                                Icons.broken_image,
-                                                color: Colors.grey,
-                                              ),
-                                            ),
-                                          ),
-                                        );
-                                      },
+                                  const Text(
+                                    'Trabajos mostrados',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: textColor,
                                     ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: accentColor,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      '${items.length} FOTO${items.length == 1 ? '' : 'S'}',
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w800,
+                                        color: primaryColor,
+                                      ),
+                                    ),
+                                  ),
                                 ],
-                              );
-                            },
+                              ),
+                              const SizedBox(height: 12),
+                              if (items.isEmpty)
+                                Container(
+                                  padding: const EdgeInsets.all(32),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[100],
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: const Text(
+                                    'Todavía no hay fotos de trabajos en el portfolio.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(color: Colors.grey),
+                                  ),
+                                )
+                              else
+                                GridView.builder(
+                                  shrinkWrap: true,
+                                  physics:
+                                      const NeverScrollableScrollPhysics(),
+                                  gridDelegate:
+                                      const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    crossAxisSpacing: 12,
+                                    mainAxisSpacing: 12,
+                                    childAspectRatio: 0.78,
+                                  ),
+                                  itemCount: items.length,
+                                  itemBuilder: (context, index) {
+                                    final item = items[index];
+                                    return _TrabajoFotoTile(
+                                      item: item,
+                                      primaryColor: primaryColor,
+                                      onTap: () => _abrirFotoGrande(
+                                        context,
+                                        items,
+                                        index,
+                                      ),
+                                    );
+                                  },
+                                ),
+                            ],
                           );
                         },
                       ),
@@ -868,6 +898,208 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
           ),
         );
       },
+    );
+  }
+}
+
+class _TrabajoFotoItem {
+  final String url;
+  final String servicio;
+  final String mesAnio;
+  final String trabajoId;
+  const _TrabajoFotoItem({
+    required this.url,
+    required this.servicio,
+    required this.mesAnio,
+    required this.trabajoId,
+  });
+}
+
+class _TrabajoFotoTile extends StatelessWidget {
+  final _TrabajoFotoItem item;
+  final Color primaryColor;
+  final VoidCallback onTap;
+  const _TrabajoFotoTile({
+    required this.item,
+    required this.primaryColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Image.network(
+                      item.url,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: Colors.grey[300],
+                        child: const Icon(Icons.broken_image, color: Colors.grey),
+                      ),
+                    ),
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.45),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.zoom_in_rounded,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              item.servicio,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: primaryColor,
+              ),
+            ),
+            if (item.mesAnio.isNotEmpty)
+              Text(
+                item.mesAnio,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textMuted,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FotoGrandeViewer extends StatefulWidget {
+  final List<_TrabajoFotoItem> items;
+  final int initialIndex;
+  const _FotoGrandeViewer({
+    required this.items,
+    required this.initialIndex,
+  });
+
+  @override
+  State<_FotoGrandeViewer> createState() => _FotoGrandeViewerState();
+}
+
+class _FotoGrandeViewerState extends State<_FotoGrandeViewer> {
+  late final PageController _controller;
+  late int _index;
+
+  @override
+  void initState() {
+    super.initState();
+    _index = widget.initialIndex;
+    _controller = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.items[_index];
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            PageView.builder(
+              controller: _controller,
+              itemCount: widget.items.length,
+              onPageChanged: (i) => setState(() => _index = i),
+              itemBuilder: (_, i) {
+                return InteractiveViewer(
+                  minScale: 0.8,
+                  maxScale: 4,
+                  child: Center(
+                    child: Image.network(
+                      widget.items[i].url,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const Icon(
+                        Icons.broken_image,
+                        color: Colors.white54,
+                        size: 64,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
+              ),
+            ),
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 24,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.55),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      item.servicio,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                      ),
+                    ),
+                    if (item.mesAnio.isNotEmpty)
+                      Text(
+                        item.mesAnio,
+                        style: const TextStyle(color: Colors.white70, fontSize: 13),
+                      ),
+                    Text(
+                      '${_index + 1} / ${widget.items.length}',
+                      style: const TextStyle(color: Colors.white54, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
