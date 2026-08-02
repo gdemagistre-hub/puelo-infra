@@ -282,47 +282,71 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       final visible =
           profesiones.isNotEmpty && localidades.isNotEmpty && telefono.isNotEmpty;
       final consejos = <_ConsejoItem>[];
-      if (localidades.isEmpty) {
+
+      // Confianza de perfil: checklist accionable (scoring v1)
+      final tipsConf = ScoringService.generarConsejosConfianza(data);
+      for (final t in tipsConf) {
+        final id = t['id'] ?? '';
+        IconData icon = Icons.trending_up_rounded;
+        VoidCallback onTap = () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const DatosPersonalesFlotanteWidget()),
+          ).then((_) => _cargarEstadoVisibilidadYConsejos());
+        };
+        if (id == 'zona') {
+          icon = Icons.map_outlined;
+          onTap = () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ZonaDeTrabajoFlotanteWidget()),
+            ).then((_) => _cargarEstadoVisibilidadYConsejos());
+          };
+        } else if (id == 'oficios') {
+          icon = Icons.handyman_outlined;
+          onTap = () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const EspecialidadesLaboralesFlotanteWidget(),
+              ),
+            ).then((_) => _cargarEstadoVisibilidadYConsejos());
+          };
+        } else if (id == 'foto_perfil') {
+          icon = Icons.camera_alt_outlined;
+          onTap = () => _mostrarOpcionesSelfie();
+        } else if (id == 'evals' || id == 'tiempo') {
+          icon = id == 'evals' ? Icons.star_outline_rounded : Icons.schedule_rounded;
+          onTap = _compartirTarjeta;
+        } else if (id == 'fotos_trabajo') {
+          icon = Icons.photo_library_outlined;
+          onTap = _compartirTarjeta;
+        }
         consejos.add(_ConsejoItem(
-          title: 'Definí tu zona de trabajo',
-          body: 'Sin zona los clientes de tu barrio no te encuentran.',
-          icon: Icons.map_outlined,
-          onTap: () {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const ZonaDeTrabajoFlotanteWidget()))
-                .then((_) => _cargarEstadoVisibilidadYConsejos());
-          },
+          title: t['title'] ?? '',
+          body: t['body'] ?? '',
+          icon: icon,
+          onTap: onTap,
         ));
       }
-      if (profesiones.isEmpty) {
-        consejos.add(_ConsejoItem(
-          title: 'Indicá qué oficios hacés',
-          body: 'Sin oficios no aparecés cuando alguien busca un servicio.',
-          icon: Icons.handyman_outlined,
-          onTap: () {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const EspecialidadesLaboralesFlotanteWidget()))
-                .then((_) => _cargarEstadoVisibilidadYConsejos());
-          },
-        ));
-      }
-      if (telefono.isEmpty) {
-        consejos.add(_ConsejoItem(
-          title: 'Cargá tu celular',
-          body: 'Es como te van a contactar por WhatsApp o llamada.',
-          icon: Icons.phone_outlined,
-          onTap: () {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const DatosPersonalesFlotanteWidget()))
-                .then((_) => _cargarEstadoVisibilidadYConsejos());
-          },
-        ));
-      }
+
       if (consejos.isEmpty) {
+        final sc = data['scoring'];
+        final nivel = sc is Map ? (sc['nivel_confianza'] as String?) : null;
+        final score = sc is Map ? (sc['score_identidad'] as num?)?.toInt() : null;
         consejos.add(_ConsejoItem(
-          title: 'Estás listo para que te contacten',
-          body: 'Pasale tu tarjeta por WhatsApp o pedí evaluaciones.',
+          title: nivel == 'muy_alto'
+              ? 'Excelente confianza de perfil'
+              : 'Vas bien: compartí tu tarjeta',
+          body: score != null
+              ? 'Confianza ${ScoringService.labelNivel(nivel)} ($score/100). Pasale tu tarjeta y pedí evaluaciones reales de clientes.'
+              : 'Pasale tu tarjeta por WhatsApp y pedí evaluaciones de trabajos reales.',
           icon: Icons.emoji_events_outlined,
           onTap: _compartirTarjeta,
         ));
       }
+
+      // Mostrar hasta 4 consejos (prioriza confianza)
       if (mounted) {
         setState(() {
           _estaVisible = visible;
@@ -331,7 +355,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               ? 'Sin zona de trabajo'
               : '${localidades.length} zona${localidades.length == 1 ? '' : 's'}';
           _pasosCompletos = pasos;
-          _consejos = consejos.take(2).toList();
+          _consejos = consejos.take(4).toList();
           _cargandoConsejos = false;
           _visibilidadCargando = false;
         });
