@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_session.dart';
+import 'catalogo_oficios.dart';
 
 class EspecialidadesLaboralesFlotanteWidget extends StatefulWidget {
   const EspecialidadesLaboralesFlotanteWidget({super.key});
@@ -56,52 +57,26 @@ class _EspecialidadesLaboralesFlotanteWidgetState
   }
 
   Future<void> _cargarCatalogos() async {
+    // Catálogo local v2 (categoría → especialidad). Firestore se alinea vía seed.
+    _oficiosDisponibles = CatalogoOficios.maestroIds();
     try {
       final oficiosSnapshot = await db.collection('cat_oficios').get();
-      debugPrint('cat_oficios docs: ${oficiosSnapshot.docs.length}');
-
       for (final doc in oficiosSnapshot.docs) {
         final data = doc.data();
         final raw = data['maestro'];
         if (raw is List && raw.isNotEmpty) {
-          _oficiosDisponibles = raw
+          final remoto = raw
               .map((e) => e.toString().trim())
               .where((s) => s.isNotEmpty)
               .toList();
-          return;
+          // Unión: local + remoto (nadie queda afuera si el seed va atrás)
+          final set = {..._oficiosDisponibles, ...remoto};
+          _oficiosDisponibles = set.toList()..sort();
+          break;
         }
       }
-
-      if (_oficiosDisponibles.isEmpty) {
-        debugPrint(
-          oficiosSnapshot.docs.isEmpty
-              ? 'cat_oficios vacía; usando catálogo local de oficios.'
-              : 'cat_oficios sin campo maestro; usando catálogo local.',
-        );
-        _oficiosDisponibles = const [
-          'electricidad',
-          'carpinteria',
-          'plomeria',
-          'jardineria',
-          'limpieza',
-          'pintura',
-          'gasista',
-          'albanileria',
-        ];
-      }
     } catch (e) {
-      debugPrint('Error leyendo cat_oficios: $e');
-      // Fallback local si rules aún no permiten cat_oficios o hay fallo de red.
-      _oficiosDisponibles = const [
-        'electricidad',
-        'carpinteria',
-        'plomeria',
-        'jardineria',
-        'limpieza',
-        'pintura',
-        'gasista',
-        'albanileria',
-      ];
+      debugPrint('cat_oficios remoto no disponible, uso local: $e');
       _errorCarga = null;
     }
   }
@@ -125,20 +100,7 @@ class _EspecialidadesLaboralesFlotanteWidgetState
     }
   }
 
-  String _labelOficio(String clave) {
-    const labels = {
-      'electricidad': 'Electricista',
-      'plomeria': 'Plomería',
-      'gasista': 'Gasista',
-      'carpinteria': 'Carpintería',
-      'pintura': 'Pintura',
-      'albanileria': 'Construcción',
-      'jardineria': 'Jardinería',
-      'limpieza': 'Limpieza',
-    };
-    final k = clave.toLowerCase().trim();
-    return labels[k] ?? clave;
-  }
+  String _labelOficio(String clave) => CatalogoOficios.label(clave);
 
   Future<void> _guardar() async {
     final uid = UserSession().uid;
@@ -153,9 +115,12 @@ class _EspecialidadesLaboralesFlotanteWidgetState
 
     setState(() => _saving = true);
     try {
+      final categorias =
+          CatalogoOficios.categoriasDesdeProfesiones(_oficiosSeleccionados);
       await db.collection('usuarios').doc(uid).set({
         'nombre_comercial': _nombreComercialController.text.trim(),
         'profesiones': _oficiosSeleccionados,
+        'categorias_servicio': categorias,
         'es_trabajador': true,
         'updated_at': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -166,6 +131,7 @@ class _EspecialidadesLaboralesFlotanteWidgetState
           ...session.datosCompletos!,
           'nombre_comercial': _nombreComercialController.text.trim(),
           'profesiones': _oficiosSeleccionados,
+          'categorias_servicio': categorias,
           'es_trabajador': true,
         };
       }
@@ -190,6 +156,7 @@ class _EspecialidadesLaboralesFlotanteWidgetState
   }
 
   void _mostrarSeleccionEspecialidades() {
+    String? catExpandida;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -200,81 +167,114 @@ class _EspecialidadesLaboralesFlotanteWidgetState
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setModalState) {
+            final alto = MediaQuery.of(context).size.height * 0.85;
             return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
-                        borderRadius: BorderRadius.circular(2),
+              child: SizedBox(
+                height: alto,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Servicios que ofrezco',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: _textColor,
+                      const SizedBox(height: 14),
+                      const Text(
+                        'Servicios que ofrezco',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: _textColor,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Podés elegir más de uno',
-                      style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-                    ),
-                    const SizedBox(height: 12),
-                    Flexible(
-                      child: ListView(
-                        shrinkWrap: true,
-                        children: _oficiosDisponibles.map((oficio) {
-                          final selected =
-                              _oficiosSeleccionados.contains(oficio);
-                          return CheckboxListTile(
-                            value: selected,
-                            activeColor: primaryColor,
-                            title: Text(
-                              _labelOficio(oficio),
-                              style: const TextStyle(fontWeight: FontWeight.w500),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Elegí categoría y después las especialidades. '
+                        'El cliente te encuentra por las dos.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.3),
+                      ),
+                      const SizedBox(height: 8),
+                      if (_oficiosSeleccionados.isNotEmpty)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            '${_oficiosSeleccionados.length} seleccionada(s)',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: primaryColor,
                             ),
-                            onChanged: (v) {
-                              setModalState(() {
-                                if (v == true) {
-                                  if (!_oficiosSeleccionados.contains(oficio)) {
-                                    _oficiosSeleccionados.add(oficio);
-                                  }
-                                } else {
-                                  _oficiosSeleccionados.remove(oficio);
-                                }
-                              });
-                              setState(() {});
-                            },
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryColor,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: const Text('Listo'),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: ListView(
+                          children: [
+                            for (final cat in CatalogoOficios.categorias) ...[
+                              _CategoriaTile(
+                                categoria: cat,
+                                expanded: catExpandida == cat.id,
+                                seleccionados: _oficiosSeleccionados,
+                                primary: primaryColor,
+                                onToggleExpand: () {
+                                  setModalState(() {
+                                    catExpandida =
+                                        catExpandida == cat.id ? null : cat.id;
+                                  });
+                                },
+                                onToggleEsp: (espId, selected) {
+                                  setModalState(() {
+                                    if (selected) {
+                                      if (!_oficiosSeleccionados.contains(espId)) {
+                                        _oficiosSeleccionados.add(espId);
+                                      }
+                                    } else {
+                                      _oficiosSeleccionados.remove(espId);
+                                    }
+                                  });
+                                  setState(() {});
+                                },
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                            const SizedBox(height: 8),
+                            Text(
+                              '¿No está tu oficio? Escribinos y lo sumamos. '
+                              'Mientras tanto elegí la categoría más cercana.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                                height: 1.35,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryColor,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text('Listo',
+                              style: TextStyle(fontWeight: FontWeight.w700)),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );
@@ -356,7 +356,7 @@ class _EspecialidadesLaboralesFlotanteWidgetState
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  'Podés elegir más de uno',
+                  'Por categoría y especialidad — el cliente te encuentra igual',
                   style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
                 ),
                 const SizedBox(height: 12),
@@ -496,6 +496,87 @@ class _EspecialidadesLaboralesFlotanteWidgetState
                 ),
               ],
             ),
+    );
+  }
+}
+
+class _CategoriaTile extends StatelessWidget {
+  final OficioCategoria categoria;
+  final bool expanded;
+  final List<String> seleccionados;
+  final Color primary;
+  final VoidCallback onToggleExpand;
+  final void Function(String espId, bool selected) onToggleEsp;
+
+  const _CategoriaTile({
+    required this.categoria,
+    required this.expanded,
+    required this.seleccionados,
+    required this.primary,
+    required this.onToggleExpand,
+    required this.onToggleEsp,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final esps = CatalogoOficios.especialidadesDe(categoria.id);
+    final nSel = esps.where((e) => seleccionados.contains(e.id)).length;
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: nSel > 0 ? primary.withOpacity(0.45) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Column(
+        children: [
+          ListTile(
+            onTap: onToggleExpand,
+            leading: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: primary.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(categoria.icon, color: primary, size: 22),
+            ),
+            title: Text(
+              categoria.label,
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+            ),
+            subtitle: Text(
+              nSel > 0 ? '$nSel especialidad(es)' : '${esps.length} opciones',
+              style: const TextStyle(fontSize: 12),
+            ),
+            trailing: Icon(
+              expanded ? Icons.expand_less : Icons.expand_more,
+              color: Colors.grey.shade500,
+            ),
+          ),
+          if (expanded)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+              child: Column(
+                children: [
+                  for (final esp in esps)
+                    CheckboxListTile(
+                      dense: true,
+                      value: seleccionados.contains(esp.id),
+                      activeColor: primary,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      title: Text(
+                        esp.label,
+                        style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+                      ),
+                      onChanged: (v) => onToggleEsp(esp.id, v == true),
+                    ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
