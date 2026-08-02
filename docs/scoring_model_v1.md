@@ -38,3 +38,7 @@ nuevo → registrado → bronce → bronce_plus (OCR) → plata (≥10 evals/val
 ## Changelog
 
 - **v1.0** — Capas A/B/C + preview crédito; foto perfil y OCR explícitos; multiplicadores de evaluador.
+
+## Batch
+
+Ver [scoring_batch.md](./scoring_batch.md). Pipeline F0–F5 en `ScoringService.ejecutarBatchDiario` y Cloud Functions.
