@@ -962,8 +962,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: _quickAction(Icons.check_circle_outline, 'Evaluar trabajos', () {
-                    Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => const MenuEvaluacionesWidget()));
+                    setState(() => _currentIndex = 1);
                   }),
                 ),
               ],
