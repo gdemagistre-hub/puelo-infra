@@ -7,12 +7,18 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Admin vía custom claim (preferido) o usuarios/{uid}.es_admin
+    // Admin vía custom claim o usuarios/{uid}.es_admin
     function isAdmin() {
       return isSignedIn() && (
         request.auth.token.admin == true ||
         get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.es_admin == true
       );
+    }
+
+    // FlutterFlow (si aún se usa ese email de servicio)
+    function isFlutterFlow() {
+      return isSignedIn()
+        && request.auth.token.email.matches('firebase@flutterflow.io');
     }
 
     function analyticsKeysOk() {
@@ -25,13 +31,16 @@ service cloud.firestore {
       return request.resource.data.keys().size() <= 24;
     }
 
+    // ---------- FlutterFlow (opcional) ----------
+    match /{document=**} {
+      allow read, write: if isFlutterFlow();
+    }
+
     // ---------- analytics ----------
     match /analytics_events/{id} {
       allow create: if analyticsKeysOk() && analyticsSizeOk()
         && request.resource.data.type is string
         && request.resource.data.session_id is string;
-      // TEMP: lectura abierta (ConsolaProx gate client-side).
-      // Con Auth estricto: allow read: if isAdmin();
       allow read: if true;
       allow update, delete: if false;
     }
@@ -39,42 +48,35 @@ service cloud.firestore {
     // ---------- stats / batch ----------
     match /stats/{doc} {
       allow read: if true;
-      // TEMP: batch scoring desde cliente. Con Auth: isAdmin()
+      // TEMP: batch scoring desde cliente. Luego: isAdmin()
       allow write: if true;
     }
 
-    // ---------- catálogos geo (solo lectura) ----------
+    // ---------- catálogos (solo lectura pública) ----------
     match /cat_paises/{doc} {
       allow read: if true;
-      allow write: if false;
+      allow write: if isAdmin();
     }
     match /cat_departamentos/{doc} {
       allow read: if true;
-      allow write: if false;
+      allow write: if isAdmin();
     }
     match /cat_localidades/{doc} {
       allow read: if true;
-      allow write: if false;
+      allow write: if isAdmin();
     }
-
-    // ---------- catálogo de oficios / servicios ----------
     match /cat_oficios/{doc} {
       allow read: if true;
-      allow write: if false; // solo backend / consola
+      allow write: if isAdmin();
     }
 
     // ---------- usuarios ----------
-    // Convención con Google Auth (y futuros FB/Apple):
-    //   doc id = Firebase Auth uid
-    //   campos: auth_provider, auth_uid, email, url_foto_perfil, estado, …
-    //
+    // Doc id = Auth uid (Google / futuros FB-Apple)
     // TEMP pre-lanzamiento: write abierto para:
     //   - ensureUserProfile post-Google
     //   - impersonación por dropdown (sin request.auth)
     // Al abrir al público + apagar dropdown:
-    //   allow read: if true;
-    //   allow create: if isSignedIn() && request.auth.uid == userId;
-    //   allow update: if isSignedIn() && request.auth.uid == userId;
+    //   allow create, update: if isSignedIn() && request.auth.uid == userId;
     //   allow delete: if isAdmin();
     match /usuarios/{userId} {
       allow read: if true;
@@ -87,6 +89,16 @@ service cloud.firestore {
       allow write: if true; // TEMP
     }
 
+    match /trabajos_galeria/{id} {
+      allow read, create: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    match /calificaciones/{id} {
+      allow read, create: if true;
+      allow update, delete: if isAdmin();
+    }
+
     // ---------- validaciones / tokens ----------
     match /validaciones/{id} {
       allow read, write: if true; // TEMP
@@ -96,6 +108,7 @@ service cloud.firestore {
     }
 
     // ---------- default DENY ----------
+    // Sin regla abierta por fecha (la anterior venció 2026-07-31).
     match /{document=**} {
       allow read, write: if false;
     }
