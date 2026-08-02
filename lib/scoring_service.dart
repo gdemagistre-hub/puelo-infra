@@ -136,12 +136,215 @@ class ScoringService {
     }
 
     final raw = detalle.values.fold<int>(0, (a, b) => a + b);
-    final normalizado = _normalizar(raw, techoIdentidad);
+    var normalizado = _normalizar(raw, techoIdentidad);
+
+    // --- Anti-gaming: techo por antigüedad de cuenta ---
+    final dias = _diasDesdeAlta(data);
+    int techoEdad = 100;
+    if (dias != null) {
+      if (dias < 7) {
+        techoEdad = 40;
+      } else if (dias < 30) {
+        techoEdad = 70;
+      }
+    } else {
+      techoEdad = 50; // sin fecha de alta: no regalar "muy alto"
+    }
+    if (normalizado > techoEdad) {
+      detalle['techo_antiguedad'] = techoEdad;
+      normalizado = techoEdad;
+    }
+
+    // Fraude: techo duro
+    final riesgo = (data['riesgo_fraude'] ?? '').toString();
+    if (riesgo == 'alto' && normalizado > 25) {
+      detalle['techo_fraude'] = 25;
+      normalizado = 25;
+    } else if (riesgo == 'medio' && normalizado > 50) {
+      detalle['techo_fraude'] = 50;
+      normalizado = 50;
+    }
+
+    // --- Maduración: señales fuertes al 50% si < 3 días ---
+    if (dias != null && dias < 3) {
+      final fuertes = (detalle['doc_ocr_validado'] ?? 0) +
+          (detalle['foto_perfil'] ?? 0) +
+          (detalle['foto_documento'] ?? 0);
+      if (fuertes > 0) {
+        final castigo = (fuertes * 0.5).round();
+        // re-normalizar con raw reducido conceptualmente
+        final rawMaduro = (raw - castigo).clamp(0, raw);
+        normalizado = _normalizar(rawMaduro, techoIdentidad);
+        if (normalizado > techoEdad) normalizado = techoEdad;
+        detalle['maduracion_3d'] = 1;
+      }
+    }
+
     return LayerScoreResult(
       raw: raw,
       score: normalizado,
       detalle: detalle,
     );
+  }
+
+  static int? _diasDesdeAlta(Map<String, dynamic> data) {
+    final alta = _fechaAlta(data);
+    if (alta == null) return null;
+    return DateTime.now().difference(alta).inDays;
+  }
+
+  // ---------------------------------------------------------------------------
+  // CONSEJOS DE CONFIANZA (UI Home prestador)
+  // ---------------------------------------------------------------------------
+
+  /// Checklist accionable para subir confianza de perfil (sin mencionar crédito).
+  static List<Map<String, String>> generarConsejosConfianza(
+    Map<String, dynamic> data, {
+    int fotosPortfolio = 0,
+  }) {
+    final out = <Map<String, String>>[];
+    void tip(String id, String title, String body) {
+      out.add({'id': id, 'title': title, 'body': body});
+    }
+
+    if (!_noVacio(data['url_foto_perfil'])) {
+      tip(
+        'foto_perfil',
+        'Sumá una foto de perfil',
+        'Una selfie clara sube la confianza: los clientes quieren ver a quién contratan.',
+      );
+    }
+    if (data['doc_validado'] != true) {
+      tip(
+        'ocr',
+        'Validá tu documento con la cámara',
+        'El scan del DNI es el salto más grande de confianza (identidad verificada).',
+      );
+    } else if (!_noVacio(data['url_foto_documento'])) {
+      tip(
+        'foto_doc',
+        'Adjuntá la foto de tu documento',
+        'Complementa la validación y refuerza que el DNI es real.',
+      );
+    }
+    if (_noVacio(data['doc_numero'] ?? data['numero_documento']) &&
+        !_noVacio(data['genero_documento'] ?? data['sexo_documento'])) {
+      tip(
+        'genero',
+        'Indicá cómo figura tu género en el documento',
+        'Completa el dato del DNI: Mujer, Hombre o No binario.',
+      );
+    }
+    if (!_noVacio(data['telefono'])) {
+      tip(
+        'tel',
+        'Cargá tu celular',
+        'Es el canal real de contacto (WhatsApp / llamada).',
+      );
+    }
+    final geo = data['direccion_geo'] as Map<String, dynamic>?;
+    if (!_noVacio(geo?['localidad_id'] ?? geo?['localidad_nombre'])) {
+      tip(
+        'domicilio',
+        'Completá tu domicilio',
+        'Provincia, partido y localidad suman a la confianza del perfil.',
+      );
+    }
+    final profesiones = data['profesiones'] as List<dynamic>? ?? [];
+    if (profesiones.isEmpty) {
+      tip(
+        'oficios',
+        'Indicá los servicios que ofrecés',
+        'Sin oficios no aparecés en búsquedas y el perfil se ve incompleto.',
+      );
+    }
+    final zonas = data['zonas_cobertura'] as Map<String, dynamic>?;
+    final locs = zonas?['localidades'] as List<dynamic>? ?? [];
+    if (locs.isEmpty) {
+      tip(
+        'zona',
+        'Definí tu zona de trabajo',
+        'Los clientes de tu barrio solo te encuentran si cargás cobertura.',
+      );
+    }
+    if (fotosPortfolio < 1) {
+      tip(
+        'fotos_trabajo',
+        'Subí fotos de trabajos hechos',
+        'Evidencia visual: ayuda al badge y a que confíen en lo que hacés.',
+      );
+    }
+
+    final scoring = data['scoring'];
+    final nEval = scoring is Map
+        ? (scoring['n_eval_trabajo'] as num?)?.toInt() ?? 0
+        : 0;
+    final cant = (data['cantidadEvaluadores'] as num?)?.toInt() ?? 0;
+    if (nEval == 0 && cant == 0) {
+      tip(
+        'evals',
+        'Pedí tu primera evaluación de un cliente real',
+        'La trayectoria se construye con trabajos calificados (no con auto-elogios).',
+      );
+    }
+
+    // Tiempo: no prometer "muy alta" de un día para el otro
+    final dias = _diasDesdeAlta(data);
+    if (dias != null && dias < 7) {
+      tip(
+        'tiempo',
+        'La confianza crece con el tiempo',
+        'Las cuentas nuevas tienen un techo de confianza la primera semana: evita atajos y completá con datos reales.',
+      );
+    }
+
+    return out;
+  }
+
+  // ---------------------------------------------------------------------------
+  // LÍMITES DE VALIDACIÓN (anti-granja)
+  // ---------------------------------------------------------------------------
+
+  /// ¿Puede este usuario emitir una validación de identidad/domicilio?
+  /// Frágil: máx 1 total hasta que alguien lo valide; luego 1 cada 7 días.
+  static ValidationGate canEmitirValidacion(Map<String, dynamic> validador) {
+    final recibidas =
+        (validador['validaciones_recibidas'] as List<dynamic>? ?? []).length;
+    final emitidas = (validador['validaciones_emitidas_count'] as num?)?.toInt() ??
+        (validador['validaciones_emitidas'] as List?)?.length ??
+        0;
+    final ultima = validador['ultima_validacion_emitida_en'];
+    DateTime? ultimaDt;
+    if (ultima is Timestamp) ultimaDt = ultima.toDate();
+    if (ultima is String) ultimaDt = DateTime.tryParse(ultima);
+
+    final fragil = recibidas == 0;
+    if (fragil && emitidas >= 1) {
+      return const ValidationGate(
+        allowed: false,
+        reason:
+            'Para validar a otra persona, primero alguien tiene que validarte a vos. Así evitamos cuentas solo creadas para inflar confianza.',
+      );
+    }
+    if (!fragil && emitidas >= 1 && ultimaDt != null) {
+      final dias = DateTime.now().difference(ultimaDt).inDays;
+      if (dias < 7) {
+        return ValidationGate(
+          allowed: false,
+          reason:
+              'Podés volver a validar a alguien en ${7 - dias} día(s). El ritmo lento protege a la comunidad del fraude.',
+        );
+      }
+    }
+    // Cuenta muy nueva: mismo freno aunque ya tenga 1 slot
+    final diasAlta = _diasDesdeAlta(validador) ?? 0;
+    if (diasAlta < 1 && emitidas >= 1) {
+      return const ValidationGate(
+        allowed: false,
+        reason: 'Tu cuenta es muy nueva. Esperá un poco antes de validar a más personas.',
+      );
+    }
+    return const ValidationGate(allowed: true, reason: '');
   }
 
   // ---------------------------------------------------------------------------
@@ -628,13 +831,23 @@ class ScoringService {
         'status': 'running',
       });
 
-      // ----- F1: publicar calificaciones vencidas (7 días) -----
+      // ----- F1: publicar calificaciones vencidas (7 días) o aceptadas -----
       try {
         final pub = await _publicarCalificacionesVencidas();
         evalsPublicadasTimeout = pub.porTimeout;
         evalsParCompleto = pub.parCompleto;
+        // Recalcular promedios públicos solo con evals publicadas
+        await _recalcularPromediosDesdeCalificacionesPublicadas();
       } catch (e) {
         errores.add('F1_publicar: $e');
+      }
+
+      // ----- F1.5: detección de patrones de fraude (reglas + grafo) -----
+      int flagsFraude = 0;
+      try {
+        flagsFraude = await _detectarPatronesFraude();
+      } catch (e) {
+        errores.add('F1_5_fraude: $e');
       }
 
       // ----- F2: indexar trabajos -----
@@ -923,6 +1136,7 @@ class ScoringService {
         'usuarios_actualizados': escritos,
         'evals_publicadas_timeout': evalsPublicadasTimeout,
         'evals_par_completo': evalsParCompleto,
+        'flags_fraude': flagsFraude,
         'fuente': trigger,
         'model_version': modelVersion,
         'last_run_id': runId,
@@ -941,6 +1155,7 @@ class ScoringService {
           'usuarios_actualizados': escritos,
           'evals_publicadas_timeout': evalsPublicadasTimeout,
           'evals_par_completo': evalsParCompleto,
+          'flags_fraude': flagsFraude,
           'errores_count': errores.length,
         },
         'errores': errores.take(50).toList(),
@@ -1049,8 +1264,10 @@ class ScoringService {
       // Par ya listo para publicar
       final ambos =
           d['par_completo'] == true || d['tiene_respuesta_prestador'] == true;
+      final aceptadoPrestador = d['aceptado_por_prestador'] == true;
       final pendientePar = estado == 'par_completo_pendiente_pub' ||
-          (ambos && _estadosPendientes.contains(estado));
+          (ambos && _estadosPendientes.contains(estado)) ||
+          (aceptadoPrestador && _estadosPendientes.contains(estado));
 
       DateTime? fecha;
       final f = d['fecha'] ??
@@ -1111,6 +1328,187 @@ class ScoringService {
     }
     // desconocido → no sumar (seguro)
     return false;
+  }
+
+
+  /// Promedios públicos del prestador = solo calificaciones publicadas.
+  static Future<void> _recalcularPromediosDesdeCalificacionesPublicadas() async {
+    final snap = await _db.collection('calificaciones').get();
+    final porPrestador = <String, List<int>>{};
+    for (final doc in snap.docs) {
+      final d = doc.data();
+      if (!_esCalificacionPublicada(d)) continue;
+      final pid = (d['prestador_id'] ??
+              d['trabajador_id'] ??
+              d['evaluado_id'] ??
+              '')
+          .toString();
+      if (pid.isEmpty) continue;
+      final est = d['estrellas'] ?? d['rating'] ?? d['puntaje'];
+      if (est is! num) continue;
+      porPrestador.putIfAbsent(pid, () => []).add(est.round());
+    }
+    WriteBatch batch = _db.batch();
+    int n = 0;
+    for (final e in porPrestador.entries) {
+      final votos = e.value;
+      final suma = votos.fold<int>(0, (a, b) => a + b);
+      final prom = votos.isEmpty ? 0.0 : suma / votos.length;
+      batch.set(
+        _db.collection('usuarios').doc(e.key),
+        {
+          'sumaEstrellas': suma,
+          'cantidadEvaluadores': votos.length,
+          'promedioEstrellas': prom,
+        },
+        SetOptions(merge: true),
+      );
+      n++;
+      if (n >= 400) {
+        await batch.commit();
+        batch = _db.batch();
+        n = 0;
+      }
+    }
+    if (n > 0) await batch.commit();
+  }
+
+  /// Patrones de fraude (sin ML externo): anillos, granjas, ráfagas, solo-validador.
+  /// Escribe flags en usuarios y resumen en stats/fraud_flags.
+  static Future<int> _detectarPatronesFraude() async {
+    final users = await _db.collection('usuarios').get();
+    final edges = <String, Set<String>>{}; // validador -> targets
+    final recibidos = <String, Set<String>>{}; // target -> validadores
+    final altaMs = <String, int>{};
+    final now = DateTime.now();
+
+    for (final doc in users.docs) {
+      final d = doc.data();
+      final uid = doc.id;
+      final alta = _fechaAlta(d);
+      if (alta != null) altaMs[uid] = alta.millisecondsSinceEpoch;
+      final vals = d['validaciones_recibidas'] as List<dynamic>? ?? [];
+      for (final v in vals) {
+        if (v is! Map) continue;
+        final vid = (v['validadorId'] ??
+                v['validador_id'] ??
+                v['usuario_id'] ??
+                '')
+            .toString();
+        if (vid.isEmpty) continue;
+        edges.putIfAbsent(vid, () => {}).add(uid);
+        recibidos.putIfAbsent(uid, () => {}).add(vid);
+      }
+      final emitidas = d['validaciones_emitidas'] as List<dynamic>? ?? [];
+      for (final v in emitidas) {
+        if (v is! Map) continue;
+        final tid = (v['target_id'] ?? v['targetUserId'] ?? '').toString();
+        if (tid.isEmpty) continue;
+        edges.putIfAbsent(uid, () => {}).add(tid);
+        recibidos.putIfAbsent(tid, () => {}).add(uid);
+      }
+    }
+
+    final flagsByUser = <String, List<String>>{};
+    void flag(String uid, String code) {
+      flagsByUser.putIfAbsent(uid, () => []);
+      if (!flagsByUser[uid]!.contains(code)) flagsByUser[uid]!.add(code);
+    }
+
+    // Anillo A↔B
+    for (final a in edges.keys) {
+      for (final b in edges[a]!) {
+        if (edges[b]?.contains(a) == true) {
+          flag(a, 'anillo_mutual');
+          flag(b, 'anillo_mutual');
+        }
+      }
+    }
+
+    // Ráfaga: >3 validaciones emitidas y cuenta < 48h
+    for (final e in edges.entries) {
+      final alta = altaMs[e.key];
+      if (alta == null) continue;
+      final ageH = (now.millisecondsSinceEpoch - alta) / 3600000;
+      if (e.value.length >= 3 && ageH < 48) {
+        flag(e.key, 'rafaga_cuenta_nueva');
+      }
+      if (e.value.length >= 5) {
+        flag(e.key, 'volumen_alto_saliente');
+      }
+    }
+
+    // Solo-validador: emite ≥2 y no recibió ninguna + perfil pobre
+    for (final doc in users.docs) {
+      final uid = doc.id;
+      final d = doc.data();
+      final sal = edges[uid]?.length ?? 0;
+      final rec = recibidos[uid]?.length ?? 0;
+      final scoreId = (d['scoring'] is Map)
+          ? ((d['scoring'] as Map)['score_identidad'] as num?)?.toInt() ?? 0
+          : 0;
+      if (sal >= 2 && rec == 0 && scoreId < 30) {
+        flag(uid, 'solo_validador');
+      }
+    }
+
+    // Clúster mismo día: validador y validado creados el mismo día calendario
+    for (final e in edges.entries) {
+      final aAlta = altaMs[e.key];
+      if (aAlta == null) continue;
+      final aDay = DateTime.fromMillisecondsSinceEpoch(aAlta);
+      for (final t in e.value) {
+        final tAlta = altaMs[t];
+        if (tAlta == null) continue;
+        final tDay = DateTime.fromMillisecondsSinceEpoch(tAlta);
+        if (aDay.year == tDay.year &&
+            aDay.month == tDay.month &&
+            aDay.day == tDay.day) {
+          flag(e.key, 'mismo_dia_alta');
+          flag(t, 'mismo_dia_alta');
+        }
+      }
+    }
+
+    WriteBatch batch = _db.batch();
+    int n = 0;
+    int totalFlags = 0;
+    for (final e in flagsByUser.entries) {
+      final codes = e.value;
+      totalFlags += codes.length;
+      final nivel = codes.length >= 3
+          ? 'alto'
+          : codes.length == 2
+              ? 'medio'
+              : 'bajo';
+      // riesgo alto → techo de identidad en próximo cálculo vía campo
+      batch.set(
+        _db.collection('usuarios').doc(e.key),
+        {
+          'riesgo_fraude': nivel,
+          'riesgo_fraude_flags': codes,
+          'riesgo_fraude_en': FieldValue.serverTimestamp(),
+          if (nivel == 'alto') 'scoring_stale': true,
+        },
+        SetOptions(merge: true),
+      );
+      n++;
+      if (n >= 400) {
+        await batch.commit();
+        batch = _db.batch();
+        n = 0;
+      }
+    }
+    if (n > 0) await batch.commit();
+
+    await _db.collection('stats').doc('fraud_flags').set({
+      'ultima_corrida': FieldValue.serverTimestamp(),
+      'usuarios_flaggeados': flagsByUser.length,
+      'flags_totales': totalFlags,
+      'model': 'heuristics_v1',
+    }, SetOptions(merge: true));
+
+    return flagsByUser.length;
   }
 
   static String? _resolverUsuarioId(Map<String, dynamic> trabajo) {
@@ -1175,6 +1573,12 @@ class BatchScoringResult {
 
   String get resumen =>
       '[$status] $actualizados/$procesados users · timeout=$evalsPublicadasTimeout · ${duracionMs}ms';
+}
+
+class ValidationGate {
+  final bool allowed;
+  final String reason;
+  const ValidationGate({required this.allowed, required this.reason});
 }
 
 class ColorBadge {
