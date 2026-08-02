@@ -167,16 +167,16 @@ class _DatosPersonalesFlotanteWidgetState
       fillColor: Colors.white,
       labelStyle: TextStyle(color: Colors.grey.shade600),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade200),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade200),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: primaryColor, width: 1.5),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: primaryColor, width: 1.6),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     );
@@ -608,7 +608,7 @@ class _DatosPersonalesFlotanteWidgetState
           'Datos personales',
           style: TextStyle(
             color: _textColor,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w800,
             fontSize: 18,
           ),
         ),
@@ -621,68 +621,156 @@ class _DatosPersonalesFlotanteWidgetState
                 Form(
                   key: _formKey,
                   child: ListView(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
                     children: [
-                      _buildField('Nombre *', _nombreController, required: true),
-                      _buildField(
-                        'Apellido *',
-                        _apellidoController,
-                        required: true,
-                      ),
-
-                      // Celular + WhatsApp
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              primaryColor.withOpacity(0.14),
+                              primaryColor.withOpacity(0.04),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: primaryColor.withOpacity(0.15),
+                          ),
+                        ),
                         child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: TextFormField(
-                                controller: _telefonoController,
-                                keyboardType: TextInputType.phone,
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.allow(
-                                    RegExp(r'[+\d]'),
-                                  ),
-                                  LengthLimitingTextInputFormatter(14),
-                                  _TelefonoInputFormatter(),
-                                ],
-                                decoration: _dec(
-                                  'Celular *',
-                                  hint: '+5491112345678',
-                                  helper:
-                                      'Empezá con + y 13 dígitos, sin espacios ni guiones',
-                                ),
-                                validator: _validarTelefono,
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Icon(
+                                Icons.person_rounded,
+                                color: primaryColor,
+                                size: 26,
                               ),
                             ),
-                            const SizedBox(width: 10),
-                            Column(
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Tu identidad en Puelo',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w800,
+                                      color: _textColor,
+                                    ),
+                                  ),
+                                  Text(
+                                    _docValidado
+                                        ? 'Documento validado · completá el resto'
+                                        : 'Completá y validá para subir confianza',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey.shade600,
+                                      height: 1.3,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (_docValidado)
+                              const Icon(
+                                Icons.verified_rounded,
+                                color: Color(0xFF059669),
+                                size: 22,
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _sectionCard(
+                        icon: Icons.badge_outlined,
+                        title: 'Quién sos',
+                        subtitle: 'Nombre y cómo te contactan',
+                        children: [
+                          _buildField(
+                            'Nombre *',
+                            _nombreController,
+                            required: true,
+                          ),
+                          _buildField(
+                            'Apellido *',
+                            _apellidoController,
+                            required: true,
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const SizedBox(height: 4),
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: _telefonoController,
+                                    keyboardType: TextInputType.phone,
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.allow(
+                                        RegExp(r'[+\d]'),
+                                      ),
+                                      LengthLimitingTextInputFormatter(14),
+                                      _TelefonoInputFormatter(),
+                                    ],
+                                    decoration: _dec(
+                                      'Celular *',
+                                      hint: '+5491112345678',
+                                      helper: '+ y 13 dígitos, sin espacios',
+                                    ),
+                                    validator: _validarTelefono,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
                                 Container(
+                                  margin: const EdgeInsets.only(top: 2),
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 2,
+                                    horizontal: 10,
+                                    vertical: 8,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: Colors.white,
+                                    color: _tieneWhatsapp
+                                        ? const Color(0xFFDCFCE7)
+                                        : Colors.white,
                                     border: Border.all(
-                                      color: Colors.grey.shade200,
+                                      color: _tieneWhatsapp
+                                          ? const Color(0xFF86EFAC)
+                                          : Colors.grey.shade200,
                                     ),
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(14),
                                   ),
                                   child: Column(
                                     children: [
+                                      Icon(
+                                        Icons.chat_rounded,
+                                        size: 18,
+                                        color: _tieneWhatsapp
+                                            ? const Color(0xFF16A34A)
+                                            : Colors.grey.shade400,
+                                      ),
+                                      const SizedBox(height: 2),
                                       const Text(
                                         'WhatsApp',
-                                        style: TextStyle(fontSize: 11),
+                                        style: TextStyle(fontSize: 10),
                                       ),
-                                      Checkbox(
-                                        value: _tieneWhatsapp,
-                                        activeColor: primaryColor,
-                                        onChanged: (v) => setState(
-                                          () => _tieneWhatsapp = v ?? false,
+                                      SizedBox(
+                                        height: 28,
+                                        child: Checkbox(
+                                          value: _tieneWhatsapp,
+                                          activeColor: const Color(0xFF16A34A),
+                                          materialTapTargetSize:
+                                              MaterialTapTargetSize.shrinkWrap,
+                                          onChanged: (v) => setState(
+                                            () => _tieneWhatsapp = v ?? false,
+                                          ),
                                         ),
                                       ),
                                     ],
@@ -690,57 +778,98 @@ class _DatosPersonalesFlotanteWidgetState
                                 ),
                               ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-
-                      _buildDropdown(
-                        'Tipo de documento',
-                        _tipoDoc,
-                        _tiposDoc,
-                        (v) => setState(() => _tipoDoc = v),
+                      const SizedBox(height: 14),
+                      _sectionCard(
+                        icon: Icons.credit_card_outlined,
+                        title: 'Documento',
+                        subtitle: 'Base de la confianza de perfil',
+                        trailing: _docValidado
+                            ? Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFD1FAE5),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: const Text(
+                                  'Validado',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF047857),
+                                  ),
+                                ),
+                              )
+                            : null,
+                        children: [
+                          _buildDropdown(
+                            'Tipo de documento',
+                            _tipoDoc,
+                            _tiposDoc,
+                            (v) => setState(() => _tipoDoc = v),
+                          ),
+                          _buildDropdown(
+                            'País de emisión',
+                            _paisDoc,
+                            _paises,
+                            (v) => setState(() => _paisDoc = v),
+                          ),
+                          _buildField(
+                            'Número de documento',
+                            _docNumeroController,
+                          ),
+                          _buildGeneroDocumento(),
+                          _buildFechaNacimiento(),
+                          _buildFotoDocumento(),
+                        ],
                       ),
-                      _buildDropdown(
-                        'País de emisión',
-                        _paisDoc,
-                        _paises,
-                        (v) => setState(() => _paisDoc = v),
+                      const SizedBox(height: 14),
+                      _sectionCard(
+                        icon: Icons.mail_outline_rounded,
+                        title: 'Contacto digital',
+                        subtitle: 'Email e Instagram',
+                        children: [
+                          _buildField(
+                            'Email',
+                            _emailController,
+                            keyboard: TextInputType.emailAddress,
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: TextFormField(
+                              controller: _emailConfirmController,
+                              keyboardType: TextInputType.emailAddress,
+                              decoration: _dec('Confirmar email'),
+                              validator: (v) {
+                                final e1 = _emailController.text.trim();
+                                final e2 = (v ?? '').trim();
+                                if (e1 != e2) {
+                                  return 'Los emails no coinciden';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                          _buildField(
+                            'Usuario de Instagram',
+                            _instagramController,
+                            hint: '@usuario',
+                          ),
+                        ],
                       ),
-                      _buildField('Número de documento', _docNumeroController),
-                      _buildGeneroDocumento(),
-                      _buildFechaNacimiento(),
-                      _buildFotoDocumento(),
-                      _buildField(
-                        'Email',
-                        _emailController,
-                        keyboard: TextInputType.emailAddress,
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: TextFormField(
-                          controller: _emailConfirmController,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: _dec('Confirmar email'),
-                          validator: (v) {
-                            final e1 = _emailController.text.trim();
-                            final e2 = (v ?? '').trim();
-                            if (e1 != e2) return 'Los emails no coinciden';
-                            return null;
-                          },
-                        ),
-                      ),
-                      _buildField(
-                        'Usuario de Instagram',
-                        _instagramController,
-                        hint: '@usuario',
-                      ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 20),
                       SizedBox(
                         width: double.infinity,
-                        height: 50,
+                        height: 54,
                         child: ElevatedButton.icon(
-                          onPressed:
-                              _saving || _procesandoOcr ? null : _actualizarDatos,
+                          onPressed: _saving || _procesandoOcr
+                              ? null
+                              : _actualizarDatos,
                           icon: _saving
                               ? const SizedBox(
                                   width: 20,
@@ -750,21 +879,25 @@ class _DatosPersonalesFlotanteWidgetState
                                     color: Colors.white,
                                   ),
                                 )
-                              : const Icon(Icons.save_outlined),
+                              : const Icon(Icons.check_circle_outline_rounded),
                           label: Text(
-                            _saving ? 'Guardando...' : 'Actualizar los datos',
+                            _saving ? 'Guardando…' : 'Guardar datos',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                            ),
                           ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: primaryColor,
                             foregroundColor: Colors.white,
                             elevation: 0,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(16),
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 12),
                     ],
                   ),
                 ),
@@ -795,6 +928,74 @@ class _DatosPersonalesFlotanteWidgetState
                   ),
               ],
             ),
+    );
+  }
+
+  Widget _sectionCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required List<Widget> children,
+    Widget? trailing,
+  }) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: primaryColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: primaryColor, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: _textColor,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (trailing != null) trailing,
+            ],
+          ),
+          const SizedBox(height: 14),
+          ...children,
+        ],
+      ),
     );
   }
 
