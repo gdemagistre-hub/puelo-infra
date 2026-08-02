@@ -211,20 +211,20 @@ class ScoringService {
       tip(
         'foto_perfil',
         'Sumá una foto de perfil',
-        'Una selfie clara sube la confianza: los clientes quieren ver a quién contratan.',
+        'Selfie clara: los clientes quieren verte.',
       );
     }
     if (data['doc_validado'] != true) {
       tip(
         'ocr',
         'Validá tu documento con la cámara',
-        'El scan del DNI es el salto más grande de confianza (identidad verificada).',
+        'El scan del DNI es el mayor salto de confianza.',
       );
     } else if (!_noVacio(data['url_foto_documento'])) {
       tip(
         'foto_doc',
         'Adjuntá la foto de tu documento',
-        'Complementa la validación y refuerza que el DNI es real.',
+        'Refuerza que el documento es real.',
       );
     }
     if (_noVacio(data['doc_numero'] ?? data['numero_documento']) &&
@@ -232,14 +232,14 @@ class ScoringService {
       tip(
         'genero',
         'Indicá cómo figura tu género en el documento',
-        'Completa el dato del DNI: Mujer, Hombre o No binario.',
+        'Mujer, Hombre o No binario según el DNI.',
       );
     }
     if (!_noVacio(data['telefono'])) {
       tip(
         'tel',
         'Cargá tu celular',
-        'Es el canal real de contacto (WhatsApp / llamada).',
+        'Para WhatsApp o llamada.',
       );
     }
     final geo = data['direccion_geo'] as Map<String, dynamic>?;
@@ -247,7 +247,7 @@ class ScoringService {
       tip(
         'domicilio',
         'Completá tu domicilio',
-        'Provincia, partido y localidad suman a la confianza del perfil.',
+        'Provincia, partido y localidad.',
       );
     }
     final profesiones = data['profesiones'] as List<dynamic>? ?? [];
@@ -255,7 +255,7 @@ class ScoringService {
       tip(
         'oficios',
         'Indicá los servicios que ofrecés',
-        'Sin oficios no aparecés en búsquedas y el perfil se ve incompleto.',
+        'Así aparecés cuando buscan tu rubro.',
       );
     }
     final zonas = data['zonas_cobertura'] as Map<String, dynamic>?;
@@ -264,14 +264,14 @@ class ScoringService {
       tip(
         'zona',
         'Definí tu zona de trabajo',
-        'Los clientes de tu barrio solo te encuentran si cargás cobertura.',
+        'Para que te encuentren en tu barrio.',
       );
     }
     if (fotosPortfolio < 1) {
       tip(
         'fotos_trabajo',
         'Subí fotos de trabajos hechos',
-        'Evidencia visual: ayuda al badge y a que confíen en lo que hacés.',
+        'Evidencia visual de lo que hacés.',
       );
     }
 
@@ -284,7 +284,7 @@ class ScoringService {
       tip(
         'evals',
         'Pedí tu primera evaluación de un cliente real',
-        'La trayectoria se construye con trabajos calificados (no con auto-elogios).',
+        'Pedí a un cliente real que te califique.',
       );
     }
 
@@ -294,7 +294,7 @@ class ScoringService {
       tip(
         'tiempo',
         'La confianza crece con el tiempo',
-        'Las cuentas nuevas tienen un techo de confianza la primera semana: evita atajos y completá con datos reales.',
+        'La primera semana hay techo de confianza: datos reales, sin atajos.',
       );
     }
 
