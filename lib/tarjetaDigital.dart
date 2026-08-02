@@ -549,11 +549,20 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                                         const SizedBox(height: 6),
                                         Text(
                                           'Confianza de perfil: ${ScoringService.labelNivel(nivelConfianza)}'
-                                          '${scoreIdentidad != null ? ' ($scoreIdentidad)' : ''}',
+                                          '${scoreIdentidad != null ? ' ($scoreIdentidad/100)' : ''}',
                                           style: const TextStyle(
                                             fontSize: 12,
                                             color: AppColors.textMuted,
                                             fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        Text(
+                                          cantidadEvaluadores > 0
+                                              ? 'Trayectoria: $cantidadEvaluadores evaluación(es) de clientes'
+                                              : 'Trayectoria: sin evaluaciones de clientes aún',
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: AppColors.textMuted,
                                           ),
                                         ),
                                       ],
