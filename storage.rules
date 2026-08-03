@@ -1,0 +1,12 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // TEMP pre-lanzamiento (dropdown sin auth). Al abrir al público: exigir request.auth.
+    match /{allPaths=**} {
+      allow read: if true;
+      allow write: if request.resource == null
+        || request.resource.size < 5 * 1024 * 1024
+           && request.resource.contentType.matches('image/.*');
+    }
+  }
+}
