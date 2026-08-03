@@ -1,0 +1,53 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "usuarios",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "es_trabajador", "order": "ASCENDING" },
+        { "fieldPath": "categorias_servicio", "arrayConfig": "CONTAINS" }
+      ]
+    },
+    {
+      "collectionGroup": "usuarios",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "es_trabajador", "order": "ASCENDING" },
+        { "fieldPath": "profesiones", "arrayConfig": "CONTAINS" }
+      ]
+    },
+    {
+      "collectionGroup": "usuarios",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "es_trabajador", "order": "ASCENDING" },
+        { "fieldPath": "list_visible", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "usuarios",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "es_trabajador", "order": "ASCENDING" },
+        { "fieldPath": "zona_ids", "arrayConfig": "CONTAINS" }
+      ]
+    },
+    {
+      "collectionGroup": "calificaciones",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "estado", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "trabajos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "usuario_id", "order": "ASCENDING" },
+        { "fieldPath": "fechaCarga", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
