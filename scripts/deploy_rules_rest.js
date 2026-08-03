@@ -5,10 +5,7 @@ const PROJECT = process.env.GCLOUD_PROJECT || "lifewalletpuelo";
 async function main() {
   const content = fs.readFileSync("firestore.rules", "utf8");
   const auth = new GoogleAuth({
-    scopes: [
-      "https://www.googleapis.com/auth/cloud-platform",
-      "https://www.googleapis.com/auth/firebase",
-    ],
+    scopes: ["https://www.googleapis.com/auth/cloud-platform", "https://www.googleapis.com/auth/firebase"],
   });
   const client = await auth.getClient();
   const { token } = await client.getAccessToken();
@@ -17,6 +14,7 @@ async function main() {
     "Content-Type": "application/json",
   };
 
+  // Create ruleset
   const createRes = await fetch(
     `https://firebaserules.googleapis.com/v1/projects/${PROJECT}/rulesets`,
     {
@@ -35,54 +33,54 @@ async function main() {
   const rulesetName = createJson.name;
   console.log("Created", rulesetName);
 
-  const listRes = await fetch(
-    `https://firebaserules.googleapis.com/v1/projects/${PROJECT}/releases`,
+  // GET existing release
+  const relName = `projects/${PROJECT}/releases/cloud.firestore`;
+  const getRes = await fetch(
+    `https://firebaserules.googleapis.com/v1/${relName}`,
     { headers }
   );
-  const listJson = await listRes.json();
-  console.log("Releases raw:", JSON.stringify(listJson, null, 2));
+  const getJson = await getRes.json();
+  console.log("GET release", getRes.status, JSON.stringify(getJson, null, 2));
 
-  const releaseResource = `projects/${PROJECT}/releases/cloud.firestore`;
-
-  // Try several body shapes (API quirks)
-  const attempts = [
-    { updateMask: "rulesetName", body: { rulesetName } },
-    { updateMask: "ruleset_name", body: { ruleset_name: rulesetName } },
-    { updateMask: "rulesetName", body: { name: releaseResource, rulesetName } },
-    { updateMask: "*", body: { name: releaseResource, rulesetName } },
+  // Try updateRelease with x-goog-request-params
+  const bodies = [
+    JSON.stringify({ rulesetName }),
+    JSON.stringify({ name: relName, rulesetName }),
   ];
-
-  for (const a of attempts) {
-    const url = `https://firebaserules.googleapis.com/v1/${releaseResource}?updateMask=${encodeURIComponent(a.updateMask)}`;
-    const res = await fetch(url, {
-      method: "PATCH",
-      headers,
-      body: JSON.stringify(a.body),
-    });
-    const j = await res.json();
-    console.log("Attempt", a.updateMask, res.status, JSON.stringify(j).slice(0, 300));
-    if (res.ok) {
-      console.log(JSON.stringify({ ok: true, rulesetName }));
-      return;
+  for (const body of bodies) {
+    for (const mask of ["rulesetName", "rulesetName,name"]) {
+      const url = `https://firebaserules.googleapis.com/v1/${relName}?updateMask=${mask}`;
+      const res = await fetch(url, { method: "PATCH", headers, body });
+      const text = await res.text();
+      console.log("PATCH", mask, res.status, text.slice(0, 250));
+      if (res.ok) {
+        console.log(JSON.stringify({ ok: true, rulesetName }));
+        return;
+      }
     }
   }
 
-  // Last resort: projects.releases.create with replace via delete+create not allowed
-  // Try POST with full name
-  const postRes = await fetch(
-    `https://firebaserules.googleapis.com/v1/projects/${PROJECT}/releases`,
-    {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ name: releaseResource, rulesetName }),
-    }
-  );
-  const postJ = await postRes.json();
-  console.log("POST", postRes.status, JSON.stringify(postJ).slice(0, 400));
-  if (!postRes.ok) process.exit(1);
-  console.log(JSON.stringify({ ok: true, rulesetName }));
-}
+  // Try Firebase CLI style via firestore admin REST (rules not here)
 
+  // Last: use googleapis firebaserules.projects.releases.update
+  // Try with alt=json and $.xgafv
+  const url2 = `https://firebaserules.googleapis.com/v1/${relName}?updateMask=rulesetName&alt=json`;
+  const res2 = await fetch(url2, {
+    method: "PATCH",
+    headers: { ...headers, "X-Goog-User-Project": PROJECT },
+    body: JSON.stringify({ rulesetName }),
+  });
+  console.log("PATCH x-user-project", res2.status, (await res2.text()).slice(0, 300));
+
+  // Try POST to :update
+  const res3 = await fetch(
+    `https://firebaserules.googleapis.com/v1/${relName}:patch?updateMask=rulesetName`,
+    { method: "POST", headers, body: JSON.stringify({ rulesetName }) }
+  );
+  console.log("POST :patch", res3.status, (await res3.text()).slice(0, 300));
+
+  process.exit(1);
+}
 main().catch((e) => {
   console.error(e);
   process.exit(1);
