@@ -6,7 +6,8 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'user_session.dart';
 import 'analytics/prox_analytics.dart';
 
-/// Autenticación real (Google ahora; Facebook / Apple después).
+/// Autenticación real: Google + Apple.
+/// Facebook/Twitter deshabilitados por ahora (placeholders).
 ///
 /// Flujo:
 /// 1) Provider → Firebase Auth
@@ -106,17 +107,90 @@ class AuthService {
     } catch (_) {}
   }
 
-  /// Placeholder para el mismo patrón con Facebook.
-  Future<void> signInWithFacebook() async {
-    throw UnimplementedError(
-      'Facebook Auth se habilita en una etapa siguiente (mismo patrón que Google).',
+  /// Sign in with Apple → perfil Firestore → UserSession.
+  ///
+  /// Requiere en Firebase Console: Authentication → Sign-in method → Apple (ON)
+  /// y en Apple Developer: Services ID + key (web) / capability (iOS).
+  Future<void> signInWithApple() async {
+    final provider = AppleAuthProvider();
+    provider.addScope('email');
+    provider.addScope('name');
+
+    final UserCredential cred;
+    try {
+      if (kIsWeb) {
+        cred = await _auth.signInWithPopup(provider);
+      } else {
+        // iOS / Android: provider flow nativo de Firebase Auth 5.x
+        cred = await _auth.signInWithProvider(provider);
+      }
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'popup-closed-by-user' ||
+          e.code == 'cancelled-popup-request' ||
+          e.code == 'web-context-cancelled') {
+        throw AuthCancelledException();
+      }
+      rethrow;
+    }
+
+    final user = cred.user;
+    if (user == null) {
+      throw StateError('Apple Auth no devolvió usuario');
+    }
+
+    // Apple solo envía nombre en el PRIMER login; viene en additionalUserInfo.
+    String? appleGiven;
+    String? appleFamily;
+    final info = cred.additionalUserInfo;
+    final profile = info?.profile;
+    if (profile != null) {
+      appleGiven = (profile['given_name'] ?? profile['givenName'] ?? '')
+          .toString()
+          .trim();
+      appleFamily = (profile['family_name'] ?? profile['familyName'] ?? '')
+          .toString()
+          .trim();
+      if (appleGiven.isEmpty && appleFamily.isEmpty) {
+        final full = (profile['name'] ?? '').toString().trim();
+        if (full.isNotEmpty) {
+          final parts = full.split(RegExp(r'\s+'));
+          appleGiven = parts.first;
+          if (parts.length > 1) {
+            appleFamily = parts.sublist(1).join(' ');
+          }
+        }
+      }
+    }
+
+    debugPrint('Apple user: ${snapshotFromUser(user)}');
+
+    final data = await ensureUserProfile(
+      user,
+      providerId: 'apple',
+      preferredNombre: appleGiven?.isNotEmpty == true ? appleGiven : null,
+      preferredApellido: appleFamily?.isNotEmpty == true ? appleFamily : null,
     );
+    UserSession().iniciarSesion(
+      user.uid,
+      data,
+      authProvider: 'apple',
+      isDevImpersonation: false,
+    );
+
+    final esPrestador =
+        data['es_trabajador'] == true || data['rol'] == 'trabajador';
+    try {
+      ProxAnalytics.instance.startSession(
+        role: esPrestador ? 'prestador' : 'cliente',
+      );
+      ProxAnalytics.instance.action('login_apple', screen: '/login');
+    } catch (_) {}
   }
 
-  /// Placeholder para el mismo patrón con Apple.
-  Future<void> signInWithApple() async {
+  /// Placeholder: Facebook queda deshabilitado hasta tener App en Live + email.
+  Future<void> signInWithFacebook() async {
     throw UnimplementedError(
-      'Apple Auth se habilita en una etapa siguiente (mismo patrón que Google).',
+      'Facebook Auth deshabilitado por ahora. Usá Google, Apple o el listado de prueba.',
     );
   }
 
@@ -128,6 +202,8 @@ class AuthService {
   Future<Map<String, dynamic>> ensureUserProfile(
     User user, {
     required String providerId,
+    String? preferredNombre,
+    String? preferredApellido,
   }) async {
     final ref = _db.collection('usuarios').doc(user.uid);
     final snap = await ref.get();
@@ -143,9 +219,10 @@ class AuthService {
       }
     }
 
-    // Preferir displayName del providerData de Google si viene más completo.
+    // Nombre del provider (Google/Apple/Facebook) si es más completo.
+    const providerIds = {'google.com', 'apple.com', 'facebook.com'};
     for (final p in user.providerData) {
-      if (p.providerId == 'google.com' &&
+      if (providerIds.contains(p.providerId) &&
           (p.displayName ?? '').trim().isNotEmpty) {
         final d = p.displayName!.trim();
         final parts = d.split(RegExp(r'\s+'));
@@ -153,6 +230,14 @@ class AuthService {
         apellido = parts.length > 1 ? parts.sublist(1).join(' ') : apellido;
         break;
       }
+    }
+
+    // Apple: nombre solo en el primer login (additionalUserInfo).
+    if ((preferredNombre ?? '').trim().isNotEmpty) {
+      nombre = preferredNombre!.trim();
+    }
+    if ((preferredApellido ?? '').trim().isNotEmpty) {
+      apellido = preferredApellido!.trim();
     }
 
     final photo = (user.photoURL ?? '').trim().isNotEmpty
@@ -192,7 +277,7 @@ class AuthService {
       'updated_at': FieldValue.serverTimestamp(),
     };
 
-    // Siempre refrescar identidad desde Google si viene dato.
+    // Solo escribir si el provider mandó dato (Apple a menudo no repite nombre).
     if (nombre.isNotEmpty) patch['nombre'] = nombre;
     if (apellido.isNotEmpty) patch['apellido'] = apellido;
     if (email.isNotEmpty) patch['email'] = email;
