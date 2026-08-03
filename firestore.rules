@@ -113,6 +113,10 @@ service cloud.firestore {
     match /validacion_tokens/{id} {
       allow read, write: if true; // TEMP
     }
+    // Pendientes del flujo "Ayudar a validar" (validar_domicilio → login → aplicar)
+    match /validaciones_pendientes/{id} {
+      allow read, write: if true; // TEMP pre-lanzamiento (link público + dropdown)
+    }
 
     // ---------- default DENY ----------
     // Sin regla abierta por fecha (la anterior venció 2026-07-31).
