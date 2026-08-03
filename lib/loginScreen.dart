@@ -24,7 +24,6 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
   String? _selectedUserId;
   Map<String, dynamic>? _selectedUserData;
   bool _loadingGoogle = false;
-  bool _loadingApple = false;
   bool _loadingDev = false;
 
   static const Color primaryColor = AppColors.cliente;
@@ -90,37 +89,11 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
     }
   }
 
-  Future<void> _entrarConApple() async {
-    setState(() => _loadingApple = true);
-    try {
-      await AuthService.instance.signInWithApple();
-      if (!mounted) return;
-      _navegarPostLogin();
-    } on AuthCancelledException {
-      // Usuario cerró el sheet/popup.
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'No se pudo iniciar con Apple. '
-            'Verificá que el proveedor esté habilitado en Firebase '
-            'y la configuración de Apple Developer. ($e)',
-          ),
-          duration: const Duration(seconds: 7),
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _loadingApple = false);
-    }
-  }
-
   void _proximamente(String provider) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          '$provider aún no está habilitado. '
-          'Usá Google, Apple o el listado de prueba.',
+          '$provider se habilita en la siguiente etapa (mismo flujo que Google).',
         ),
       ),
     );
@@ -144,7 +117,7 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final busy = _loadingGoogle || _loadingApple || _loadingDev;
+    final busy = _loadingGoogle || _loadingDev;
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -341,7 +314,7 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                   ),
                   const SizedBox(height: 14),
                   _buildLoginButton(
-                    onPressed: busy ? null : _entrarConApple,
+                    onPressed: busy ? null : () => _proximamente('Apple'),
                     icon: _buildIconCircle(
                       backgroundColor: Colors.white.withOpacity(0.15),
                       child: const Icon(
@@ -350,12 +323,9 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                         size: 18,
                       ),
                     ),
-                    label: _loadingApple
-                        ? 'Conectando con Apple…'
-                        : 'Continuar con Apple',
+                    label: 'Continuar con Apple',
                     backgroundColor: Colors.black,
                     textColor: Colors.white,
-                    loading: _loadingApple,
                   ),
                   const SizedBox(height: 14),
                   _buildLoginButton(
