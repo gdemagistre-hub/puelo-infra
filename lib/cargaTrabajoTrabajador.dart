@@ -70,7 +70,8 @@ class _CargaTrabajoTrabajadorWidgetState
 
   Future<void> _pickImages() async {
     final images = await _picker.pickMultiImage(
-      maxWidth: 1920,
+      maxWidth: 1280,
+        imageQuality: 75,
       maxHeight: 1080,
       imageQuality: 80,
     );
