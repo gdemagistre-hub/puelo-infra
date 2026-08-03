@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import 'user_session.dart';
@@ -208,18 +210,32 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
       final token = uuid.v4();
       final esCorrecto = _domicilioSeleccionado == _domicilioReal;
 
-      await db.collection('calificaciones').doc(token).set({
-        'tipo': 'validacion_pendiente',
-        'targetUserId': widget.usuarioId,
-        'targetNombre': _nombreTarget,
-        'conoce': _conoce,
-        'domicilioSeleccionado': _domicilioSeleccionado,
-        'domicilioReal': _domicilioReal,
-        'esCorrecto': esCorrecto,
-        'tiempoViviendo': _tiempoViviendo,
-        'estado': 'pendiente',
-        'creado_en': FieldValue.serverTimestamp(),
-      });
+      // Admin path: Cloud Function (ignora rules del cliente)
+      final uri = Uri.parse(
+        'https://southamerica-east1-lifewalletpuelo.cloudfunctions.net/submitValidacionPendiente',
+      );
+      final resp = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'token': token,
+              'targetUserId': widget.usuarioId,
+              'targetNombre': _nombreTarget,
+              'conoce': _conoce,
+              'domicilioSeleccionado': _domicilioSeleccionado,
+              'domicilioReal': _domicilioReal,
+              'esCorrecto': esCorrecto,
+              'tiempoViviendo': _tiempoViviendo,
+            }),
+          )
+          .timeout(const Duration(seconds: 25));
+
+      if (resp.statusCode < 200 || resp.statusCode >= 300) {
+        throw StateError(
+          'No se pudo guardar la validación (${resp.statusCode}): ${resp.body}',
+        );
+      }
 
       UserSession().setPendingValidacion(token);
 
