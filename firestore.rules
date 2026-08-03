@@ -1,4 +1,6 @@
 rules_version = '2';
+// PERFORMANCE NOTE: writes TEMP abiertos pre-lanzamiento (dropdown).
+// Cerrar antes de tráfico real: ver docs/performance.md
 service cloud.firestore {
   match /databases/{database}/documents {
 
