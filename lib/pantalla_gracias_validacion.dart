@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_session.dart';
 import 'Homepage.dart';
@@ -31,77 +33,48 @@ class _PantallaGraciasValidacionWidgetState
 
   Future<void> _procesarYMostrar() async {
     final token = UserSession().pendingValidacionToken;
-    if (token == null || UserSession().uid == null) {
-      setState(() => _procesando = false);
+    final validadorId = UserSession().uid;
+    if (token == null || validadorId == null) {
+      if (mounted) setState(() => _procesando = false);
       return;
     }
 
     try {
-      final pendRef = db.collection('calificaciones').doc(token);
-      final pendSnap = await pendRef.get();
-
-      if (pendSnap.exists) {
-        final pend = pendSnap.data()!;
-        _nombreTarget = pend['targetNombre'] ?? 'la persona';
-
-        if (pend['estado'] == 'pendiente') {
-          final String targetUserId = pend['targetUserId'] ?? '';
-          final String validadorId = UserSession().uid!;
-
-          // Anti-granja: límites de emisión de validaciones
-          final valSnap = await db.collection('usuarios').doc(validadorId).get();
-          final valData = valSnap.data() ?? {};
-          final gate = ScoringService.canEmitirValidacion(valData);
-          if (!gate.allowed) {
-            await pendRef.update({
-              'tipo': 'validacion_aplicada',
-              'estado': 'rechazado_limite',
-              'motivo_rechazo': gate.reason,
-              'procesado_en': FieldValue.serverTimestamp(),
-            });
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(gate.reason), duration: const Duration(seconds: 6)),
-              );
-            }
-          } else {
-            await pendRef.update({
-              'tipo': 'validacion_aplicada',
+      final uri = Uri.parse(
+        'https://southamerica-east1-lifewalletpuelo.cloudfunctions.net/aplicarValidacionPendiente',
+      );
+      final resp = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'token': token,
               'validadorId': validadorId,
-              'estado': 'completado',
-              'procesado_en': FieldValue.serverTimestamp(),
-            });
+            }),
+          )
+          .timeout(const Duration(seconds: 25));
 
-            if (targetUserId.isNotEmpty) {
-              final Map<String, dynamic> registro = {
-                'validadorId': validadorId,
-                'validador_id': validadorId,
-                'conoce': pend['conoce'] ?? false,
-                'domicilioSeleccionado': pend['domicilioSeleccionado'] ?? '',
-                'esCorrecto': pend['esCorrecto'] ?? false,
-                'tiempoViviendo': pend['tiempoViviendo'] ?? '',
-                'fecha': FieldValue.serverTimestamp(),
-                'tipo': 'identidad',
-              };
-
-              await db.collection('usuarios').doc(targetUserId).update({
-                'validaciones_recibidas': FieldValue.arrayUnion([registro]),
-              });
-
-              await db.collection('usuarios').doc(validadorId).update({
-                'validaciones_emitidas_count': FieldValue.increment(1),
-                'validaciones_emitidas': FieldValue.arrayUnion([
-                  {
-                    'target_id': targetUserId,
-                    'token': token,
-                    'fecha': DateTime.now().toIso8601String(),
-                  }
-                ]),
-                'ultima_validacion_emitida_en': FieldValue.serverTimestamp(),
-              });
-            }
+      if (resp.statusCode == 200) {
+        try {
+          final data = jsonDecode(resp.body) as Map<String, dynamic>;
+          final n = data['targetNombre'] as String?;
+          if (n != null && n.isNotEmpty) _nombreTarget = n;
+        } catch (_) {}
+      } else if (resp.statusCode == 403) {
+        try {
+          final data = jsonDecode(resp.body) as Map<String, dynamic>;
+          final reason = data['reason'] as String?;
+          if (reason != null && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(reason),
+                duration: const Duration(seconds: 6),
+              ),
+            );
           }
-        }
+        } catch (_) {}
+      } else {
+        debugPrint('aplicarValidacion HTTP ${resp.statusCode}: ${resp.body}');
       }
     } catch (e) {
       debugPrint('Error procesando validación: $e');
