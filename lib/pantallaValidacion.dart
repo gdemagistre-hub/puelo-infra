@@ -93,7 +93,7 @@ class _PantallaValidacionWidgetState extends State<PantallaValidacionWidget> {
     String validadorId,
   ) async {
     try {
-      final pendRef = db.collection('validaciones').doc(token);
+      final pendRef = db.collection('calificaciones').doc(token);
       final pendSnap = await pendRef.get();
       if (!pendSnap.exists) return;
 
@@ -104,6 +104,7 @@ class _PantallaValidacionWidgetState extends State<PantallaValidacionWidget> {
       if (targetUserId.isEmpty) return;
 
       await pendRef.update({
+        'tipo': 'validacion_aplicada',
         'validadorId': validadorId,
         'estado': 'completado',
         'procesado_en': FieldValue.serverTimestamp(),
