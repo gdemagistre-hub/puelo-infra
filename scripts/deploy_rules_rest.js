@@ -1,11 +1,9 @@
 const fs = require("fs");
 const { GoogleAuth } = require("google-auth-library");
-
 const PROJECT = process.env.GCLOUD_PROJECT || "lifewalletpuelo";
-const RULES_PATH = process.env.RULES_PATH || "firestore.rules";
 
 async function main() {
-  const content = fs.readFileSync(RULES_PATH, "utf8");
+  const content = fs.readFileSync("firestore.rules", "utf8");
   const auth = new GoogleAuth({
     scopes: [
       "https://www.googleapis.com/auth/cloud-platform",
@@ -14,8 +12,6 @@ async function main() {
   });
   const client = await auth.getClient();
   const { token } = await client.getAccessToken();
-  if (!token) throw new Error("No access token");
-
   const headers = {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
@@ -33,52 +29,57 @@ async function main() {
   );
   const createJson = await createRes.json();
   if (!createRes.ok) {
-    console.error("Create ruleset failed", createRes.status, JSON.stringify(createJson));
+    console.error("Create failed", createRes.status, JSON.stringify(createJson));
     process.exit(1);
   }
   const rulesetName = createJson.name;
-  console.log("Created ruleset:", rulesetName);
+  console.log("Created", rulesetName);
 
-  // List releases
   const listRes = await fetch(
     `https://firebaserules.googleapis.com/v1/projects/${PROJECT}/releases`,
     { headers }
   );
   const listJson = await listRes.json();
-  console.log("Existing releases:", JSON.stringify(listJson, null, 2));
+  console.log("Releases raw:", JSON.stringify(listJson, null, 2));
 
-  const releaseId = "cloud.firestore";
-  const releaseResource = `projects/${PROJECT}/releases/${releaseId}`;
+  const releaseResource = `projects/${PROJECT}/releases/cloud.firestore`;
 
-  // PATCH with only rulesetName
-  let relRes = await fetch(
-    `https://firebaserules.googleapis.com/v1/${releaseResource}?updateMask=rulesetName`,
-    {
+  // Try several body shapes (API quirks)
+  const attempts = [
+    { updateMask: "rulesetName", body: { rulesetName } },
+    { updateMask: "ruleset_name", body: { ruleset_name: rulesetName } },
+    { updateMask: "rulesetName", body: { name: releaseResource, rulesetName } },
+    { updateMask: "*", body: { name: releaseResource, rulesetName } },
+  ];
+
+  for (const a of attempts) {
+    const url = `https://firebaserules.googleapis.com/v1/${releaseResource}?updateMask=${encodeURIComponent(a.updateMask)}`;
+    const res = await fetch(url, {
       method: "PATCH",
       headers,
-      body: JSON.stringify({ rulesetName }),
+      body: JSON.stringify(a.body),
+    });
+    const j = await res.json();
+    console.log("Attempt", a.updateMask, res.status, JSON.stringify(j).slice(0, 300));
+    if (res.ok) {
+      console.log(JSON.stringify({ ok: true, rulesetName }));
+      return;
+    }
+  }
+
+  // Last resort: projects.releases.create with replace via delete+create not allowed
+  // Try POST with full name
+  const postRes = await fetch(
+    `https://firebaserules.googleapis.com/v1/projects/${PROJECT}/releases`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ name: releaseResource, rulesetName }),
     }
   );
-  let relJson = await relRes.json();
-  console.log("PATCH status", relRes.status, JSON.stringify(relJson));
-
-  if (!relRes.ok) {
-    // Try PUT style full replace via releases: update with name
-    relRes = await fetch(
-      `https://firebaserules.googleapis.com/v1/${releaseResource}?updateMask=rulesetName`,
-      {
-        method: "PATCH",
-        headers,
-        body: JSON.stringify({ name: releaseResource, rulesetName }),
-      }
-    );
-    relJson = await relRes.json();
-    console.log("PATCH2 status", relRes.status, JSON.stringify(relJson));
-  }
-
-  if (!relRes.ok) {
-    process.exit(1);
-  }
+  const postJ = await postRes.json();
+  console.log("POST", postRes.status, JSON.stringify(postJ).slice(0, 400));
+  if (!postRes.ok) process.exit(1);
   console.log(JSON.stringify({ ok: true, rulesetName }));
 }
 
