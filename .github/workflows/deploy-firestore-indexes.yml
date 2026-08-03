@@ -19,6 +19,7 @@ jobs:
         run: |
           echo "$SA_JSON" > "$RUNNER_TEMP/sa.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
-      - name: Deploy indexes + rules + storage
+      - name: Deploy firestore indexes + rules
+        # Storage rules aparte (SA sin permission serviceusage para Storage API)
         run: |
-          firebase deploy --only firestore:indexes,firestore:rules,storage --project lifewalletpuelo --non-interactive
+          firebase deploy --only firestore:indexes,firestore:rules --project lifewalletpuelo --non-interactive
