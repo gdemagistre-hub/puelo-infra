@@ -37,7 +37,7 @@ class _PantallaGraciasValidacionWidgetState
     }
 
     try {
-      final pendRef = db.collection('validaciones').doc(token);
+      final pendRef = db.collection('calificaciones').doc(token);
       final pendSnap = await pendRef.get();
 
       if (pendSnap.exists) {
@@ -54,6 +54,7 @@ class _PantallaGraciasValidacionWidgetState
           final gate = ScoringService.canEmitirValidacion(valData);
           if (!gate.allowed) {
             await pendRef.update({
+              'tipo': 'validacion_aplicada',
               'estado': 'rechazado_limite',
               'motivo_rechazo': gate.reason,
               'procesado_en': FieldValue.serverTimestamp(),
@@ -65,6 +66,7 @@ class _PantallaGraciasValidacionWidgetState
             }
           } else {
             await pendRef.update({
+              'tipo': 'validacion_aplicada',
               'validadorId': validadorId,
               'estado': 'completado',
               'procesado_en': FieldValue.serverTimestamp(),
