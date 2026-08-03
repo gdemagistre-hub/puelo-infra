@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_session.dart';
 import 'catalogo_oficios.dart';
+import 'prestador_list_fields.dart';
 
 class EspecialidadesLaboralesFlotanteWidget extends StatefulWidget {
   const EspecialidadesLaboralesFlotanteWidget({super.key});
@@ -117,15 +118,26 @@ class _EspecialidadesLaboralesFlotanteWidgetState
     try {
       final categorias =
           CatalogoOficios.categoriasDesdeProfesiones(_oficiosSeleccionados);
+      final session = UserSession();
+      final base = {
+        ...(session.datosCompletos ?? {}),
+        'nombre_comercial': _nombreComercialController.text.trim(),
+        'profesiones': _oficiosSeleccionados,
+        'categorias_servicio': categorias,
+        'es_trabajador': true,
+      };
+      final listFields = PrestadorListFields.build(data: base);
+      final listFieldsMem =
+          PrestadorListFields.build(data: base, touchTimestamp: false);
       await db.collection('usuarios').doc(uid).set({
         'nombre_comercial': _nombreComercialController.text.trim(),
         'profesiones': _oficiosSeleccionados,
         'categorias_servicio': categorias,
         'es_trabajador': true,
         'updated_at': FieldValue.serverTimestamp(),
+        ...listFields,
       }, SetOptions(merge: true));
 
-      final session = UserSession();
       if (session.datosCompletos != null) {
         session.datosCompletos = {
           ...session.datosCompletos!,
@@ -133,8 +145,10 @@ class _EspecialidadesLaboralesFlotanteWidgetState
           'profesiones': _oficiosSeleccionados,
           'categorias_servicio': categorias,
           'es_trabajador': true,
+          ...listFieldsMem,
         };
       }
+      session.invalidateHomeCache();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
