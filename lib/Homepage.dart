@@ -361,6 +361,19 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       } else if (id == 'foto_perfil') {
         icon = Icons.camera_alt_outlined;
         action = () => _mostrarOpcionesSelfie();
+      } else if (id == 'validacion_perfil') {
+        icon = Icons.how_to_reg_outlined;
+        action = () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const SolicitarValidacionWidget(),
+            ),
+          ).then((_) {
+            UserSession().invalidateHomeCache();
+            _cargarEstadoVisibilidadYConsejos();
+          });
+        };
       } else if (id == 'evals' || id == 'tiempo') {
         icon = id == 'evals' ? Icons.star_outline_rounded : Icons.schedule_rounded;
         action = _compartirTarjeta;
@@ -407,7 +420,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           : '${localidades.length} zona${localidades.length == 1 ? '' : 's'}';
       _pasosCompletos = pasos;
       _tipsTotales = consejos.length;
-      _consejos = consejos.take(3).toList();
+      _consejos = consejos.take(4).toList();
       final sc = data['scoring'];
       if (sc is Map) {
         _nivelConfianza = sc['nivel_confianza'] as String?;
@@ -1476,6 +1489,77 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                         ),
                       ),
                       const Icon(Icons.ios_share_rounded, color: Colors.white70),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // —— CTA pedir validación de perfil (quién soy) ——
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            child: Material(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              child: InkWell(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const SolicitarValidacionWidget(),
+                    ),
+                  ).then((_) {
+                    UserSession().invalidateHomeCache();
+                    _cargarEstadoVisibilidadYConsejos();
+                  });
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: _prestadorPrimary.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Icon(Icons.how_to_reg_outlined,
+                            color: _prestadorPrimary, size: 24),
+                      ),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Pedí que validen quién sos',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 14,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Un conocido confirma tu perfil · suma confianza',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.chevron_right_rounded,
+                          color: Colors.grey.shade400),
                     ],
                   ),
                 ),
