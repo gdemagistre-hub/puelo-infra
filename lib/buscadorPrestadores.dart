@@ -222,8 +222,13 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
           .collection('usuarios')
           .where('es_trabajador', isEqualTo: true);
 
-      // Oficio/categoría se filtra en cliente (categoría ⊃ especialidades + sinónimos)
-      // para no dejar prestadores invisibles por granularidad.
+      // Categoría en servidor (requiere categorias_servicio + índice).
+      // Fallback cliente cubre sinónimos y usuarios sin backfill.
+      final catId = CatalogoOficios.categoriaIdDesdeChip(_selectedRubro);
+      if (catId != null) {
+        query = query.where('categorias_servicio', arrayContains: catId);
+      }
+
       query = query.limit(_pageSize);
       if (!reset && _lastDoc != null) {
         query = query.startAfterDocument(_lastDoc!);
@@ -246,6 +251,38 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
       });
     } catch (e) {
       debugPrint('Error buscador: $e');
+      final msg = e.toString();
+      // Si falta índice o campo, reintenta sin filtro de categoría (cliente filtra).
+      if (msg.contains('failed-precondition') ||
+          msg.contains('FAILED_PRECONDITION') ||
+          msg.contains('index')) {
+        try {
+          Query fallback = db
+              .collection('usuarios')
+              .where('es_trabajador', isEqualTo: true)
+              .limit(_pageSize);
+          if (!reset && _lastDoc != null) {
+            fallback = fallback.startAfterDocument(_lastDoc!);
+          }
+          final snap = await fallback.get();
+          if (!mounted) return;
+          setState(() {
+            if (reset) {
+              _docs = snap.docs;
+            } else {
+              _docs = [..._docs, ...snap.docs];
+            }
+            _lastDoc = snap.docs.isNotEmpty ? snap.docs.last : _lastDoc;
+            _hasMore = snap.docs.length >= _pageSize;
+            _loading = false;
+            _loadingMore = false;
+            _error = null;
+          });
+          return;
+        } catch (e2) {
+          debugPrint('Buscador fallback error: $e2');
+        }
+      }
       if (!mounted) return;
       setState(() {
         _loading = false;
@@ -748,10 +785,11 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
               const Divider(height: 1),
               Expanded(
                 child: _loading
-                    ? const Center(
-                        child: CircularProgressIndicator(
-                          color: _clientePrimary,
-                        ),
+                    ? ListView.separated(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: 6,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (_, __) => _SkeletonCard(),
                       )
                     : _error != null
                         ? Center(
@@ -1093,6 +1131,68 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _SkeletonCard extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 96,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE2E8F0),
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  height: 12,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE2E8F0),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  height: 10,
+                  width: 140,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  height: 10,
+                  width: 90,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
