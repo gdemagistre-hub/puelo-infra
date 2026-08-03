@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_session.dart';
+import 'prestador_list_fields.dart';
 import 'widgets/searchable_picker.dart';
 import 'catalogo_geo_cache.dart';
 
@@ -246,18 +247,38 @@ class _ZonaDeTrabajoFlotanteWidgetState
     setState(() => _saving = true);
 
     try {
+      final cobertura = {
+        'pais_id': _paisId,
+        'pais_nombre': _paisNombre,
+        'provincia_id': _provinciaId,
+        'provincia_nombre': _provinciaNombre,
+        'partidos': _partidosSeleccionados,
+        'localidades': _localidadesSeleccionadas,
+      };
+      final session = UserSession();
+      final base = {
+        ...(session.datosCompletos ?? {}),
+        'zonas_cobertura': cobertura,
+        'es_trabajador': true,
+      };
+      final listFields = PrestadorListFields.build(data: base);
+      final listFieldsMem =
+          PrestadorListFields.build(data: base, touchTimestamp: false);
       await db.collection('usuarios').doc(uid).set({
-        'zonas_cobertura': {
-          'pais_id': _paisId,
-          'pais_nombre': _paisNombre,
-          'provincia_id': _provinciaId,
-          'provincia_nombre': _provinciaNombre,
-          'partidos': _partidosSeleccionados,
-          'localidades': _localidadesSeleccionadas,
-        },
+        'zonas_cobertura': cobertura,
         'es_trabajador': true,
         'updated_at': FieldValue.serverTimestamp(),
+        ...listFields,
       }, SetOptions(merge: true));
+      if (session.datosCompletos != null) {
+        session.datosCompletos = {
+          ...session.datosCompletos!,
+          'zonas_cobertura': cobertura,
+          'es_trabajador': true,
+          ...listFieldsMem,
+        };
+      }
+      session.invalidateHomeCache();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
