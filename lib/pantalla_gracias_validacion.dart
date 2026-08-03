@@ -37,7 +37,7 @@ class _PantallaGraciasValidacionWidgetState
     }
 
     try {
-      final pendRef = db.collection('validaciones_pendientes').doc(token);
+      final pendRef = db.collection('validaciones').doc(token);
       final pendSnap = await pendRef.get();
 
       if (pendSnap.exists) {
