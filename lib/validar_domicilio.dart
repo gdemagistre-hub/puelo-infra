@@ -208,7 +208,9 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
       final token = uuid.v4();
       final esCorrecto = _domicilioSeleccionado == _domicilioReal;
 
-      await db.collection('validaciones_pendientes').doc(token).set({
+      // Colección `validaciones` (rules TEMP allow write). Antes: validaciones_pendientes (denied).
+      await db.collection('validaciones').doc(token).set({
+        'tipo': 'pendiente_domicilio',
         'targetUserId': widget.usuarioId,
         'targetNombre': _nombreTarget,
         'conoce': _conoce,
