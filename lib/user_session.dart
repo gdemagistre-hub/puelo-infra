@@ -33,7 +33,30 @@ class UserSession {
   /// Token de una validación de domicilio pendiente
   String? pendingValidacionToken;
 
+  /// Cache liviano Home prestador (evita re-fetch al volver a la pestaña).
+  DateTime? _homeCacheAt;
+  Map<String, dynamic>? _homeCacheData;
+  static const Duration homeCacheTtl = Duration(seconds: 45);
+
   bool get isLoggedIn => uid != null && uid!.isNotEmpty;
+
+  Map<String, dynamic>? get homeCacheIfFresh {
+    final at = _homeCacheAt;
+    final data = _homeCacheData;
+    if (at == null || data == null) return null;
+    if (DateTime.now().difference(at) > homeCacheTtl) return null;
+    return data;
+  }
+
+  void setHomeCache(Map<String, dynamic> data) {
+    _homeCacheData = Map<String, dynamic>.from(data);
+    _homeCacheAt = DateTime.now();
+  }
+
+  void invalidateHomeCache() {
+    _homeCacheData = null;
+    _homeCacheAt = null;
+  }
 
   void iniciarSesion(
     String id,
@@ -190,6 +213,7 @@ class UserSession {
     pendingValidacionToken = null;
     authProvider = null;
     isDevImpersonation = false;
+    invalidateHomeCache();
     CatalogoGeoCache.instance.clear();
     try {
       final prefs = await SharedPreferences.getInstance();
