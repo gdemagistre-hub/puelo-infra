@@ -20,6 +20,7 @@ import 'especialidadesLaboralesflotante.dart';
 import 'solicitar_validacion.dart';
 import 'scoring_service.dart';
 import 'catalogo_oficios.dart';
+import 'prestador_list_fields.dart';
 import 'config/app_env.dart';
 import 'theme/app_copy.dart';
 import 'analytics/prox_analytics.dart';
@@ -249,12 +250,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   }
 
   Future<void> _cargarEstadoVisibilidadYConsejos() async {
-    setState(() {
-      _cargandoConsejos = true;
-      _visibilidadCargando = true;
-    });
     final uid = UserSession().uid;
     if (uid == null) {
+      if (!mounted) return;
       setState(() {
         _consejos = [];
         _cargandoConsejos = false;
@@ -263,139 +261,164 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       });
       return;
     }
+
+    final cached = UserSession().homeCacheIfFresh;
+    if (cached != null) {
+      _aplicarEstadoDesdeData(cached);
+    } else if (mounted) {
+      setState(() {
+        _cargandoConsejos = true;
+        _visibilidadCargando = true;
+      });
+    }
+
     try {
-      final doc = await FirebaseFirestore.instance.collection('usuarios').doc(uid).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(uid)
+          .get();
       final data = doc.data() ?? {};
-      final profesiones = (data['profesiones'] as List<dynamic>? ?? [])
-          .map((e) => e.toString().toLowerCase().trim())
-          .where((s) => s.isNotEmpty)
-          .toList();
-      final zonas = data['zonas_cobertura'] as Map<String, dynamic>?;
-      final localidades = zonas?['localidades'] as List<dynamic>? ?? [];
-      final telefono = (data['telefono'] ?? '').toString().trim();
-      final nombre = (data['nombre'] ?? '').toString().trim();
-      final apellido = (data['apellido'] ?? '').toString().trim();
-      final labelsOficios = profesiones
-          .map((k) => _metaServicios[k]?.label ?? CatalogoOficios.label(k))
-          .take(3)
-          .join(' · ');
-      int pasos = 0;
-      if (profesiones.isNotEmpty) pasos++;
-      if (localidades.isNotEmpty) pasos++;
-      if (telefono.isNotEmpty) pasos++;
-      if (nombre.isNotEmpty && apellido.isNotEmpty) pasos++;
-      final visible =
-          profesiones.isNotEmpty && localidades.isNotEmpty && telefono.isNotEmpty;
-      final consejos = <_ConsejoItem>[];
-
-      // Confianza de perfil: checklist accionable (scoring v1)
-      final leidosRaw = data['tips_confianza_leidos'];
-      if (leidosRaw is List) {
-        _tipsLeidos
-          ..clear()
-          ..addAll(leidosRaw.map((e) => e.toString()));
-      }
-
-      final tipsConf = ScoringService.generarConsejosConfianza(data);
-      for (final t in tipsConf) {
-        final id = t['id'] ?? '';
-        IconData icon = Icons.trending_up_rounded;
-        VoidCallback action = () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const DatosPersonalesFlotanteWidget()),
-          ).then((_) => _cargarEstadoVisibilidadYConsejos());
-        };
-        if (id == 'zona') {
-          icon = Icons.map_outlined;
-          action = () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ZonaDeTrabajoFlotanteWidget()),
-            ).then((_) => _cargarEstadoVisibilidadYConsejos());
-          };
-        } else if (id == 'oficios') {
-          icon = Icons.handyman_outlined;
-          action = () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const EspecialidadesLaboralesFlotanteWidget(),
-              ),
-            ).then((_) => _cargarEstadoVisibilidadYConsejos());
-          };
-        } else if (id == 'foto_perfil') {
-          icon = Icons.camera_alt_outlined;
-          action = () => _mostrarOpcionesSelfie();
-        } else if (id == 'evals' || id == 'tiempo') {
-          icon = id == 'evals' ? Icons.star_outline_rounded : Icons.schedule_rounded;
-          action = _compartirTarjeta;
-        } else if (id == 'fotos_trabajo') {
-          icon = Icons.photo_library_outlined;
-          action = _compartirTarjeta;
-        }
-        consejos.add(_ConsejoItem(
-          id: id.isEmpty ? t['title'] ?? '' : id,
-          title: t['title'] ?? '',
-          body: t['body'] ?? '',
-          icon: icon,
-          onTap: () => _abrirConsejoConfianza(
-            id.isEmpty ? (t['title'] ?? '') : id,
-            action,
-          ),
-        ));
-      }
-
-      if (consejos.isEmpty) {
-        final sc = data['scoring'];
-        final nivel = sc is Map ? (sc['nivel_confianza'] as String?) : null;
-        final score = sc is Map ? (sc['score_identidad'] as num?)?.toInt() : null;
-        consejos.add(_ConsejoItem(
-          id: 'compartir',
-          title: nivel == 'muy_alto'
-              ? 'Excelente confianza de perfil'
-              : 'Vas bien: compartí tu tarjeta',
-          body: score != null
-              ? 'Confianza ${ScoringService.labelNivel(nivel)} ($score/100). Pasale tu tarjeta y pedí evaluaciones reales de clientes.'
-              : 'Pasale tu tarjeta por WhatsApp y pedí evaluaciones de trabajos reales.',
-          icon: Icons.emoji_events_outlined,
-          onTap: () => _abrirConsejoConfianza('compartir', _compartirTarjeta),
-        ));
-      }
-
-      // Mostrar hasta 4 consejos (prioriza confianza)
-      if (mounted) {
-        setState(() {
-          _estaVisible = visible;
-          _resumenOficios = labelsOficios.isEmpty ? 'Sin oficios cargados' : labelsOficios;
-          _resumenZona = localidades.isEmpty
-              ? 'Sin zona de trabajo'
-              : '${localidades.length} zona${localidades.length == 1 ? '' : 's'}';
-          _pasosCompletos = pasos;
-          _tipsTotales = consejos.length;
-          _consejos = consejos.take(3).toList();
-          final sc = data['scoring'];
-          if (sc is Map) {
-            _nivelConfianza = sc['nivel_confianza'] as String?;
-            _scoreIdentidad = (sc['score_identidad'] as num?)?.toInt();
-          } else {
-            _nivelConfianza = null;
-            _scoreIdentidad = null;
-          }
-          _cargandoConsejos = false;
-          _visibilidadCargando = false;
-        });
-      }
+      UserSession().setHomeCache(data);
+      if (mounted) _aplicarEstadoDesdeData(data);
     } catch (e) {
       debugPrint('Error visibilidad/consejos: $e');
       if (mounted) {
         setState(() {
-          _consejos = [];
           _cargandoConsejos = false;
           _visibilidadCargando = false;
         });
       }
     }
+  }
+
+  void _aplicarEstadoDesdeData(Map<String, dynamic> data) {
+    final profesiones = (data['profesiones'] as List<dynamic>? ?? [])
+        .map((e) => e.toString().toLowerCase().trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+    final zonas = data['zonas_cobertura'] as Map<String, dynamic>?;
+    final localidades = zonas?['localidades'] as List<dynamic>? ?? [];
+    final telefono = (data['telefono'] ?? '').toString().trim();
+    final nombre = (data['nombre'] ?? '').toString().trim();
+    final apellido = (data['apellido'] ?? '').toString().trim();
+    final labelsOficios = profesiones
+        .map((k) => _metaServicios[k]?.label ?? CatalogoOficios.label(k))
+        .take(3)
+        .join(' · ');
+    int pasos = 0;
+    if (profesiones.isNotEmpty) pasos++;
+    if (localidades.isNotEmpty) pasos++;
+    if (telefono.isNotEmpty) pasos++;
+    if (nombre.isNotEmpty && apellido.isNotEmpty) pasos++;
+    final visible =
+        profesiones.isNotEmpty && localidades.isNotEmpty && telefono.isNotEmpty;
+
+    final leidosRaw = data['tips_confianza_leidos'];
+    if (leidosRaw is List) {
+      _tipsLeidos
+        ..clear()
+        ..addAll(leidosRaw.map((e) => e.toString()));
+    }
+
+    final consejos = <_ConsejoItem>[];
+    final tipsConf = ScoringService.generarConsejosConfianza(data);
+    for (final t in tipsConf) {
+      final id = t['id'] ?? '';
+      IconData icon = Icons.trending_up_rounded;
+      VoidCallback action = () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const DatosPersonalesFlotanteWidget()),
+        ).then((_) {
+          UserSession().invalidateHomeCache();
+          _cargarEstadoVisibilidadYConsejos();
+        });
+      };
+      if (id == 'zona') {
+        icon = Icons.map_outlined;
+        action = () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ZonaDeTrabajoFlotanteWidget()),
+          ).then((_) {
+            UserSession().invalidateHomeCache();
+            _cargarEstadoVisibilidadYConsejos();
+          });
+        };
+      } else if (id == 'oficios') {
+        icon = Icons.handyman_outlined;
+        action = () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const EspecialidadesLaboralesFlotanteWidget(),
+            ),
+          ).then((_) {
+            UserSession().invalidateHomeCache();
+            _cargarEstadoVisibilidadYConsejos();
+          });
+        };
+      } else if (id == 'foto_perfil') {
+        icon = Icons.camera_alt_outlined;
+        action = () => _mostrarOpcionesSelfie();
+      } else if (id == 'evals' || id == 'tiempo') {
+        icon = id == 'evals' ? Icons.star_outline_rounded : Icons.schedule_rounded;
+        action = _compartirTarjeta;
+      } else if (id == 'fotos_trabajo') {
+        icon = Icons.photo_library_outlined;
+        action = _compartirTarjeta;
+      }
+      consejos.add(_ConsejoItem(
+        id: id.isEmpty ? t['title'] ?? '' : id,
+        title: t['title'] ?? '',
+        body: t['body'] ?? '',
+        icon: icon,
+        onTap: () => _abrirConsejoConfianza(
+          id.isEmpty ? (t['title'] ?? '') : id,
+          action,
+        ),
+      ));
+    }
+
+    if (consejos.isEmpty) {
+      final sc = data['scoring'];
+      final nivel = sc is Map ? (sc['nivel_confianza'] as String?) : null;
+      final score = sc is Map ? (sc['score_identidad'] as num?)?.toInt() : null;
+      consejos.add(_ConsejoItem(
+        id: 'compartir',
+        title: nivel == 'muy_alto'
+            ? 'Excelente confianza de perfil'
+            : 'Vas bien: compartí tu tarjeta',
+        body: score != null
+            ? 'Confianza ${ScoringService.labelNivel(nivel)} ($score/100). Pasale tu tarjeta y pedí evaluaciones reales de clientes.'
+            : 'Pasale tu tarjeta por WhatsApp y pedí evaluaciones de trabajos reales.',
+        icon: Icons.emoji_events_outlined,
+        onTap: () => _abrirConsejoConfianza('compartir', _compartirTarjeta),
+      ));
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _estaVisible = visible;
+      _resumenOficios =
+          labelsOficios.isEmpty ? 'Sin oficios cargados' : labelsOficios;
+      _resumenZona = localidades.isEmpty
+          ? 'Sin zona de trabajo'
+          : '${localidades.length} zona${localidades.length == 1 ? '' : 's'}';
+      _pasosCompletos = pasos;
+      _tipsTotales = consejos.length;
+      _consejos = consejos.take(3).toList();
+      final sc = data['scoring'];
+      if (sc is Map) {
+        _nivelConfianza = sc['nivel_confianza'] as String?;
+        _scoreIdentidad = (sc['score_identidad'] as num?)?.toInt();
+      } else {
+        _nivelConfianza = null;
+        _scoreIdentidad = null;
+      }
+      _cargandoConsejos = false;
+      _visibilidadCargando = false;
+    });
   }
 
   Future<void> _mostrarOpcionesSelfie() async {
@@ -481,9 +504,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       final picker = ImagePicker();
       final XFile? file = await picker.pickImage(
         source: source,
-        maxWidth: 800,
-        maxHeight: 800,
-        imageQuality: 85,
+        maxWidth: 480,
+        maxHeight: 480,
+        imageQuality: 72,
         preferredCameraDevice: CameraDevice.front,
       );
       if (file == null) return;
@@ -504,16 +527,29 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
       await FirebaseFirestore.instance.collection('usuarios').doc(uid).set({
         'url_foto_perfil': url,
+        ...PrestadorListFields.build(data: {
+          ...(UserSession().datosCompletos ?? {}),
+          'url_foto_perfil': url,
+        }),
         'updated_at': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
       final session = UserSession();
+      final listFields = PrestadorListFields.build(
+        data: {
+          ...(session.datosCompletos ?? {}),
+          'url_foto_perfil': url,
+        },
+        touchTimestamp: false,
+      );
       if (session.datosCompletos != null) {
         session.datosCompletos = {
           ...session.datosCompletos!,
           'url_foto_perfil': url,
+          ...listFields,
         };
       }
+      session.invalidateHomeCache();
 
       if (mounted) {
         setState(() {
