@@ -227,6 +227,17 @@ class ScoringService {
         'Refuerza que el documento es real.',
       );
     }
+
+    // Validación social (conocido/vecino) — distinta de evaluación de trabajo
+    final valsRecibidas =
+        (data['validaciones_recibidas'] as List<dynamic>? ?? []);
+    if (valsRecibidas.isEmpty) {
+      tip(
+        'validacion_perfil',
+        'Pedí que validen quién sos',
+        'Alguien de confianza confirma que te conoce. Suma a tu reputación en la comunidad.',
+      );
+    }
     if (_noVacio(data['doc_numero'] ?? data['numero_documento']) &&
         !_noVacio(data['genero_documento'] ?? data['sexo_documento'])) {
       tip(
