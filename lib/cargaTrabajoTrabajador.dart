@@ -71,9 +71,8 @@ class _CargaTrabajoTrabajadorWidgetState
   Future<void> _pickImages() async {
     final images = await _picker.pickMultiImage(
       maxWidth: 1280,
-        imageQuality: 75,
       maxHeight: 1080,
-      imageQuality: 80,
+      imageQuality: 75,
     );
     if (images.isNotEmpty) {
       setState(() => _selectedImages.addAll(images));
