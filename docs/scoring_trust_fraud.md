@@ -30,3 +30,12 @@ Señales fuertes (OCR, fotos) maduran 3 días al 50%.
 Heurísticas (no LLM): anillo mutual, ráfaga cuenta nueva, solo-validador, volumen alto, mismo día de alta.
 Escribe `riesgo_fraude` en usuarios + `stats/fraud_flags`.
 Correr: Actions → **Run scoring batch**.
+
+## Crédito futuro: Gini, KS y ROC
+
+Ver [scoring_model_v1.md](./scoring_model_v1.md) § *Métricas de discriminación (etapa microcrédito)*.
+
+- **Hoy (confianza / fraude heurístico):** no se publican Gini/KS/AUC como métricas de producto.
+- **Etapa microcrédito:** validación del modelo de PD (y opcionalmente fraude con label) con **AUC, Gini y KS** out-of-time.
+- Los scores de identidad/servicio alimentan elegibilidad y features; no sustituyen el model validation crediticio.
+
