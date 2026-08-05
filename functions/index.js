@@ -1,5 +1,6 @@
 /**
  * Cloud Functions — Puelo scoring + validación de domicilio (admin bypass rules).
+ * Redeploy 2026-08-05: submitValidacionPendiente must be live (client fallback hits permission-denied).
  */
 const { onRequest } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
