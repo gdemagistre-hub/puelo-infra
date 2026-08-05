@@ -25,7 +25,7 @@ class AppCopy {
   static const String ctaLlamar = 'Llamar';
   static const String ctaBuscar = 'Buscar prestadores';
   static const String ctaCalificar = '¿Cómo te fue con el trabajo?';
-  static const String ctaCompartirTarjeta = 'Compartir mi tarjeta';
+  static const String ctaCompartirTarjeta = 'Compartir por WhatsApp';
   static const String ctaProximamente = 'Próximamente';
 
   // —— Navegación / secciones ——
