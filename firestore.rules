@@ -48,6 +48,15 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ---------- contactos (leads de WhatsApp / llamada) ----------
+    // Create abierto TEMP (incluye impersonación dropdown sin Auth).
+    // Luego: allow create: if isSignedIn() && request.resource.data.cliente_uid == request.auth.uid;
+    match /contactos/{id} {
+      allow create: if true;
+      allow read: if true; // TEMP — luego isAdmin() o prestador_uid == auth.uid
+      allow update, delete: if false;
+    }
+
     // ---------- stats / batch ----------
     match /stats/{doc} {
       allow read: if true;
@@ -77,13 +86,6 @@ service cloud.firestore {
     }
 
     // ---------- usuarios ----------
-    // Doc id = Auth uid (Google / futuros FB-Apple)
-    // TEMP pre-lanzamiento: write abierto para:
-    //   - ensureUserProfile post-Google
-    //   - impersonación por dropdown (sin request.auth)
-    // Al abrir al público + apagar dropdown:
-    //   allow create, update: if isSignedIn() && request.auth.uid == userId;
-    //   allow delete: if isAdmin();
     match /usuarios/{userId} {
       allow read: if true;
       allow write: if true;
@@ -102,7 +104,6 @@ service cloud.firestore {
 
     match /calificaciones/{id} {
       allow read, create: if true;
-      // TEMP: F1 del batch publica estados (timeout 7d). Luego: isAdmin() o Function only
       allow update: if true;
       allow delete: if isAdmin();
     }
@@ -114,13 +115,11 @@ service cloud.firestore {
     match /validacion_tokens/{id} {
       allow read, write: if true; // TEMP
     }
-    // Pendientes del flujo "Ayudar a validar" (validar_domicilio → login → aplicar)
     match /validaciones_pendientes/{id} {
-      allow read, write: if true; // TEMP pre-lanzamiento (link público + dropdown)
+      allow read, write: if true; // TEMP
     }
 
     // ---------- default DENY ----------
-    // Sin regla abierta por fecha (la anterior venció 2026-07-31).
     match /{document=**} {
       allow read, write: if false;
     }
