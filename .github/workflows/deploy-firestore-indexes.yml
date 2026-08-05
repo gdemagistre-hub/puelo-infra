@@ -2,6 +2,12 @@ name: Deploy Firestore indexes & rules
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "firestore.rules"
+      - "firestore.indexes.json"
+      - ".github/workflows/deploy-firestore-indexes.yml"
 
 jobs:
   deploy:
