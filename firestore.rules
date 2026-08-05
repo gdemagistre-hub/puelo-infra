@@ -1,6 +1,7 @@
 rules_version = '2';
 // PERFORMANCE NOTE: writes TEMP abiertos pre-lanzamiento (dropdown).
 // Cerrar antes de tráfico real: ver docs/performance.md
+// 2026-08-05: redeploy — validaciones / validaciones_pendientes / calificaciones abiertos (flujo Ayudar a validar)
 service cloud.firestore {
   match /databases/{database}/documents {
 
