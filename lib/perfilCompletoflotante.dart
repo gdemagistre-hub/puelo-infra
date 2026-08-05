@@ -62,6 +62,21 @@ class _PerfilCompletoFlotanteWidgetState
     return '—';
   }
 
+  List<Map<String, dynamic>> get _capacitaciones {
+    final raw = _data['capacitaciones'];
+    if (raw is! List) return const [];
+    final out = <Map<String, dynamic>>[];
+    for (final e in raw) {
+      if (e is Map) out.add(Map<String, dynamic>.from(e));
+    }
+    out.sort((a, b) {
+      final oa = (a['orden'] as num?)?.toInt() ?? 0;
+      final ob = (b['orden'] as num?)?.toInt() ?? 0;
+      return ob.compareTo(oa);
+    });
+    return out;
+  }
+
   @override
   Widget build(BuildContext context) {
     final geo = _data['direccion_geo'] as Map<String, dynamic>? ?? {};
@@ -77,6 +92,7 @@ class _PerfilCompletoFlotanteWidgetState
     final badge = _data['badge_prestador'] as String?;
     final telefono = _str(_data['telefono']);
     final whatsapp = _data['tiene_whatsapp'] == true;
+    final caps = _capacitaciones;
 
     return Scaffold(
       backgroundColor: _bg,
@@ -238,6 +254,88 @@ class _PerfilCompletoFlotanteWidgetState
                     ),
                   ],
                 ),
+                if (caps.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  _sectionCard(
+                    title: 'Preparación y cursos',
+                    children: [
+                      const Text(
+                        'Evidencia cargada por vos. No modifica el puntaje de confianza.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textMuted,
+                          height: 1.3,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      ...caps.map((c) {
+                        final titulo = (c['titulo'] ?? '').toString();
+                        final url = (c['url_foto'] ?? '').toString();
+                        final anio = c['anio'];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (url.isNotEmpty)
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.network(
+                                    url,
+                                    width: 48,
+                                    height: 48,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Container(
+                                      width: 48,
+                                      height: 48,
+                                      color: Colors.grey.shade200,
+                                      child: const Icon(Icons.school_outlined,
+                                          size: 20),
+                                    ),
+                                  ),
+                                )
+                              else
+                                Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade100,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(Icons.school_outlined,
+                                      size: 20),
+                                ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      titulo.isEmpty ? '—' : titulo,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: _textColor,
+                                      ),
+                                    ),
+                                    if (anio != null)
+                                      Text(
+                                        '$anio',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.textMuted,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 30),
               ],
             ),
