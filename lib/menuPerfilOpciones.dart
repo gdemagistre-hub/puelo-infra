@@ -4,6 +4,7 @@ import 'datosPersonalesflotante.dart';
 import 'Domicilioflotante.dart';
 import 'especialidadesLaboralesflotante.dart';
 import 'ZonaDeTrabajoflotante.dart';
+import 'capacitacionesflotante.dart';
 import 'perfilCompletoflotante.dart';
 import 'registroTrabajador.dart';
 import 'consola_prox.dart';
@@ -135,6 +136,15 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
           subtitle: 'Dónde podés atender para que te encuentren cerca.',
           onTap: () =>
               _abrirFlotante(context, const ZonaDeTrabajoFlotanteWidget()),
+        ),
+        _MenuItem(
+          icon: Icons.school_outlined,
+          label: 'Preparación y cursos',
+          subtitle:
+              'Cursos, matrículas o constancias con foto. '
+              'Se muestran en tu perfil; no modifican el puntaje de confianza.',
+          onTap: () =>
+              _abrirFlotante(context, const CapacitacionesFlotanteWidget()),
         ),
       ],
       _MenuItem(
