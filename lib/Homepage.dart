@@ -312,24 +312,24 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           // Barra de búsqueda
           Material(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             child: InkWell(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(14),
               onTap: () => _abrirBuscador(),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: const Color(0xFFE2E8F0)),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.search_rounded, color: _clientePrimary, size: 22),
-                    const SizedBox(width: 12),
+                    Icon(Icons.search_rounded, color: _clientePrimary, size: 20),
+                    const SizedBox(width: 10),
                     const Expanded(
                       child: Text(
                         'Buscar electricista, plomero, gasista...',
-                        style: TextStyle(color: Color(0xFF94A3B8), fontSize: 15),
+                        style: TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
                       ),
                     ),
                   ],
@@ -338,67 +338,69 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 18),
 
           const Text(
             '¿Qué necesitás?',
             style: TextStyle(
-              fontSize: 16,
+              fontSize: 15,
               fontWeight: FontWeight.w800,
               color: Color(0xFF0F172A),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
 
-          // Grid de categorías
+          // Grid de categorías — compacto / estética rústica
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            gridDelegate: const SpacedGridDelegate(
               crossAxisCount: 2,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 1.55,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+              childAspectRatio: 2.6,
             ),
             itemCount: _categorias.length,
             itemBuilder: (context, index) {
               final cat = _categorias[index];
               return Material(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(12),
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(12),
                   onTap: () => _abrirBuscador(oficio: cat['id'] as String),
                   child: Container(
-                    padding: const EdgeInsets.all(14),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
                     child: Row(
                       children: [
                         Container(
-                          width: 42,
-                          height: 42,
+                          width: 32,
+                          height: 32,
                           decoration: BoxDecoration(
                             color: _clientePrimary.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(9),
                           ),
                           child: Icon(
                             cat['icon'] as IconData,
                             color: _clientePrimary,
-                            size: 22,
+                            size: 17,
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             cat['label'] as String,
                             style: const TextStyle(
-                              fontSize: 14,
+                              fontSize: 13,
                               fontWeight: FontWeight.w700,
                               color: Color(0xFF0F172A),
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -409,28 +411,28 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             },
           ),
 
-          const SizedBox(height: 28),
+          const SizedBox(height: 20),
 
           // CTA secundaria
           Material(
             color: _clientePrimary,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             child: InkWell(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(14),
               onTap: () => _abrirBuscador(),
               child: const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
+                padding: EdgeInsets.symmetric(vertical: 13),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.search_rounded, color: Colors.white, size: 20),
-                    SizedBox(width: 10),
+                    Icon(Icons.search_rounded, color: Colors.white, size: 18),
+                    SizedBox(width: 8),
                     Text(
                       'Ver todos los prestadores',
                       style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w700,
-                        fontSize: 15,
+                        fontSize: 14,
                       ),
                     ),
                   ],
@@ -845,5 +847,15 @@ class _ConsejoItem {
     required this.body,
     required this.icon,
     required this.onTap,
+  });
+}
+
+/// Delegate compacto para el grid de categorías (evita depender de packages extra).
+class SpacedGridDelegate extends SliverGridDelegateWithFixedCrossAxisCount {
+  const SpacedGridDelegate({
+    required super.crossAxisCount,
+    super.mainAxisSpacing = 0,
+    super.crossAxisSpacing = 0,
+    super.childAspectRatio = 1,
   });
 }
