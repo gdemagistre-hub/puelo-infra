@@ -238,7 +238,6 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
     );
   }
 
-
   Future<List<_TrabajoFotoItem>> _cargarFotosTrabajos(String userId) async {
     final items = <_TrabajoFotoItem>[];
 
@@ -811,7 +810,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
                             gridDelegate:
-                                const SpacedGridDelegate(
+                                const SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: 2,
                               mainAxisSpacing: 10,
                               crossAxisSpacing: 10,
@@ -916,117 +915,6 @@ class _TrabajoFotoItem {
     required this.servicio,
     required this.mesAnio,
     required this.trabajoId,
-  });
-}
-
-class SpacedGridDelegate extends SliverGridDelegate {
-  final int crossAxisCount;
-  final double mainAxisSpacing;
-  final double crossAxisSpacing;
-  final double childAspectRatio;
-
-  const SpacedGridDelegate({
-    required this.crossAxisCount,
-    this.mainAxisSpacing = 0,
-    this.crossAxisSpacing = 0,
-    this.childAspectRatio = 1,
-  });
-
-  @override
-  SliverGridLayout getLayout(SliverConstraints constraints) {
-    final double usableWidth =
-        constraints.crossAxisExtent - (crossAxisCount - 1) * crossAxisSpacing;
-    final double itemWidth = usableWidth / crossAxisCount;
-    final double itemHeight = itemWidth / childAspectRatio;
-    return SpacedGridLayout(
-      crossAxisCount: crossAxisCount,
-      mainAxisStride: itemHeight + mainAxisSpacing,
-      crossAxisStride: itemWidth + crossAxisSpacing,
-      childMainAxisExtent: itemHeight,
-      childCrossAxisExtent: itemWidth,
-      reverseCrossAxis: axisDirectionIsReversed(constraints.crossAxisDirection),
-    );
-  }
-
-  @override
-  bool shouldRelayout(SpacedGridDelegate oldDelegate) {
-    return oldDelegate.crossAxisCount != crossAxisCount ||
-        oldDelegate.mainAxisSpacing != mainAxisSpacing ||
-        oldDelegate.crossAxisSpacing != crossAxisSpacing ||
-        oldDelegate.childAspectRatio != childAspectRatio;
-  }
-}
-
-class SpacedGridLayout extends SpacedGridLayoutBase {
-  SpacedGridLayout({
-    required super.crossAxisCount,
-    required super.mainAxisStride,
-    required super.crossAxisStride,
-    required super.childMainAxisExtent,
-    required super.childCrossAxisExtent,
-    required super.reverseCrossAxis,
-  });
-}
-
-abstract class SpacedGridLayoutBase extends SliverGridLayout {
-  final int crossAxisCount;
-  final double mainAxisStride;
-  final double crossAxisStride;
-  final double childMainAxisExtent;
-  final double childCrossAxisExtent;
-  final bool reverseCrossAxis;
-
-  SpacedGridLayoutBase({
-    required this.crossAxisCount,
-    required this.mainAxisStride,
-    required this.crossAxisStride,
-    required this.childMainAxisExtent,
-    required this.childCrossAxisExtent,
-    required this.reverseCrossAxis,
-  });
-
-  @override
-  int getMinChildIndexForScrollOffset(double scrollOffset) {
-    return crossAxisCount * (scrollOffset ~/ mainAxisStride);
-  }
-
-  @override
-  int getMaxChildIndexForScrollOffset(double scrollOffset) {
-    final mainAxisCount = (scrollOffset / mainAxisStride).ceil();
-    return (mainAxisCount * crossAxisCount) - 1;
-  }
-
-  @override
-  SliverGridGeometry getGeometryForChildIndex(int index) {
-    final double crossAxisStart =
-        (index % crossAxisCount) * crossAxisStride;
-    return SpacedGridGeometry(
-      scrollOffset: (index ~/ crossAxisCount) * mainAxisStride,
-      crossAxisOffset: reverseCrossAxis
-          ? crossAxisCount * crossAxisStride -
-              crossAxisStart -
-              childCrossAxisExtent
-          : crossAxisStart,
-      mainAxisExtent: childMainAxisExtent,
-      crossAxisExtent: childCrossAxisExtent,
-    );
-  }
-
-  @override
-  double computeMaxScrollOffset(int childCount) {
-    final mainAxisCount = ((childCount - 1) ~/ crossAxisCount) + 1;
-    return mainAxisCount * mainAxisStride - mainAxisSpacing;
-  }
-
-  double get mainAxisSpacing => mainAxisStride - childMainAxisExtent;
-}
-
-class SpacedGridGeometry extends SliverGridGeometry {
-  SpacedGridGeometry({
-    required super.scrollOffset,
-    required super.crossAxisOffset,
-    required super.mainAxisExtent,
-    required super.crossAxisExtent,
   });
 }
 
