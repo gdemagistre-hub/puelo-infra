@@ -6,8 +6,7 @@ on:
     branches:
       - sprint5/wire-completar-datos
     paths:
-      - 'scripts/patches/sprint5_completar_datos.patch'
-      - 'scripts/patches/sprint4_wire_listsync.sh'
+      - 'scripts/patches/**'
       - '.github/workflows/apply-sprint5-patches.yml'
 
 permissions:
@@ -17,31 +16,57 @@ jobs:
   apply:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout full history
         uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      - name: Apply unified patch
+      - name: Restore datosPersonales from last good commit + patch
         run: |
-          if git apply --check scripts/patches/sprint5_completar_datos.patch; then
-            git apply scripts/patches/sprint5_completar_datos.patch
-            echo "patch applied"
-          else
-            echo "patch already applied or not applicable"
-            bash scripts/patches/sprint4_wire_listsync.sh || true
-          fi
+          set -euo pipefail
+          # f2a53eb still has the full unpatched datos file
+          git show f2a53eb7e877d2fe7c45275bae8ab0e5bc034bd9:lib/datosPersonalesflotante.dart > lib/datosPersonalesflotante.dart
+          python3 - <<'PY'
+from pathlib import Path
+p = Path('lib/datosPersonalesflotante.dart')
+t = p.read_text()
+if 'usuario_list_sync' not in t:
+    t = t.replace("import 'user_session.dart';\n", "import 'user_session.dart';\nimport 'usuario_list_sync.dart';\n")
+old = """      await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(uid)
+          .set(payload, SetOptions(merge: true));
+      final session = UserSession();
+      session.nombre = _nombreController.text.trim();
+      session.apellido = _apellidoController.text.trim();
+      if (session.datosCompletos != null) {
+        session.datosCompletos = {...session.datosCompletos!, ...payload};
+      }"""
+new = """      await UsuarioListSync.mergeUserDoc(uid, payload);
+      final session = UserSession();
+      session.nombre = _nombreController.text.trim();
+      session.apellido = _apellidoController.text.trim();"""
+if old in t:
+    t = t.replace(old, new, 1)
+    print('datos: patched')
+elif 'UsuarioListSync.mergeUserDoc' in t:
+    print('datos: already')
+else:
+    raise SystemExit('datos pattern missing')
+p.write_text(t)
+print('size', len(t))
+PY
 
       - name: Commit and push if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add lib/completar_perfil.dart lib/datosPersonalesflotante.dart || true
+          git add lib/datosPersonalesflotante.dart
           if git diff --staged --quiet; then
-            echo "No changes to commit"
+            echo "No changes"
           else
-            git commit -m "Sprint 5: wire UsuarioListSync en completar + datos personales"
+            git commit -m "Sprint 5: restore + UsuarioListSync en datosPersonalesflotante"
             git push origin HEAD:${{ github.ref_name }}
           fi
