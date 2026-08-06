@@ -10,6 +10,7 @@ import 'user_session.dart';
 import 'catalogo_geo_cache.dart';
 import 'catalogo_oficios.dart';
 import 'contacto_service.dart';
+import 'prestador_list_fields.dart';
 
 /// Buscador optimizado para pico laboral.
 class BuscadorPrestadoresWidget extends StatefulWidget {
@@ -144,9 +145,11 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
       partidos = [];
       localidades = [];
     });
-    if (provId == null) return;
-    final list = await CatalogoGeoCache.instance.partidosDeProvincia(provId);
-    if (mounted) setState(() => partidos = list);
+    if (provId != null) {
+      final list = await CatalogoGeoCache.instance.partidosDeProvincia(provId);
+      if (mounted) setState(() => partidos = list);
+    }
+    await _cargarPrestadores(reset: true);
   }
 
   Future<void> _onPartidoSelected(String? partId) async {
@@ -156,9 +159,16 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
       selectedLocalidadId = null;
       localidades = [];
     });
-    if (partId == null) return;
-    final list = await CatalogoGeoCache.instance.localidadesDePartido(partId);
-    if (mounted) setState(() => localidades = list);
+    if (partId != null) {
+      final list = await CatalogoGeoCache.instance.localidadesDePartido(partId);
+      if (mounted) setState(() => localidades = list);
+    }
+    await _cargarPrestadores(reset: true);
+  }
+
+  Future<void> _onLocalidadSelected(String? locId) async {
+    setState(() => selectedLocalidadId = locId);
+    await _cargarPrestadores(reset: true);
   }
 
   void _limpiarFiltrosZona() {
@@ -172,6 +182,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
       partidos = [];
       localidades = [];
     });
+    _cargarPrestadores(reset: true);
   }
 
   void _onSearchChanged(String value) {
@@ -186,6 +197,13 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     if (_selectedRubro == rubro) return;
     setState(() => _selectedRubro = rubro);
     _cargarPrestadores(reset: true);
+  }
+
+  /// Zona activa para query server: filtro UI > preferencia del cliente.
+  String? get _zonaServerFilter {
+    return selectedLocalidadId ??
+        selectedPartidoId ??
+        selectedProvinciaId;
   }
 
   Future<void> _cargarPrestadores({required bool reset}) async {
@@ -203,22 +221,15 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     }
 
     try {
-      Query query = db.collection('usuarios').where('es_trabajador', isEqualTo: true);
-      final catId = CatalogoOficios.categoriaIdDesdeChip(_selectedRubro);
-      if (catId != null) {
-        query = query.where('categorias_servicio', arrayContains: catId);
-      }
-      query = query.limit(_pageSize);
-      if (!reset && _lastDoc != null) {
-        query = query.startAfterDocument(_lastDoc!);
-      }
-      final snap = await query.get();
+      final snap = await _queryPrestadores(reset: reset);
       if (!mounted) return;
+      final docs = List<QueryDocumentSnapshot>.from(snap.docs);
+      if (reset) _ordenarPorPreferenciaZona(docs);
       setState(() {
         if (reset) {
-          _docs = snap.docs;
+          _docs = docs;
         } else {
-          _docs = [..._docs, ...snap.docs];
+          _docs = [..._docs, ...docs];
         }
         _lastDoc = snap.docs.isNotEmpty ? snap.docs.last : _lastDoc;
         _hasMore = snap.docs.length >= _pageSize;
@@ -229,17 +240,22 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     } catch (e) {
       debugPrint('Error buscador: $e');
       try {
-        Query fallback = db.collection('usuarios').where('es_trabajador', isEqualTo: true).limit(_pageSize);
+        // Fallback mínimo: solo es_trabajador
+        Query fallback =
+            db.collection('usuarios').where('es_trabajador', isEqualTo: true);
+        fallback = fallback.limit(_pageSize);
         if (!reset && _lastDoc != null) {
           fallback = fallback.startAfterDocument(_lastDoc!);
         }
         final snap = await fallback.get();
         if (!mounted) return;
+        final docs = List<QueryDocumentSnapshot>.from(snap.docs);
+        if (reset) _ordenarPorPreferenciaZona(docs);
         setState(() {
           if (reset) {
-            _docs = snap.docs;
+            _docs = docs;
           } else {
-            _docs = [..._docs, ...snap.docs];
+            _docs = [..._docs, ...docs];
           }
           _lastDoc = snap.docs.isNotEmpty ? snap.docs.last : _lastDoc;
           _hasMore = snap.docs.length >= _pageSize;
@@ -260,6 +276,68 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     }
   }
 
+  /// Elige la mejor query según índices disponibles (una arrayContains a la vez).
+  Future<QuerySnapshot> _queryPrestadores({required bool reset}) async {
+    final catId = CatalogoOficios.categoriaIdDesdeChip(_selectedRubro);
+    final zonaId = _zonaServerFilter;
+
+    Query query = db.collection('usuarios').where('es_trabajador', isEqualTo: true);
+
+    if (zonaId != null) {
+      // Índice: es_trabajador + zona_ids
+      query = query.where('zona_ids', arrayContains: zonaId);
+    } else if (catId != null) {
+      // Índice: es_trabajador + categorias_servicio
+      query = query.where('categorias_servicio', arrayContains: catId);
+    } else {
+      // Índice: es_trabajador + list_visible — solo perfiles listables
+      query = query.where('list_visible', isEqualTo: true);
+    }
+
+    query = query.limit(_pageSize);
+    if (!reset && _lastDoc != null) {
+      query = query.startAfterDocument(_lastDoc!);
+    }
+    return query.get();
+  }
+
+  /// Soft-rank: preferir prestadores que cubren la zona del cliente.
+  void _ordenarPorPreferenciaZona(List<QueryDocumentSnapshot> docs) {
+    if (!_tienePreferenciaZona) return;
+    docs.sort((a, b) {
+      final sa = _scoreZonaPref(a.data() as Map<String, dynamic>);
+      final sb = _scoreZonaPref(b.data() as Map<String, dynamic>);
+      if (sa != sb) return sb.compareTo(sa);
+      // Desempate: mejor promedio
+      final pa = (a.data() as Map)['list_promedio'] as num? ??
+          (a.data() as Map)['promedioEstrellas'] as num? ??
+          0;
+      final pb = (b.data() as Map)['list_promedio'] as num? ??
+          (b.data() as Map)['promedioEstrellas'] as num? ??
+          0;
+      return pb.compareTo(pa);
+    });
+  }
+
+  int _scoreZonaPref(Map<String, dynamic> data) {
+    final zonaIds = (data['zona_ids'] as List<dynamic>? ?? [])
+        .map((e) => e.toString())
+        .toSet();
+    if (zonaIds.isEmpty) {
+      // Fallback a cobertura anidada
+      final cob = data['zonas_cobertura'] as Map<String, dynamic>?;
+      if (cob != null) {
+        for (final id in PrestadorListFields.zonaIdsFromCobertura(cob)) {
+          zonaIds.add(id);
+        }
+      }
+    }
+    if (_prefLocalidadId != null && zonaIds.contains(_prefLocalidadId)) return 3;
+    if (_prefPartidoId != null && zonaIds.contains(_prefPartidoId)) return 2;
+    if (_prefProvinciaId != null && zonaIds.contains(_prefProvinciaId)) return 1;
+    return 0;
+  }
+
   String _telefonoDe(Map<String, dynamic> data) =>
       (data['telefono'] ?? data['celular'] ?? '').toString().trim();
 
@@ -272,7 +350,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
   }
 
   String _initials(Map<String, dynamic> data) {
-    final n = (data['nombre'] ?? '').toString().trim();
+    final n = (data['nombre'] ?? data['list_nombre'] ?? '').toString().trim();
     final a = (data['apellido'] ?? '').toString().trim();
     if (n.isEmpty && a.isEmpty) return 'P';
     if (a.isEmpty) return n[0].toUpperCase();
@@ -314,10 +392,12 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     final tel = telRaw.replaceAll(RegExp(r'[^\d+]'), '');
     final nombre = (data['nombre'] ?? '').toString().trim();
     final apellido = (data['apellido'] ?? '').toString().trim();
-    final comercial = (data['nombre_comercial'] ?? '').toString().trim();
-    final nombreLog = comercial.isNotEmpty ? comercial : '$nombre $apellido'.trim();
+    final comercial = (data['nombre_comercial'] ?? data['list_nombre'] ?? '')
+        .toString()
+        .trim();
+    final nombreLog =
+        comercial.isNotEmpty ? comercial : '$nombre $apellido'.trim();
 
-    // Registrar contacto (fire-and-forget)
     ContactoService.registrar(
       prestadorUid: prestadorUid,
       tipo: 'whatsapp',
@@ -337,8 +417,13 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
 
   List<QueryDocumentSnapshot> get _filtrados {
     final catId = CatalogoOficios.categoriaIdDesdeChip(_selectedRubro);
+    final zonaId = _zonaServerFilter;
     var list = _docs.where((doc) {
       final data = doc.data() as Map<String, dynamic>;
+
+      // Ocultar explícitamente no listables (si el campo existe).
+      if (data['list_visible'] == false) return false;
+
       final profesiones = (data['profesiones'] as List<dynamic>? ?? [])
           .map((e) => e.toString())
           .toList();
@@ -347,16 +432,41 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
           .toList();
       final allKeys = [...profesiones, ...cats];
 
-      if (catId != null) {
+      // Si la query no filtró por categoría (ej. filtró por zona), filtrar acá.
+      if (catId != null && zonaId != null) {
         if (!CatalogoOficios.coincide(profesiones: allKeys, categoriaId: catId)) {
           return false;
+        }
+      } else if (catId != null && zonaId == null) {
+        // Ya filtrado en server; re-check por seguridad
+        if (!CatalogoOficios.coincide(profesiones: allKeys, categoriaId: catId)) {
+          return false;
+        }
+      }
+
+      // Zona UI: si server usó zona, ok; si no y hay zona, filtrar client
+      if (zonaId != null) {
+        final zonaIds = (data['zona_ids'] as List<dynamic>? ?? [])
+            .map((e) => e.toString())
+            .toSet();
+        if (zonaIds.isNotEmpty && !zonaIds.contains(zonaId)) {
+          // Puede ser que server ya filtró; si no match, drop
+          return false;
+        }
+        if (zonaIds.isEmpty) {
+          final cob = data['zonas_cobertura'] as Map<String, dynamic>?;
+          final derived = PrestadorListFields.zonaIdsFromCobertura(cob);
+          if (derived.isNotEmpty && !derived.contains(zonaId)) return false;
         }
       }
 
       if (_searchQuery.isEmpty) return true;
       final nombre = (data['nombre'] ?? '').toString().toLowerCase();
       final apellido = (data['apellido'] ?? '').toString().toLowerCase();
-      final comercial = (data['nombre_comercial'] ?? '').toString().toLowerCase();
+      final comercial =
+          (data['nombre_comercial'] ?? data['list_nombre'] ?? '')
+              .toString()
+              .toLowerCase();
       if (nombre.contains(_searchQuery) ||
           apellido.contains(_searchQuery) ||
           comercial.contains(_searchQuery)) {
@@ -364,6 +474,11 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
       }
       return CatalogoOficios.coincide(profesiones: allKeys, texto: _searchQuery);
     }).toList();
+
+    // Re-rank si hay preferencia y no hay filtro de zona explícito
+    if (_tienePreferenciaZona && zonaId == null) {
+      _ordenarPorPreferenciaZona(list);
+    }
     return list;
   }
 
@@ -447,6 +562,29 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                 ),
               ),
               const Divider(height: 1),
+              if (_tienePreferenciaZona)
+                Container(
+                  width: double.infinity,
+                  color: _clientePrimary.withOpacity(0.06),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      Icon(Icons.near_me_rounded, size: 16, color: _clientePrimary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Priorizando cerca de '
+                          '${_prefLocalidadNombre ?? _prefPartidoNombre ?? _prefProvinciaNombre ?? 'tu zona'}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _clientePrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               Expanded(
                 child: _loading
                     ? const Center(child: CircularProgressIndicator(color: _clientePrimary))
@@ -504,23 +642,35 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
 
                                       final doc = filtered[index];
                                       final data = doc.data() as Map<String, dynamic>;
-                                      final promedio = (data['promedioEstrellas'] as num?)?.toDouble() ?? 0.0;
-                                      final cantidadEvaluadores = (data['cantidadEvaluadores'] as num?)?.toInt() ?? 0;
+                                      final promedio = (data['list_promedio'] as num?)?.toDouble() ??
+                                          (data['promedioEstrellas'] as num?)?.toDouble() ??
+                                          0.0;
+                                      final cantidadEvaluadores =
+                                          (data['list_n_eval'] as num?)?.toInt() ??
+                                          (data['cantidadEvaluadores'] as num?)?.toInt() ??
+                                          0;
                                       final profesiones = data['profesiones'] as List? ?? [];
-                                      final badge = data['badge_prestador'] as String?;
+                                      final badge = (data['list_badge'] ?? data['badge_prestador']) as String?;
+                                      final listNombre = (data['list_nombre'] ?? '').toString().trim();
                                       final comercial = (data['nombre_comercial'] ?? '').toString().trim();
-                                      final nombreMostrar = comercial.isNotEmpty
-                                          ? comercial
-                                          : '${data['nombre'] ?? ''} ${data['apellido'] ?? ''}'.trim();
+                                      final nombreMostrar = listNombre.isNotEmpty
+                                          ? listNombre
+                                          : (comercial.isNotEmpty
+                                              ? comercial
+                                              : '${data['nombre'] ?? ''} ${data['apellido'] ?? ''}'.trim());
                                       final tel = _telefonoDe(data);
                                       final puedeWa = tel.isNotEmpty && _tieneWhatsApp(data);
                                       final zona = _zonaResumen(data);
+                                      final cerca = _scoreZonaPref(data) > 0;
 
                                       return Container(
                                         margin: const EdgeInsets.only(bottom: 12),
                                         decoration: BoxDecoration(
                                           color: Colors.white,
                                           borderRadius: BorderRadius.circular(16),
+                                          border: cerca
+                                              ? Border.all(color: _clientePrimary.withOpacity(0.25))
+                                              : null,
                                           boxShadow: [
                                             BoxShadow(
                                               color: Colors.black.withOpacity(0.05),

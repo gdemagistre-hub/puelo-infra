@@ -108,9 +108,18 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       });
       return;
     }
+
+    // Sprint 1: cache en sesión (TTL ~45s) — evita re-fetch al volver.
+    final cached = UserSession().homeCacheIfFresh;
+    if (cached != null) {
+      if (mounted) _aplicarEstadoDesdeData(cached);
+      return;
+    }
+
     try {
       final doc = await FirebaseFirestore.instance.collection('usuarios').doc(uid).get();
       final data = doc.data() ?? {};
+      UserSession().setHomeCache(data);
       if (mounted) _aplicarEstadoDesdeData(data);
     } catch (e) {
       if (mounted) setState(() {
@@ -138,34 +147,52 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       IconData icon = Icons.trending_up_rounded;
       VoidCallback action = () {
         Navigator.push(context, MaterialPageRoute(builder: (_) => const DatosPersonalesFlotanteWidget()))
-            .then((_) => _cargarEstadoVisibilidadYConsejos());
+            .then((_) {
+          UserSession().invalidateHomeCache();
+          return _cargarEstadoVisibilidadYConsejos();
+        });
       };
       if (id == 'zona') {
         icon = Icons.map_outlined;
         action = () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ZonaDeTrabajoFlotanteWidget()))
-            .then((_) => _cargarEstadoVisibilidadYConsejos());
+            .then((_) {
+          UserSession().invalidateHomeCache();
+          return _cargarEstadoVisibilidadYConsejos();
+        });
       } else if (id == 'oficios') {
         icon = Icons.handyman_outlined;
         action = () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EspecialidadesLaboralesFlotanteWidget()))
-            .then((_) => _cargarEstadoVisibilidadYConsejos());
+            .then((_) {
+          UserSession().invalidateHomeCache();
+          return _cargarEstadoVisibilidadYConsejos();
+        });
       } else if (id == 'foto_perfil') {
         icon = Icons.camera_alt_outlined;
         action = () {};
       } else if (id == 'validacion_perfil') {
         icon = Icons.how_to_reg_outlined;
         action = () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SolicitarValidacionWidget()))
-            .then((_) => _cargarEstadoVisibilidadYConsejos());
+            .then((_) {
+          UserSession().invalidateHomeCache();
+          return _cargarEstadoVisibilidadYConsejos();
+        });
       } else if (id == 'fotos_trabajo') {
         icon = Icons.photo_library_outlined;
         action = () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CargaTrabajoTrabajadorWidget()))
-            .then((_) => _cargarEstadoVisibilidadYConsejos());
+            .then((_) {
+          UserSession().invalidateHomeCache();
+          return _cargarEstadoVisibilidadYConsejos();
+        });
       } else if (id == 'evals' || id == 'tiempo') {
         icon = id == 'evals' ? Icons.star_outline_rounded : Icons.schedule_rounded;
         action = _compartirTarjeta;
       } else if (id == 'domicilio') {
         icon = Icons.home_outlined;
         action = () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DomicilioFlotanteWidget()))
-            .then((_) => _cargarEstadoVisibilidadYConsejos());
+            .then((_) {
+          UserSession().invalidateHomeCache();
+          return _cargarEstadoVisibilidadYConsejos();
+        });
       }
       consejos.add(_ConsejoItem(
         id: id.isEmpty ? (t['title'] ?? '') : id,
