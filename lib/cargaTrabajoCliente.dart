@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'calificarTrabajo.dart';
 import 'Homepage.dart';
 import 'user_session.dart';
+import 'platform_capabilities.dart';
 
 class CargaTrabajoClienteWidget extends StatefulWidget {
   const CargaTrabajoClienteWidget({super.key});
@@ -30,16 +31,27 @@ class _CargaTrabajoClienteWidgetState extends State<CargaTrabajoClienteWidget> {
           .get();
 
   Future<void> _pickImages() async {
-    final List<XFile> images = await _picker.pickMultiImage(
-      maxWidth: 1920,
-      maxHeight: 1080,
-      imageQuality: 80,
-    );
-
-    if (images.isNotEmpty) {
-      setState(() {
-        _selectedImages.addAll(images);
-      });
+    if (!PlatformCapabilities.supportsGallery) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(PlatformCapabilities.cameraUnsupportedMessage)),
+      );
+      return;
+    }
+    try {
+      final List<XFile> images = await _picker.pickMultiImage(
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 80,
+      );
+      if (images.isNotEmpty && mounted) {
+        setState(() => _selectedImages.addAll(images));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudieron seleccionar imágenes: $e')),
+      );
     }
   }
 
