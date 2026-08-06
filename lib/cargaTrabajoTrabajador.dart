@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'user_session.dart';
+import 'platform_capabilities.dart';
 import 'especialidadesLaboralesflotante.dart';
 import 'theme/app_colors.dart';
 
@@ -69,13 +70,20 @@ class _CargaTrabajoTrabajadorWidgetState
   }
 
   Future<void> _pickImages() async {
-    final images = await _picker.pickMultiImage(
-      maxWidth: 1280,
-      maxHeight: 1080,
-      imageQuality: 75,
-    );
-    if (images.isNotEmpty) {
-      setState(() => _selectedImages.addAll(images));
+    try {
+      final images = await _picker.pickMultiImage(
+        maxWidth: 1280,
+        maxHeight: 1080,
+        imageQuality: 75,
+      );
+      if (images.isNotEmpty && mounted) {
+        setState(() => _selectedImages.addAll(images));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudieron seleccionar imágenes: $e')),
+      );
     }
   }
 
@@ -123,8 +131,6 @@ class _CargaTrabajoTrabajadorWidgetState
         imageUrls.add(await snapshot.ref.getDownloadURL());
       }
 
-      // Portfolio: asociado al usuario logueado + oficio.
-      // NO cuenta como experiencia / trabajos realizados para scoring de volumen.
       await FirebaseFirestore.instance.collection('trabajos').add({
         'trabajadorRef': trabajadorRef,
         'usuario_id': uid,
@@ -190,15 +196,15 @@ class _CargaTrabajoTrabajadorWidgetState
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'Estas fotos son tu **portfolio**: se ven en tu tarjeta '
+                            'Estas fotos son tu portfolio: se ven en tu tarjeta '
                             'y se asocian a un oficio tuyo.\n'
-                            'No suman como “experiencias realizadas”.',
+                            'No suman como experiencias realizadas.',
                             style: TextStyle(
                               fontSize: 13,
                               color: AppColors.text.withOpacity(0.9),
                               height: 1.35,
                             ),
-                          )._plainMarkdownFallback(),
+                          ),
                         ),
                       ],
                     ),
@@ -385,17 +391,6 @@ class _CargaTrabajoTrabajadorWidgetState
                 ],
               ),
             ),
-    );
-  }
-}
-
-extension on Text {
-  /// Evita depender de markdown packages: muestra texto plano sin **
-  Widget _plainMarkdownFallback() {
-    final t = data?.replaceAll('**', '') ?? '';
-    return Text(
-      t,
-      style: style,
     );
   }
 }
