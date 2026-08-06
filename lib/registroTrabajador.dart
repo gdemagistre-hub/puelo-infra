@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'Homepage.dart';
 import 'user_session.dart';
+import 'prestador_list_fields.dart';
 import 'especialidadesLaboralesflotante.dart';
 import 'ZonaDeTrabajoflotante.dart';
 import 'tarjetaDigital.dart';
@@ -106,13 +107,22 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
     final uid = UserSession().uid;
     if (uid == null) return;
 
-    // Asegurar flags prestador
+    // Asegurar flags prestador + list fields (Sprint 2)
     try {
-      await FirebaseFirestore.instance.collection('usuarios').doc(uid).set({
+      final session = UserSession();
+      final patch = <String, dynamic>{
         'es_trabajador': true,
         'rol': 'trabajador',
         'updated_at': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      };
+      final base = {...(session.datosCompletos ?? {}), ...patch};
+      patch.addAll(PrestadorListFields.build(data: base, touchTimestamp: true));
+      await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(uid)
+          .set(patch, SetOptions(merge: true));
+      session.datosCompletos = {...(session.datosCompletos ?? {}), ...patch};
+      session.invalidateHomeCache();
     } catch (_) {}
 
     if (!mounted) return;
