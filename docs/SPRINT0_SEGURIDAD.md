@@ -68,3 +68,21 @@ git checkout backup/pre-sprint0-YYYYMMDDTHHMMSSZ
 # o
 git checkout backup/pre-sprint0-YYYYMMDDTHHMMSSZ-df00470
 ```
+
+## Estado de deploy (2026-08-06)
+
+| Pipeline | Resultado |
+|----------|-----------|
+| Hosting | **OK** |
+| Storage rules | **OK** |
+| Firestore rules (CLI) | Falló: SA sin `serviceusage.services.get` |
+| Firestore rules (REST) | Ruleset **creado** (`86c8f723-…`); release falló por payload/permisos SA |
+| Cloud Functions | Falló: SA sin `iam.serviceAccounts.ActAs` sobre `lifewalletpuelo@appspot.gserviceaccount.com` |
+
+### Acción manual (Owner GCP)
+
+1. Dar al SA de GitHub el rol **Service Account User** sobre `lifewalletpuelo@appspot.gserviceaccount.com`.
+2. Roles útiles: Firebase Rules Admin / Cloud Datastore Index Admin / Service Usage Consumer.
+3. Re-ejecutar workflows: Deploy Functions + Deploy Firestore rules (REST).
+4. Configurar en Functions: `BATCH_SECRET`, `DEV_LOGIN_SECRET`.
+
