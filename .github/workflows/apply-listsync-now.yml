@@ -1,0 +1,45 @@
+name: Apply listsync patch now
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - sprint5/apply-listsync-patch
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: sprint5/apply-listsync-patch
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Apply patch
+        run: |
+          set -euo pipefail
+          if git apply --check scripts/patches/sprint5_completar_datos.patch 2>/dev/null; then
+            git apply scripts/patches/sprint5_completar_datos.patch
+            echo "unified patch applied"
+          else
+            bash scripts/patches/sprint4_wire_listsync.sh
+            echo "script applied"
+          fi
+          grep -n UsuarioListSync lib/completar_perfil.dart lib/datosPersonalesflotante.dart || true
+          wc -c lib/completar_perfil.dart lib/datosPersonalesflotante.dart
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/completar_perfil.dart lib/datosPersonalesflotante.dart
+          if git diff --staged --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Sprint 5: UsuarioListSync en completar_perfil + datosPersonales"
+            git push origin sprint5/apply-listsync-patch
+          fi
