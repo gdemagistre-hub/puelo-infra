@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_session.dart';
+import 'usuario_list_sync.dart';
 import 'widgets/searchable_picker.dart';
 import 'catalogo_geo_cache.dart';
 import 'theme/app_colors.dart';
@@ -272,7 +273,7 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
     setState(() => _saving = true);
 
     try {
-      await db.collection('usuarios').doc(uid).set({
+      await UsuarioListSync.mergeUserDoc(uid, {
         'calle': _calleController.text.trim(),
         'numero': _numeroController.text.trim(),
         'piso_depto': _pisoController.text.trim(),
@@ -286,7 +287,7 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
           'localidad_nombre': selectedLocalidadNombre,
         },
         'updated_at': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
