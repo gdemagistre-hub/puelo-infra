@@ -100,75 +100,90 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
     }
   }
 
-  /// Portfolio se guarda en trabajos con:
-  /// - usuario_id (uid del prestador)
-  /// - tipo: 'portfolio'
-  /// - imagenes: List<String> de URLs (no un solo url_foto)
+  /// Fotos de trabajos: schema real en Firestore
+  /// - cargaTrabajoTrabajador: usuario_id + tipo=portfolio + imagenes[]
+  /// - cargaTrabajoCliente (dummies calificados): trabajadorRef + imagenes[] (sin tipo portfolio)
   Future<List<_FotoItem>> _cargarFotos(String userId) async {
     final items = <_FotoItem>[];
+    final seen = <String>{};
 
     void _extraerDeDoc(Map<String, dynamic> d) {
       final desc = (d['descripcion'] ?? d['titulo'] ?? d['profesion'] ?? '').toString();
-      // Formato actual: array imagenes[]
       final imgs = d['imagenes'];
       if (imgs is List) {
         for (final u in imgs) {
           final url = u?.toString().trim() ?? '';
-          if (url.isNotEmpty) items.add(_FotoItem(url: url, desc: desc));
+          if (url.isEmpty || seen.contains(url)) continue;
+          seen.add(url);
+          items.add(_FotoItem(url: url, desc: desc));
         }
         return;
       }
-      // Fallbacks legacy (doc con una sola foto)
       final single = (d['url_foto'] ?? d['foto_url'] ?? d['url'] ?? d['imagen'] ?? '').toString().trim();
-      if (single.isNotEmpty) items.add(_FotoItem(url: single, desc: desc));
+      if (single.isNotEmpty && !seen.contains(single)) {
+        seen.add(single);
+        items.add(_FotoItem(url: single, desc: desc));
+      }
     }
 
-    // 1) Campo real que escribe cargaTrabajoTrabajador: usuario_id + tipo portfolio
+    bool _coincide(Map<String, dynamic> d) {
+      final uidCampo = d['usuario_id']?.toString();
+      if (uidCampo != null && uidCampo == userId) return true;
+      final tid = d['trabajador_uid']?.toString();
+      if (tid != null && tid == userId) return true;
+      final rawRef = d['trabajadorRef'];
+      if (rawRef is DocumentReference) return rawRef.id == userId;
+      if (rawRef is String) {
+        return rawRef == userId ||
+            rawRef.endsWith('/$userId') ||
+            rawRef == 'usuarios/$userId';
+      }
+      return false;
+    }
+
+    // 1) usuario_id (portfolio del prestador)
     try {
       final snap = await FirebaseFirestore.instance
           .collection('trabajos')
           .where('usuario_id', isEqualTo: userId)
-          .where('tipo', isEqualTo: 'portfolio')
-          .limit(20)
+          .limit(40)
           .get();
       for (final doc in snap.docs) {
         _extraerDeDoc(doc.data());
       }
-      if (items.isNotEmpty) return items;
     } catch (e) {
-      debugPrint('portfolio query usuario_id+tipo: $e');
+      debugPrint('fotos query usuario_id: $e');
     }
 
-    // 2) Solo usuario_id (por si falta índice compuesto) y filtrar tipo en cliente
+    // 2) trabajadorRef == DocumentReference(usuarios/uid) — flujo cliente / dummies
+    try {
+      final ref = FirebaseFirestore.instance.collection('usuarios').doc(userId);
+      final snap = await FirebaseFirestore.instance
+          .collection('trabajos')
+          .where('trabajadorRef', isEqualTo: ref)
+          .limit(40)
+          .get();
+      for (final doc in snap.docs) {
+        _extraerDeDoc(doc.data());
+      }
+    } catch (e) {
+      debugPrint('fotos query trabajadorRef: $e');
+    }
+
+    if (items.isNotEmpty) return items;
+
+    // 3) Fallback: escanear trabajos recientes y filtrar por ref/uid (como hacía la tarjeta original)
     try {
       final snap = await FirebaseFirestore.instance
           .collection('trabajos')
-          .where('usuario_id', isEqualTo: userId)
-          .limit(30)
+          .limit(120)
           .get();
       for (final doc in snap.docs) {
         final d = doc.data();
-        final tipo = (d['tipo'] ?? '').toString();
-        if (tipo.isNotEmpty && tipo != 'portfolio') continue;
-        _extraerDeDoc(d);
-      }
-      if (items.isNotEmpty) return items;
-    } catch (e) {
-      debugPrint('portfolio query usuario_id: $e');
-    }
-
-    // 3) Legacy trabajador_uid (por si hubo datos viejos)
-    try {
-      final snap = await FirebaseFirestore.instance
-          .collection('trabajos')
-          .where('trabajador_uid', isEqualTo: userId)
-          .limit(20)
-          .get();
-      for (final doc in snap.docs) {
-        _extraerDeDoc(doc.data());
+        if (_coincide(d)) _extraerDeDoc(d);
       }
     } catch (e) {
-      debugPrint('portfolio query trabajador_uid: $e');
+      debugPrint('fotos fallback scan: $e');
     }
 
     return items;
