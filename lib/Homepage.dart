@@ -25,6 +25,8 @@ import 'config/app_env.dart';
 import 'theme/app_copy.dart';
 import 'analytics/prox_analytics.dart';
 import 'cargaTrabajoTrabajador.dart';
+import 'usuario_list_sync.dart';
+import 'widgets/image_source_sheet.dart';
 
 class HomePageWidget extends StatefulWidget {
   final bool? initialModoPrestador;
@@ -109,7 +111,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       return;
     }
 
-    // Sprint 1: cache en sesión (TTL ~45s) — evita re-fetch al volver.
     final cached = UserSession().homeCacheIfFresh;
     if (cached != null) {
       if (mounted) _aplicarEstadoDesdeData(cached);
@@ -168,7 +169,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         });
       } else if (id == 'foto_perfil') {
         icon = Icons.camera_alt_outlined;
-        action = () {};
+        action = () {
+          if (!_subiendoFoto) _sumarFotoPerfil();
+        };
       } else if (id == 'validacion_perfil') {
         icon = Icons.how_to_reg_outlined;
         action = () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SolicitarValidacionWidget()))
@@ -218,6 +221,79 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       _cargandoConsejos = false;
       _visibilidadCargando = false;
     });
+  }
+
+  Future<void> _sumarFotoPerfil() async {
+    final uid = UserSession().uid;
+    if (uid == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Iniciá sesión para subir tu foto de perfil.'),
+        ),
+      );
+      return;
+    }
+    if (_subiendoFoto) return;
+
+    final source = await pickImageSource(context);
+    if (source == null || !mounted) return;
+
+    setState(() => _subiendoFoto = true);
+    try {
+      final picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: source,
+        imageQuality: 70,
+        maxWidth: 1200,
+      );
+      if (image == null) {
+        if (mounted) setState(() => _subiendoFoto = false);
+        return;
+      }
+
+      final bytes = await image.readAsBytes();
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('usuarios')
+          .child(uid)
+          .child('perfil.jpg');
+      await ref.putData(
+        bytes,
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
+      final url = await ref.getDownloadURL();
+
+      await UsuarioListSync.mergeUserDoc(uid, {
+        'url_foto_perfil': url,
+        'foto_perfil': url,
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) return;
+      setState(() {
+        _urlFotoPerfil = url;
+        _subiendoFoto = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Foto de perfil actualizada'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      await _cargarEstadoVisibilidadYConsejos();
+    } catch (e) {
+      debugPrint('Error subiendo foto de perfil: $e');
+      if (!mounted) return;
+      setState(() => _subiendoFoto = false);
+      final raw = e.toString().toLowerCase();
+      final msg = (raw.contains('permission') ||
+              raw.contains('unauthorized') ||
+              raw.contains('unauthenticated'))
+          ? 'No hay permiso para subir. Usá Google Sign-In o mintDevSession (Storage requiere Auth).'
+          : 'No se pudo subir la foto: $e';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    }
   }
 
   void _compartirTarjeta() {
@@ -305,10 +381,35 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           Padding(
             padding: const EdgeInsets.only(right: 12),
-            child: CircleAvatar(
-              radius: 20,
-              backgroundColor: primaryColor,
-              child: Text(_getInitials(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: GestureDetector(
+              onTap: () {
+                if (!_subiendoFoto) _sumarFotoPerfil();
+              },
+              child: CircleAvatar(
+                radius: 20,
+                backgroundColor: primaryColor,
+                backgroundImage: _urlFotoPerfil != null
+                    ? NetworkImage(_urlFotoPerfil!)
+                    : null,
+                child: _subiendoFoto
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : (_urlFotoPerfil == null
+                        ? Text(
+                            _getInitials(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          )
+                        : null),
+              ),
             ),
           ),
         ],
