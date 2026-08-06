@@ -1,7 +1,8 @@
 rules_version = '2';
-// PERFORMANCE NOTE: writes TEMP abiertos pre-lanzamiento (dropdown).
-// Cerrar antes de tráfico real: ver docs/performance.md
-// 2026-08-05: redeploy — validaciones / validaciones_pendientes / calificaciones abiertos (flujo Ayudar a validar)
+// Sprint 0 (2026-08-06): cierre de superficie privilegiada.
+// Menú "Modo prueba (equipo)" se mantiene: lectura de usuarios + writes de
+// campos de perfil NO privilegiados (sin Auth) siguen habilitados TEMP.
+// NO abrir al público sin: Auth obligatorio en writes + custom claims admin.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -10,7 +11,8 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Admin vía custom claim o usuarios/{uid}.es_admin
+    // Admin: preferir custom claim. Campo es_admin solo si hay Auth (no se puede
+    // auto-asignar: writes de es_admin están bloqueados abajo).
     function isAdmin() {
       return isSignedIn() && (
         request.auth.token.admin == true ||
@@ -18,10 +20,38 @@ service cloud.firestore {
       );
     }
 
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
     // FlutterFlow (si aún se usa ese email de servicio)
     function isFlutterFlow() {
       return isSignedIn()
         && request.auth.token.email.matches('firebase@flutterflow.io');
+    }
+
+    // Campos que el cliente NUNCA puede crear/modificar (solo Admin SDK / claim admin)
+    function privilegedKeys() {
+      return [
+        'es_admin',
+        'scoring',
+        'badge_prestador',
+        'riesgo_fraude',
+        'fraud_flags',
+        'score_identidad',
+        'score_reputacion',
+        'score_actividad',
+        'score_total'
+      ];
+    }
+
+    function createHasNoPrivileged() {
+      return !request.resource.data.keys().hasAny(privilegedKeys());
+    }
+
+    function updateTouchesNoPrivileged() {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(privilegedKeys());
     }
 
     function analyticsKeysOk() {
@@ -34,36 +64,36 @@ service cloud.firestore {
       return request.resource.data.keys().size() <= 24;
     }
 
-    // ---------- FlutterFlow (opcional) ----------
+    // ---------- FlutterFlow (opcional, acotado) ----------
     match /{document=**} {
       allow read, write: if isFlutterFlow();
     }
 
     // ---------- analytics ----------
     match /analytics_events/{id} {
+      // Create: permite buffer cliente (también sesión dev sin Auth) con keys sanitizadas
       allow create: if analyticsKeysOk() && analyticsSizeOk()
         && request.resource.data.type is string
         && request.resource.data.session_id is string;
-      allow read: if true;
+      allow read: if isAdmin();
       allow update, delete: if false;
     }
 
-    // ---------- contactos (leads de WhatsApp / llamada) ----------
-    // Create abierto TEMP (incluye impersonación dropdown sin Auth).
-    // Luego: allow create: if isSignedIn() && request.resource.data.cliente_uid == request.auth.uid;
+    // ---------- contactos (leads WhatsApp / llamada) ----------
+    // TEMP: create abierto para impersonación (dropdown). Cerrar con Auth al go-live.
     match /contactos/{id} {
       allow create: if true;
-      allow read: if true; // TEMP — luego isAdmin() o prestador_uid == auth.uid
+      allow read: if isAdmin();
       allow update, delete: if false;
     }
 
-    // ---------- stats / batch ----------
+    // ---------- stats / batch: solo Admin SDK (Functions / GH Actions) ----------
     match /stats/{doc} {
-      allow read: if true;
-      // TEMP: batch scoring desde cliente (+ subcolección runs). Luego: isAdmin()
-      allow write: if true;
+      allow read: if isAdmin();
+      allow write: if false;
       match /{document=**} {
-        allow read, write: if true;
+        allow read: if isAdmin();
+        allow write: if false;
       }
     }
 
@@ -86,15 +116,46 @@ service cloud.firestore {
     }
 
     // ---------- usuarios ----------
+    // read: true → buscador + dropdown "Modo prueba"
+    // write: TEMP sin Auth para campos de perfil; privilegios bloqueados
     match /usuarios/{userId} {
       allow read: if true;
-      allow write: if true;
+
+      allow create: if createHasNoPrivileged()
+        && (
+          !isSignedIn()
+          || isOwner(userId)
+          || isAdmin()
+        );
+
+      allow update: if (
+          isAdmin()
+        ) || (
+          updateTouchesNoPrivileged()
+          && (
+            // Sesión real: dueño del doc
+            isOwner(userId)
+            // TEMP Sprint0: dropdown sin Auth puede editar perfil no privilegiado
+            || !isSignedIn()
+          )
+        );
+
+      allow delete: if isAdmin();
     }
 
     // ---------- trabajos ----------
     match /trabajos/{id} {
       allow read: if true;
-      allow write: if true; // TEMP
+      // TEMP: create/update abiertos (portfolio / carga con impersonación)
+      allow create: if true;
+      allow update: if true;
+      allow delete: if isAdmin() || (isSignedIn()
+        && resource.data.keys().hasAny(['usuario_id', 'usuarioId', 'uid'])
+        && (
+          resource.data.usuario_id == request.auth.uid
+          || resource.data.usuarioId == request.auth.uid
+          || resource.data.uid == request.auth.uid
+        ));
     }
 
     match /trabajos_galeria/{id} {
@@ -102,21 +163,23 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // ---------- calificaciones (create cliente; update scoring solo Admin SDK) ----------
     match /calificaciones/{id} {
-      allow read, create: if true;
-      allow update: if true;
+      allow read: if true;
+      allow create: if true;
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
-    // ---------- validaciones / tokens ----------
+    // ---------- validaciones / tokens: solo Cloud Functions (Admin SDK) ----------
     match /validaciones/{id} {
-      allow read, write: if true; // TEMP
+      allow read, write: if false;
     }
     match /validacion_tokens/{id} {
-      allow read, write: if true; // TEMP
+      allow read, write: if false;
     }
     match /validaciones_pendientes/{id} {
-      allow read, write: if true; // TEMP
+      allow read, write: if false;
     }
 
     // ---------- default DENY ----------

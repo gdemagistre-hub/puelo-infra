@@ -1,12 +1,28 @@
 rules_version = '2';
+// Sprint 0: writes requieren Auth y path bajo usuarios/{uid}/.
+// Lectura pública de imágenes de perfil/portfolio (URLs en tarjeta pública).
+// Nota: impersonación sin Auth no puede subir archivos (usar Google o mintDevSession).
 service firebase.storage {
   match /b/{bucket}/o {
-    // TEMP pre-lanzamiento (dropdown sin auth). Al abrir al público: exigir request.auth.
-    match /{allPaths=**} {
+    function isImage() {
+      return request.resource.contentType.matches('image/(jpeg|jpg|png|webp|gif)');
+    }
+    function underLimit() {
+      return request.resource.size < 5 * 1024 * 1024;
+    }
+    function isOwnerPath(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    match /usuarios/{userId}/{allPaths=**} {
       allow read: if true;
-      allow write: if request.resource == null
-        || request.resource.size < 5 * 1024 * 1024
-           && request.resource.contentType.matches('image/.*');
+      allow write: if isOwnerPath(userId)
+        && (request.resource == null || (underLimit() && isImage()));
+    }
+
+    // Deny-by-default resto del bucket
+    match /{allPaths=**} {
+      allow read, write: if false;
     }
   }
 }

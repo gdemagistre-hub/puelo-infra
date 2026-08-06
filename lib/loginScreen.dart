@@ -1,5 +1,9 @@
-import 'package:flutter/material.dart';
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 import 'Homepage.dart';
 import 'user_session.dart';
@@ -9,12 +13,16 @@ import 'pantalla_gracias_validacion.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_copy.dart';
 import 'analytics/prox_analytics.dart';
+import 'config/app_env.dart';
 
 class LoginScreenWidget extends StatefulWidget {
   const LoginScreenWidget({super.key});
 
   static const String routeName = 'LoginScreen';
   static const String routePath = '/login';
+
+  static const String _mintDevUrl =
+      'https://southamerica-east1-lifewalletpuelo.cloudfunctions.net/mintDevSession';
 
   @override
   State<LoginScreenWidget> createState() => _LoginScreenWidgetState();
@@ -26,9 +34,39 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
   bool _loadingGoogle = false;
   bool _loadingDev = false;
 
+  /// One-shot (sin snapshots de colección completa).
+  late final Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>>
+      _usuariosDevFuture;
+
   static const Color primaryColor = AppColors.cliente;
   static const Color textColor = AppColors.text;
   static const Color subTextColor = AppColors.textMuted;
+
+  @override
+  void initState() {
+    super.initState();
+    _usuariosDevFuture = _loadUsuariosDev();
+  }
+
+  Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>>
+      _loadUsuariosDev() async {
+    // Sin orderBy: evita excluir docs sin campo `nombre` y no exige índice extra.
+    final snap = await FirebaseFirestore.instance
+        .collection('usuarios')
+        .limit(150)
+        .get();
+    final docs = snap.docs.toList();
+    docs.sort((a, b) {
+      final na = '${a.data()['nombre'] ?? ''} ${a.data()['apellido'] ?? ''}'
+          .trim()
+          .toLowerCase();
+      final nb = '${b.data()['nombre'] ?? ''} ${b.data()['apellido'] ?? ''}'
+          .trim()
+          .toLowerCase();
+      return na.compareTo(nb);
+    });
+    return docs;
+  }
 
   Future<void> _entrarDevDropdown() async {
     if (_selectedUserId == null || _selectedUserData == null) {
@@ -44,10 +82,39 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
 
     setState(() => _loadingDev = true);
     try {
+      var usedCustomToken = false;
+
+      if (AppEnv.hasDevLoginSecret) {
+        try {
+          final resp = await http
+              .post(
+                Uri.parse(LoginScreenWidget._mintDevUrl),
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-Dev-Login-Secret': AppEnv.devLoginSecret,
+                },
+                body: jsonEncode({'uid': _selectedUserId}),
+              )
+              .timeout(const Duration(seconds: 15));
+          if (resp.statusCode >= 200 && resp.statusCode < 300) {
+            final body = jsonDecode(resp.body) as Map<String, dynamic>;
+            final custom = body['token'] as String?;
+            if (custom != null && custom.isNotEmpty) {
+              await FirebaseAuth.instance.signInWithCustomToken(custom);
+              usedCustomToken = true;
+            }
+          } else {
+            debugPrint('mintDevSession HTTP ${resp.statusCode}: ${resp.body}');
+          }
+        } catch (e) {
+          debugPrint('mintDevSession error: $e');
+        }
+      }
+
       UserSession().iniciarSesion(
         _selectedUserId!,
         _selectedUserData!,
-        authProvider: 'dev',
+        authProvider: usedCustomToken ? 'dev_token' : 'dev',
         isDevImpersonation: true,
       );
 
@@ -56,9 +123,23 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
       ProxAnalytics.instance.startSession(
         role: esPrestador ? 'prestador' : 'cliente',
       );
-      ProxAnalytics.instance.action('login_dev_dropdown', screen: '/login');
+      ProxAnalytics.instance.action(
+        usedCustomToken ? 'login_dev_token' : 'login_dev_dropdown',
+        screen: '/login',
+      );
 
       if (!mounted) return;
+      if (!usedCustomToken && AppEnv.verboseLogging) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Modo prueba local (sin Auth). Storage y algunas rules pueden fallar. '
+              'Configurá DEV_LOGIN_SECRET en el build del equipo.',
+            ),
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
       _navegarPostLogin();
     } finally {
       if (mounted) setState(() => _loadingDev = false);
@@ -72,7 +153,7 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
       if (!mounted) return;
       _navegarPostLogin();
     } on AuthCancelledException {
-      // Usuario cerró el popup: no mostrar error.
+      // Usuario cerró el popup.
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -115,6 +196,120 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
     }
   }
 
+  Widget _buildDevLoginPanel({required bool busy}) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: primaryColor.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Modo prueba (equipo)',
+            style: TextStyle(
+              color: primaryColor,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            AppEnv.hasDevLoginSecret
+                ? 'Impersoná un usuario con Auth real (custom token).'
+                : 'Impersoná un usuario de Firestore. Sin DEV_LOGIN_SECRET la sesión es local.',
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 11,
+              height: 1.3,
+            ),
+          ),
+          const SizedBox(height: 8),
+          FutureBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+            future: _usuariosDevFuture,
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Text(
+                  'No se pudo cargar el listado (${snapshot.error})',
+                  style: TextStyle(color: Colors.red.shade700, fontSize: 12),
+                );
+              }
+              if (!snapshot.hasData) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(12),
+                    child: CircularProgressIndicator(color: primaryColor),
+                  ),
+                );
+              }
+
+              final items = snapshot.data!;
+              return DropdownButtonFormField<String>(
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                ),
+                hint: Text('Seleccionar usuario… (${items.length})'),
+                value: _selectedUserId,
+                isExpanded: true,
+                items: items.map((doc) {
+                  final data = doc.data();
+                  final displayName =
+                      '${data['nombre'] ?? ''} ${data['apellido'] ?? ''}'
+                          .trim();
+                  return DropdownMenuItem<String>(
+                    value: doc.id,
+                    child: Text(
+                      displayName.isNotEmpty ? displayName : 'Sin nombre',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  );
+                }).toList(),
+                onChanged: busy
+                    ? null
+                    : (val) {
+                        setState(() {
+                          _selectedUserId = val;
+                          _selectedUserData = items
+                              .firstWhere((doc) => doc.id == val)
+                              .data();
+                        });
+                      },
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: busy ? null : _entrarDevDropdown,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: primaryColor,
+                side: BorderSide(color: primaryColor.withOpacity(0.5)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: _loadingDev
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Entrar como este usuario'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final busy = _loadingGoogle || _loadingDev;
@@ -132,122 +327,10 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // MUST: listado de prueba hasta decisión contraria.
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: primaryColor.withOpacity(0.3),
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Modo prueba (equipo)',
-                          style: TextStyle(
-                            color: primaryColor,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Impersoná un usuario de Firestore sin Google. '
-                          'Se apaga al abrir el servicio al público.',
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: 11,
-                            height: 1.3,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        StreamBuilder<QuerySnapshot>(
-                          stream: FirebaseFirestore.instance
-                              .collection('usuarios')
-                              .snapshots(),
-                          builder: (context, snapshot) {
-                            if (!snapshot.hasData) {
-                              return const Center(
-                                child: CircularProgressIndicator(
-                                  color: primaryColor,
-                                ),
-                              );
-                            }
-
-                            final items = snapshot.data!.docs;
-                            return DropdownButtonFormField<String>(
-                              decoration: const InputDecoration(
-                                border: OutlineInputBorder(),
-                                contentPadding: EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                              ),
-                              hint: const Text('Seleccionar usuario…'),
-                              value: _selectedUserId,
-                              items: items.map((doc) {
-                                final data =
-                                    doc.data() as Map<String, dynamic>;
-                                final displayName =
-                                    '${data['nombre'] ?? ''} ${data['apellido'] ?? ''}'
-                                        .trim();
-                                return DropdownMenuItem<String>(
-                                  value: doc.id,
-                                  child: Text(
-                                    displayName.isNotEmpty
-                                        ? displayName
-                                        : 'Sin nombre',
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                );
-                              }).toList(),
-                              onChanged: busy
-                                  ? null
-                                  : (val) {
-                                      setState(() {
-                                        _selectedUserId = val;
-                                        _selectedUserData = items
-                                            .firstWhere((doc) => doc.id == val)
-                                            .data() as Map<String, dynamic>;
-                                      });
-                                    },
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton(
-                            onPressed: busy ? null : _entrarDevDropdown,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: primaryColor,
-                              side: BorderSide(
-                                color: primaryColor.withOpacity(0.5),
-                              ),
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: _loadingDev
-                                ? const SizedBox(
-                                    height: 18,
-                                    width: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Text('Entrar como este usuario'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 32),
+                  if (AppEnv.showDevTools) ...[
+                    _buildDevLoginPanel(busy: busy),
+                    const SizedBox(height: 32),
+                  ],
                   Center(
                     child: Image.asset(
                       'assets/images/logo_prox_icon.png.png',
@@ -344,41 +427,6 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                     label: 'Continuar con Facebook',
                     backgroundColor: const Color(0xFF1877F2),
                     textColor: Colors.white,
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Divider(color: Colors.grey[300], thickness: 1),
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 12.0),
-                        child: Text(
-                          'o con tu cuenta',
-                          style: TextStyle(color: subTextColor, fontSize: 13),
-                        ),
-                      ),
-                      Expanded(
-                        child: Divider(color: Colors.grey[300], thickness: 1),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  _buildLoginButton(
-                    onPressed: busy ? null : () => _proximamente('Email'),
-                    icon: _buildIconCircle(
-                      backgroundColor: primaryColor.withOpacity(0.1),
-                      child: const Icon(
-                        Icons.mail_outline_rounded,
-                        color: primaryColor,
-                        size: 16,
-                      ),
-                    ),
-                    label: 'Ingresar con Email',
-                    backgroundColor: Colors.white,
-                    textColor: primaryColor,
-                    hasBorder: true,
-                    borderColor: primaryColor.withOpacity(0.4),
                   ),
                   const SizedBox(height: 32),
                   Row(

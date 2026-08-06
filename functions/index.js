@@ -1,6 +1,15 @@
 /**
  * Cloud Functions — Puelo scoring + validación de domicilio (admin bypass rules).
- * Redeploy 2026-08-05: submitValidacionPendiente must be live (client fallback hits permission-denied).
+ * Sprint 0 (2026-08-06):
+ * - BATCH_SECRET fail-closed (env / secret)
+ * - aplicarValidacionPendiente con Auth Bearer preferente
+ * - mintDevSession para "Modo prueba" con DEV_LOGIN_SECRET
+ * - CORS acotado
+ *
+ * Config opcional (Firebase secrets o env):
+ *   firebase functions:secrets:set BATCH_SECRET
+ *   firebase functions:secrets:set DEV_LOGIN_SECRET
+ *   firebase functions:config o params: ALLOW_DEV_VALIDACION=1|0
  */
 const { onRequest } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
@@ -19,40 +28,88 @@ setGlobalOptions({
   timeoutSeconds: 540,
 });
 
-function cors(res) {
-  res.set("Access-Control-Allow-Origin", "*");
+const ALLOWED_ORIGINS = [
+  "https://lifewalletpuelo.web.app",
+  "https://lifewalletpuelo.firebaseapp.com",
+  "http://localhost:5000",
+  "http://localhost:8080",
+  "http://127.0.0.1:5000",
+  "http://127.0.0.1:8080",
+];
+
+function applyCors(req, res) {
+  const origin = req.get("Origin") || "";
+  if (ALLOWED_ORIGINS.includes(origin)) {
+    res.set("Access-Control-Allow-Origin", origin);
+  } else if (!origin) {
+    res.set("Access-Control-Allow-Origin", ALLOWED_ORIGINS[0]);
+  }
+  res.set("Vary", "Origin");
   res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.set(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, X-Batch-Secret, X-Dev-Login-Secret"
+  );
 }
 
-/** HTTP: POST/GET scoring batch */
-exports.scoringBatchHttp = onRequest({ invoker: "public" }, async (req, res) => {
-  cors(res);
-  if (req.method === "OPTIONS") {
-    res.status(204).send("");
-    return;
+async function verifyBearer(req) {
+  const h = req.get("Authorization") || "";
+  const m = h.match(/^Bearer\s+(.+)$/i);
+  if (!m) return null;
+  return admin.auth().verifyIdToken(m[1]);
+}
+
+function envFlag(name, defaultValue = "0") {
+  const v = process.env[name];
+  if (v === undefined || v === null || v === "") return defaultValue;
+  return String(v);
+}
+
+/** HTTP: POST/GET scoring batch — secreto OBLIGATORIO */
+exports.scoringBatchHttp = onRequest(
+  {
+    invoker: "public",
+    // Si el secret existe en el proyecto, bindearlo:
+    // secrets: ["BATCH_SECRET"],
+  },
+  async (req, res) => {
+    applyCors(req, res);
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+    if (req.method !== "POST" && req.method !== "GET") {
+      res.status(405).send("Method not allowed");
+      return;
+    }
+
+    const secret = process.env.BATCH_SECRET || "";
+    const provided =
+      req.get("X-Batch-Secret") ||
+      req.query.secret ||
+      (req.body && req.body.secret) ||
+      "";
+
+    if (!secret) {
+      res.status(503).json({ error: "batch_secret_not_configured" });
+      return;
+    }
+    if (provided !== secret) {
+      res.status(401).json({ error: "unauthorized" });
+      return;
+    }
+
+    const force = req.query.force === "1" || (req.body && req.body.force === true);
+    const trigger = req.query.trigger || (req.body && req.body.trigger) || "http";
+    try {
+      const result = await runScoringBatch({ trigger, force });
+      res.status(200).json(result);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: String(e.message || e) });
+    }
   }
-  if (req.method !== "POST" && req.method !== "GET") {
-    res.status(405).send("Method not allowed");
-    return;
-  }
-  const secret = process.env.BATCH_SECRET || "";
-  const provided =
-    req.get("X-Batch-Secret") || req.query.secret || (req.body && req.body.secret) || "";
-  if (secret && provided !== secret) {
-    res.status(401).json({ error: "unauthorized" });
-    return;
-  }
-  const force = req.query.force === "1" || (req.body && req.body.force === true);
-  const trigger = req.query.trigger || (req.body && req.body.trigger) || "http";
-  try {
-    const result = await runScoringBatch({ trigger, force });
-    res.status(200).json(result);
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: String(e.message || e) });
-  }
-});
+);
 
 exports.scoringBatchDaily = onSchedule(
   {
@@ -67,15 +124,67 @@ exports.scoringBatchDaily = onSchedule(
 );
 
 /**
- * Guarda respuesta de "Ayudar a validar" (admin SDK → ignora rules del cliente).
- * POST JSON: { targetUserId, targetNombre, conoce, domicilioSeleccionado,
- *   domicilioReal, esCorrecto, tiempoViviendo }
- * → { ok, token }
+ * Menú "Modo prueba": custom token para el uid elegido.
+ * Header X-Dev-Login-Secret == DEV_LOGIN_SECRET.
+ */
+exports.mintDevSession = onRequest(
+  {
+    invoker: "public",
+    cors: ALLOWED_ORIGINS,
+    memory: "256MiB",
+    timeoutSeconds: 30,
+  },
+  async (req, res) => {
+    applyCors(req, res);
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "method_not_allowed" });
+      return;
+    }
+    try {
+      const expected = process.env.DEV_LOGIN_SECRET || "";
+      if (!expected) {
+        res.status(503).json({ error: "dev_login_not_configured" });
+        return;
+      }
+      const provided =
+        req.get("X-Dev-Login-Secret") || (req.body && req.body.secret) || "";
+      if (provided !== expected) {
+        res.status(401).json({ error: "unauthorized" });
+        return;
+      }
+      const uid = String((req.body && req.body.uid) || "").trim();
+      if (!uid || uid.length > 128) {
+        res.status(400).json({ error: "uid_required" });
+        return;
+      }
+      const snap = await db.collection("usuarios").doc(uid).get();
+      if (!snap.exists) {
+        res.status(404).json({ error: "user_not_found" });
+        return;
+      }
+      const token = await admin.auth().createCustomToken(uid, {
+        dev_impersonation: true,
+      });
+      res.status(200).json({ ok: true, token, uid });
+    } catch (e) {
+      console.error("mintDevSession", e);
+      res.status(500).json({ error: String(e.message || e) });
+    }
+  }
+);
+
+/**
+ * Guarda respuesta de "Ayudar a validar" (admin SDK).
+ * Público: el validador externo puede no tener sesión.
  */
 exports.submitValidacionPendiente = onRequest(
-  { invoker: "public", cors: true, memory: "256MiB", timeoutSeconds: 60 },
+  { invoker: "public", cors: ALLOWED_ORIGINS, memory: "256MiB", timeoutSeconds: 60 },
   async (req, res) => {
-    cors(res);
+    applyCors(req, res);
     if (req.method === "OPTIONS") {
       res.status(204).send("");
       return;
@@ -105,7 +214,6 @@ exports.submitValidacionPendiente = onRequest(
         creado_en: admin.firestore.FieldValue.serverTimestamp(),
         fuente: "cloud_function",
       };
-      // Escribimos en ambas colecciones por compatibilidad de rules/código
       const batch = db.batch();
       batch.set(db.collection("validaciones").doc(token), doc);
       batch.set(db.collection("validaciones_pendientes").doc(token), doc);
@@ -120,13 +228,19 @@ exports.submitValidacionPendiente = onRequest(
 );
 
 /**
- * Aplica la validación pendiente al perfil del target y al validador.
- * POST JSON: { token, validadorId }
+ * Aplica validación pendiente.
+ * Preferente: Authorization Bearer → uid del token.
+ * TEMP: ALLOW_DEV_VALIDACION=1 (default) acepta body.validadorId (dropdown local).
  */
 exports.aplicarValidacionPendiente = onRequest(
-  { invoker: "public", cors: true, memory: "256MiB", timeoutSeconds: 60 },
+  {
+    invoker: "public",
+    cors: ALLOWED_ORIGINS,
+    memory: "256MiB",
+    timeoutSeconds: 60,
+  },
   async (req, res) => {
-    cors(res);
+    applyCors(req, res);
     if (req.method === "OPTIONS") {
       res.status(204).send("");
       return;
@@ -138,13 +252,36 @@ exports.aplicarValidacionPendiente = onRequest(
     try {
       const b = req.body || {};
       const token = String(b.token || "").trim();
-      const validadorId = String(b.validadorId || "").trim();
-      if (!token || !validadorId) {
-        res.status(400).json({ error: "token_and_validadorId_required" });
+      if (!token) {
+        res.status(400).json({ error: "token_required" });
         return;
       }
 
-      // Buscar pendiente en cualquiera de las 3 colecciones
+      let validadorId = "";
+      let via = "none";
+      try {
+        const decoded = await verifyBearer(req);
+        if (decoded && decoded.uid) {
+          validadorId = decoded.uid;
+          via = "auth";
+        }
+      } catch (authErr) {
+        console.warn("aplicarValidacion token invalid", authErr.message || authErr);
+      }
+
+      if (!validadorId) {
+        const allowDev = envFlag("ALLOW_DEV_VALIDACION", "1") === "1";
+        const bodyId = String(b.validadorId || "").trim();
+        if (allowDev && bodyId) {
+          validadorId = bodyId;
+          via = "dev_impersonation";
+          console.warn("aplicarValidacionPendiente via dev_impersonation", bodyId);
+        } else {
+          res.status(401).json({ error: "unauthenticated" });
+          return;
+        }
+      }
+
       let pendRef = db.collection("validaciones").doc(token);
       let pendSnap = await pendRef.get();
       if (!pendSnap.exists) {
@@ -161,11 +298,8 @@ exports.aplicarValidacionPendiente = onRequest(
       }
       const pend = pendSnap.data() || {};
       if (pend.estado !== "pendiente") {
-        res.status(200).json({ ok: true, already: true, estado: pend.estado });
+        res.status(200).json({ ok: true, already: true, estado: pend.estado, via });
         return;
-      }
-      if (pend.tipo && !String(pend.tipo).includes("pendiente") && pend.tipo !== "validacion_pendiente" && pend.tipo !== "pendiente_domicilio") {
-        // still allow if estado pendiente
       }
 
       const targetUserId = String(pend.targetUserId || "").trim();
@@ -178,7 +312,6 @@ exports.aplicarValidacionPendiente = onRequest(
         return;
       }
 
-      // Anti-granja (misma lógica simple que scoring_service)
       const valSnap = await db.collection("usuarios").doc(validadorId).get();
       const valData = valSnap.data() || {};
       const recibidas = (valData.validaciones_recibidas || []).length;
@@ -230,6 +363,7 @@ exports.aplicarValidacionPendiente = onRequest(
         tiempoViviendo: pend.tiempoViviendo || "",
         fecha: admin.firestore.FieldValue.serverTimestamp(),
         tipo: "identidad",
+        via,
       };
 
       const batch = db.batch();
@@ -238,6 +372,7 @@ exports.aplicarValidacionPendiente = onRequest(
         validadorId,
         estado: "completado",
         procesado_en: admin.firestore.FieldValue.serverTimestamp(),
+        via,
       });
       batch.update(db.collection("usuarios").doc(targetUserId), {
         validaciones_recibidas: admin.firestore.FieldValue.arrayUnion(registro),
@@ -259,6 +394,7 @@ exports.aplicarValidacionPendiente = onRequest(
         ok: true,
         targetUserId,
         targetNombre: pend.targetNombre || "",
+        via,
       });
     } catch (e) {
       console.error("aplicarValidacionPendiente", e);
