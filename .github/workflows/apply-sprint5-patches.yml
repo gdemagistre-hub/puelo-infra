@@ -6,6 +6,7 @@ on:
     branches:
       - sprint5/wire-completar-datos
     paths:
+      - 'scripts/patches/sprint5_completar_datos.patch'
       - 'scripts/patches/sprint4_wire_listsync.sh'
       - '.github/workflows/apply-sprint5-patches.yml'
 
@@ -23,14 +24,21 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      - name: Apply patches
-        run: bash scripts/patches/sprint4_wire_listsync.sh
+      - name: Apply unified patch
+        run: |
+          if git apply --check scripts/patches/sprint5_completar_datos.patch; then
+            git apply scripts/patches/sprint5_completar_datos.patch
+            echo "patch applied"
+          else
+            echo "patch already applied or not applicable"
+            bash scripts/patches/sprint4_wire_listsync.sh || true
+          fi
 
       - name: Commit and push if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add lib/completar_perfil.dart lib/datosPersonalesflotante.dart lib/Domicilioflotante.dart lib/capacitacionesflotante.dart || true
+          git add lib/completar_perfil.dart lib/datosPersonalesflotante.dart || true
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else

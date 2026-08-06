@@ -1,0 +1,86 @@
+--- a/lib/completar_perfil.dart
++++ b/lib/completar_perfil.dart
+@@ -3,6 +3,8 @@
+ import 'package:cloud_firestore/cloud_firestore.dart';
+ import 'package:firebase_storage/firebase_storage.dart';
+ import 'package:image_picker/image_picker.dart';
++import 'platform_capabilities.dart';
++import 'usuario_list_sync.dart';
+ import 'package:intl/intl.dart';
+ import 'user_session.dart';
+ import 'theme/app_colors.dart';
+@@ -216,10 +218,19 @@
+   }
+ 
+   Future<void> _tomarFoto(bool esPerfil, ImageSource source) async {
+-    final XFile? image =
+-        await picker.pickImage(source: source, imageQuality: 70);
+-    if (image != null) {
++    if (source == ImageSource.camera && !PlatformCapabilities.supportsCamera) {
++      if (!mounted) return;
++      ScaffoldMessenger.of(context).showSnackBar(
++        SnackBar(content: Text(PlatformCapabilities.cameraUnsupportedMessage)),
++      );
++      return;
++    }
++    try {
++      final XFile? image =
++          await picker.pickImage(source: source, imageQuality: 70);
++      if (image == null) return;
+       final bytes = await image.readAsBytes();
++      if (!mounted) return;
+       setState(() {
+         if (esPerfil) {
+           _fotoPerfilBytes = bytes;
+@@ -227,6 +238,11 @@
+           _fotoDocBytes = bytes;
+         }
+       });
++    } catch (e) {
++      if (!mounted) return;
++      ScaffoldMessenger.of(context).showSnackBar(
++        SnackBar(content: Text('No se pudo cargar la imagen: $e')),
++      );
+     }
+   }
+ 
+@@ -327,10 +343,7 @@
+             Timestamp.fromDate(_fechaNacimiento!);
+       }
+ 
+-      await db
+-          .collection('usuarios')
+-          .doc(_selectedUsuarioId)
+-          .set(actualizacion, SetOptions(merge: true));
++      await UsuarioListSync.mergeUserDoc(_selectedUsuarioId!, actualizacion);
+ 
+       if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(
+--- a/lib/datosPersonalesflotante.dart
++++ b/lib/datosPersonalesflotante.dart
+@@ -10,6 +10,7 @@
+ import 'dni_ocr_parser.dart';
+ import 'dni_ocr_scan.dart';
+ import 'user_session.dart';
++import 'usuario_list_sync.dart';
+ import 'theme/app_colors.dart';
+ 
+ class DatosPersonalesFlotanteWidget extends StatefulWidget {
+@@ -476,16 +477,10 @@
+         payload['doc_validado_en'] = FieldValue.delete();
+         payload['doc_hash_datos'] = FieldValue.delete();
+       }
+-      await FirebaseFirestore.instance
+-          .collection('usuarios')
+-          .doc(uid)
+-          .set(payload, SetOptions(merge: true));
++      await UsuarioListSync.mergeUserDoc(uid, payload);
+       final session = UserSession();
+       session.nombre = _nombreController.text.trim();
+       session.apellido = _apellidoController.text.trim();
+-      if (session.datosCompletos != null) {
+-        session.datosCompletos = {...session.datosCompletos!, ...payload};
+-      }
+       if (mounted) {
+         setState(() {
+           _docValidado = sigueValidado;
