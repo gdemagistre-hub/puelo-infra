@@ -1,0 +1,39 @@
+name: Apply Sprint 5 listsync patches
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - sprint5/wire-completar-datos
+    paths:
+      - 'scripts/patches/sprint4_wire_listsync.sh'
+      - '.github/workflows/apply-sprint5-patches.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Apply patches
+        run: bash scripts/patches/sprint4_wire_listsync.sh
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/completar_perfil.dart lib/datosPersonalesflotante.dart lib/Domicilioflotante.dart lib/capacitacionesflotante.dart || true
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Sprint 5: wire UsuarioListSync en completar + datos personales"
+            git push origin HEAD:${{ github.ref_name }}
+          fi
