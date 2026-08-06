@@ -100,31 +100,78 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
     }
   }
 
+  /// Portfolio se guarda en trabajos con:
+  /// - usuario_id (uid del prestador)
+  /// - tipo: 'portfolio'
+  /// - imagenes: List<String> de URLs (no un solo url_foto)
   Future<List<_FotoItem>> _cargarFotos(String userId) async {
+    final items = <_FotoItem>[];
+
+    void _extraerDeDoc(Map<String, dynamic> d) {
+      final desc = (d['descripcion'] ?? d['titulo'] ?? d['profesion'] ?? '').toString();
+      // Formato actual: array imagenes[]
+      final imgs = d['imagenes'];
+      if (imgs is List) {
+        for (final u in imgs) {
+          final url = u?.toString().trim() ?? '';
+          if (url.isNotEmpty) items.add(_FotoItem(url: url, desc: desc));
+        }
+        return;
+      }
+      // Fallbacks legacy (doc con una sola foto)
+      final single = (d['url_foto'] ?? d['foto_url'] ?? d['url'] ?? d['imagen'] ?? '').toString().trim();
+      if (single.isNotEmpty) items.add(_FotoItem(url: single, desc: desc));
+    }
+
+    // 1) Campo real que escribe cargaTrabajoTrabajador: usuario_id + tipo portfolio
     try {
-      final snap = await FirebaseFirestore.instance.collection('trabajos').where('trabajador_uid', isEqualTo: userId).where('tipo', isEqualTo: 'portfolio').limit(12).get();
-      final items = <_FotoItem>[];
+      final snap = await FirebaseFirestore.instance
+          .collection('trabajos')
+          .where('usuario_id', isEqualTo: userId)
+          .where('tipo', isEqualTo: 'portfolio')
+          .limit(20)
+          .get();
       for (final doc in snap.docs) {
-        final d = doc.data();
-        final url = (d['url_foto'] ?? d['foto_url'] ?? d['url'] ?? '').toString();
-        if (url.isEmpty) continue;
-        items.add(_FotoItem(url: url, desc: (d['descripcion'] ?? d['titulo'] ?? '').toString()));
+        _extraerDeDoc(doc.data());
       }
       if (items.isNotEmpty) return items;
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('portfolio query usuario_id+tipo: $e');
+    }
+
+    // 2) Solo usuario_id (por si falta índice compuesto) y filtrar tipo en cliente
     try {
-      final snap = await FirebaseFirestore.instance.collection('trabajos').where('trabajador_uid', isEqualTo: userId).limit(12).get();
-      final items = <_FotoItem>[];
+      final snap = await FirebaseFirestore.instance
+          .collection('trabajos')
+          .where('usuario_id', isEqualTo: userId)
+          .limit(30)
+          .get();
       for (final doc in snap.docs) {
         final d = doc.data();
-        final url = (d['url_foto'] ?? d['foto_url'] ?? d['url'] ?? '').toString();
-        if (url.isEmpty) continue;
-        items.add(_FotoItem(url: url, desc: (d['descripcion'] ?? d['titulo'] ?? '').toString()));
+        final tipo = (d['tipo'] ?? '').toString();
+        if (tipo.isNotEmpty && tipo != 'portfolio') continue;
+        _extraerDeDoc(d);
       }
-      return items;
-    } catch (_) {
-      return [];
+      if (items.isNotEmpty) return items;
+    } catch (e) {
+      debugPrint('portfolio query usuario_id: $e');
     }
+
+    // 3) Legacy trabajador_uid (por si hubo datos viejos)
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('trabajos')
+          .where('trabajador_uid', isEqualTo: userId)
+          .limit(20)
+          .get();
+      for (final doc in snap.docs) {
+        _extraerDeDoc(doc.data());
+      }
+    } catch (e) {
+      debugPrint('portfolio query trabajador_uid: $e');
+    }
+
+    return items;
   }
 
   @override
