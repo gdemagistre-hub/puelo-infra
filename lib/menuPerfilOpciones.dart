@@ -109,8 +109,10 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
         subtitle:
             'Nombre, apellido y teléfono se pueden mostrar al cliente. '
             'El resto no se comparte: sirve para validarte y generar confianza.',
-        onTap: () =>
-            _abrirFlotante(context, const DatosPersonalesFlotanteWidget()),
+        onTap: () => _abrirFlotante(
+          context,
+          DatosPersonalesFlotanteWidget(modoPrestador: modoPrestador),
+        ),
       ),
       _MenuItem(
         icon: Icons.home_outlined,
@@ -118,7 +120,10 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
         subtitle:
             'Tu dirección completa no se muestra al cliente; se usa para '
             'validaciones y para priorizar búsquedas cercanas.',
-        onTap: () => _abrirFlotante(context, const DomicilioFlotanteWidget()),
+        onTap: () => _abrirFlotante(
+          context,
+          DomicilioFlotanteWidget(modoPrestador: modoPrestador),
+        ),
       ),
       if (modoPrestador) ...[
         _MenuItem(
