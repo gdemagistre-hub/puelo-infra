@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # Sprint 4: wire UsuarioListSync + camera guards (idempotent)
-# Trigger: 2026-08-06T18:00Z
+# Trigger sprint5: 2026-08-06T18:15Z
 
 # --- Domicilio ---
 if ! grep -q "usuario_list_sync" lib/Domicilioflotante.dart; then
