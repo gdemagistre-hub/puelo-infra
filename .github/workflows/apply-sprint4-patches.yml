@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - sprint4/sync-perfiles-responsive
+      - sprint4/wire-perfiles-restantes
     paths:
       - 'scripts/patches/sprint4_wire_listsync.sh'
       - '.github/workflows/apply-sprint4-patches.yml'
@@ -19,8 +20,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: sprint4/sync-perfiles-responsive
+          ref: ${{ github.ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
       - name: Apply patches
         run: bash scripts/patches/sprint4_wire_listsync.sh
@@ -29,10 +31,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add lib/Domicilioflotante.dart lib/completar_perfil.dart lib/datosPersonalesflotante.dart lib/capacitacionesflotante.dart
+          git add lib/Domicilioflotante.dart lib/completar_perfil.dart lib/datosPersonalesflotante.dart lib/capacitacionesflotante.dart || true
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
             git commit -m "Sprint 4: wire UsuarioListSync + camera guards in perfiles"
-            git push origin sprint4/sync-perfiles-responsive
+            git push origin HEAD:${{ github.ref_name }}
           fi

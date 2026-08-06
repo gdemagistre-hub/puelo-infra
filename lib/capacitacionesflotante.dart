@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'widgets/image_source_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -105,263 +106,241 @@ class _CapacitacionesFlotanteWidgetState
     String? previewHint;
 
     try {
-    final ok = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        final bottom = MediaQuery.of(ctx).viewInsets.bottom;
-        return StatefulBuilder(
-          builder: (ctx, setModal) {
-            return Padding(
-              padding: EdgeInsets.fromLTRB(24, 12, 24, 24 + bottom),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Agregar capacitación',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: _textColor,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Sacá una foto del certificado, matrícula o constancia '
-                    'y escribí de qué se trata. No suma puntos de confianza: '
-                    'solo se muestra en tu perfil.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF64748B),
-                      height: 1.35,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  InkWell(
-                    onTap: () async {
-                      final source = await showModalBottomSheet<ImageSource>(
-                        context: ctx,
-                        builder: (c2) => SafeArea(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ListTile(
-                                leading: const Icon(Icons.photo_camera_outlined),
-                                title: const Text('Tomar foto'),
-                                onTap: () =>
-                                    Navigator.pop(c2, ImageSource.camera),
-                              ),
-                              ListTile(
-                                leading: const Icon(Icons.photo_library_outlined),
-                                title: const Text('Elegir de galería'),
-                                onTap: () =>
-                                    Navigator.pop(c2, ImageSource.gallery),
-                              ),
-                            ],
-                          ),
+      final ok = await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (ctx) {
+          final bottom = MediaQuery.of(ctx).viewInsets.bottom;
+          return StatefulBuilder(
+            builder: (ctx, setModal) {
+              return Padding(
+                padding: EdgeInsets.fromLTRB(24, 12, 24, 24 + bottom),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
                         ),
-                      );
-                      if (source == null) return;
-                      final picker = ImagePicker();
-                      final file = await picker.pickImage(
-                        source: source,
-                        maxWidth: 1200,
-                        maxHeight: 1600,
-                        imageQuality: 75,
-                      );
-                      if (file == null) return;
-                      final b = await file.readAsBytes();
-                      setModal(() {
-                        bytes = b;
-                        previewHint =
-                            kIsWeb ? 'Imagen lista' : 'Foto lista para subir';
-                      });
-                    },
-                    borderRadius: BorderRadius.circular(14),
-                    child: Container(
-                      height: 140,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
                       ),
-                      child: bytes == null
-                          ? Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.add_a_photo_outlined,
-                                    size: 36, color: primaryColor),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Foto del certificado o constancia',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.grey.shade700,
-                                  ),
-                                ),
-                              ],
-                            )
-                          : ClipRRect(
-                              borderRadius: BorderRadius.circular(14),
-                              child: Image.memory(
-                                bytes!,
-                                fit: BoxFit.cover,
-                                width: double.infinity,
-                                height: 140,
-                              ),
-                            ),
                     ),
-                  ),
-                  if (previewHint != null) ...[
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Agregar capacitación',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: _textColor,
+                      ),
+                    ),
                     const SizedBox(height: 6),
-                    Text(
-                      previewHint!,
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                    ),
-                  ],
-                  const SizedBox(height: 14),
-                  TextField(
-                    controller: tituloCtrl,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: InputDecoration(
-                      labelText: '¿Qué es?',
-                      hintText: 'Ej: Curso de soldadura TIG · 2024',
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                    const Text(
+                      'Sacá una foto del certificado, matrícula o constancia '
+                      'y escribí de qué se trata. No suma puntos de confianza: '
+                      'solo se muestra en tu perfil.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF64748B),
+                        height: 1.35,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: anioCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: 'Año (opcional)',
-                      hintText: '2024',
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  SizedBox(
-                    height: 50,
-                    child: FilledButton(
-                      onPressed: () {
-                        if (bytes == null) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Agregá una foto del documento'),
-                            ),
-                          );
-                          return;
-                        }
-                        if (tituloCtrl.text.trim().isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Escribí de qué se trata'),
-                            ),
-                          );
-                          return;
-                        }
-                        Navigator.pop(ctx, true);
+                    const SizedBox(height: 16),
+                    InkWell(
+                      onTap: () async {
+                        final source = await pickImageSource(ctx);
+                        if (source == null) return;
+                        final picker = ImagePicker();
+                        final file = await picker.pickImage(
+                          source: source,
+                          maxWidth: 1200,
+                          maxHeight: 1600,
+                          imageQuality: 75,
+                        );
+                        if (file == null) return;
+                        final b = await file.readAsBytes();
+                        setModal(() {
+                          bytes = b;
+                          previewHint =
+                              kIsWeb ? 'Imagen lista' : 'Foto lista para subir';
+                        });
                       },
-                      style: FilledButton.styleFrom(
-                        backgroundColor: primaryColor,
-                        shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        height: 140,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: bytes == null
+                            ? Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.add_a_photo_outlined,
+                                      size: 36, color: primaryColor),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Foto del certificado o constancia',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey.shade700,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : ClipRRect(
+                                borderRadius: BorderRadius.circular(14),
+                                child: Image.memory(
+                                  bytes!,
+                                  fit: BoxFit.cover,
+                                  width: double.infinity,
+                                  height: 140,
+                                ),
+                              ),
+                      ),
+                    ),
+                    if (previewHint != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        previewHint!,
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      ),
+                    ],
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: tituloCtrl,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: InputDecoration(
+                        labelText: '¿Qué es?',
+                        hintText: 'Ej: Curso de soldadura TIG · 2024',
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: const Text(
-                        'Guardar',
-                        style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: anioCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Año (opcional)',
+                        hintText: '2024',
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-
-    if (ok != true || bytes == null) return;
-    final titulo = tituloCtrl.text.trim();
-    if (titulo.isEmpty) return;
-    final anio = int.tryParse(anioCtrl.text.trim());
-
-    final uid = UserSession().uid;
-    if (uid == null) return;
-
-    setState(() => _saving = true);
-    try {
-      final id = DateTime.now().millisecondsSinceEpoch.toString();
-      final ref = FirebaseStorage.instance
-          .ref()
-          .child('usuarios')
-          .child(uid)
-          .child('capacitaciones')
-          .child('$id.jpg');
-      final upload = await ref.putData(
-        bytes!,
-        SettableMetadata(contentType: 'image/jpeg'),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      height: 50,
+                      child: FilledButton(
+                        onPressed: () {
+                          if (bytes == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Agregá una foto del documento'),
+                              ),
+                            );
+                            return;
+                          }
+                          if (tituloCtrl.text.trim().isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Escribí de qué se trata'),
+                              ),
+                            );
+                            return;
+                          }
+                          Navigator.pop(ctx, true);
+                        },
+                        style: FilledButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Guardar',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
       );
-      final url = await upload.ref.getDownloadURL();
 
-      final item = _CapacitacionItem(
-        id: id,
-        titulo: titulo,
-        urlFoto: url,
-        anio: anio,
-        orden: DateTime.now().millisecondsSinceEpoch,
-      );
-      final next = [item, ..._items];
-      await _persistir(next);
-      if (mounted) {
-        setState(() {
-          _items = next;
-          _saving = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Capacitación agregada'),
-            backgroundColor: Colors.green,
-          ),
+      if (ok != true || bytes == null) return;
+      final titulo = tituloCtrl.text.trim();
+      if (titulo.isEmpty) return;
+      final anio = int.tryParse(anioCtrl.text.trim());
+
+      final uid = UserSession().uid;
+      if (uid == null) return;
+
+      setState(() => _saving = true);
+      try {
+        final id = DateTime.now().millisecondsSinceEpoch.toString();
+        final ref = FirebaseStorage.instance
+            .ref()
+            .child('usuarios')
+            .child(uid)
+            .child('capacitaciones')
+            .child('$id.jpg');
+        final upload = await ref.putData(
+          bytes!,
+          SettableMetadata(contentType: 'image/jpeg'),
         );
-      }
-    } catch (e) {
-      debugPrint('Capacitaciones agregar: $e');
-      if (mounted) {
-        setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No se pudo guardar: $e')),
+        final url = await upload.ref.getDownloadURL();
+
+        final item = _CapacitacionItem(
+          id: id,
+          titulo: titulo,
+          urlFoto: url,
+          anio: anio,
+          orden: DateTime.now().millisecondsSinceEpoch,
         );
+        final next = [item, ..._items];
+        await _persistir(next);
+        if (mounted) {
+          setState(() {
+            _items = next;
+            _saving = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Capacitación agregada'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        debugPrint('Capacitaciones agregar: $e');
+        if (mounted) {
+          setState(() => _saving = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('No se pudo guardar: $e')),
+          );
+        }
       }
-    }
     } finally {
-      // Sprint 1: liberar controllers del modal
       tituloCtrl.dispose();
       anioCtrl.dispose();
     }
@@ -392,7 +371,6 @@ class _CapacitacionesFlotanteWidgetState
     try {
       final next = _items.where((e) => e.id != item.id).toList();
       await _persistir(next);
-      // Best-effort borrar foto en Storage
       final uid = UserSession().uid;
       if (uid != null) {
         try {

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # Sprint 4: wire UsuarioListSync + camera guards (idempotent)
+# Trigger: 2026-08-06T18:00Z
 
 # --- Domicilio ---
 if ! grep -q "usuario_list_sync" lib/Domicilioflotante.dart; then
@@ -159,17 +160,22 @@ else:
 p.write_text(t)
 PY
 
-# --- capacitaciones ---
+# --- capacitaciones (idempotent: pickImageSource OR PlatformCapabilities guard) ---
 python3 - <<'PY'
 from pathlib import Path
 p = Path('lib/capacitacionesflotante.dart')
 t = p.read_text()
-if 'platform_capabilities' not in t:
-    t = t.replace(
-        "import 'package:flutter/foundation.dart' show kIsWeb;\n",
-        "import 'package:flutter/foundation.dart' show kIsWeb;\nimport 'platform_capabilities.dart';\n",
-    )
-old = """                              ListTile(
+if 'pickImageSource' in t:
+    print('cap: already pickImageSource')
+elif 'PlatformCapabilities.supportsCamera' in t:
+    print('cap: already PlatformCapabilities guard')
+else:
+    if 'platform_capabilities' not in t:
+        t = t.replace(
+            "import 'package:flutter/foundation.dart' show kIsWeb;\n",
+            "import 'package:flutter/foundation.dart' show kIsWeb;\nimport 'platform_capabilities.dart';\n",
+        )
+    old = """                              ListTile(
                                 leading: const Icon(Icons.photo_camera_outlined),
                                 title: const Text('Tomar foto'),
                                 onTap: () =>
@@ -181,7 +187,7 @@ old = """                              ListTile(
                                 onTap: () =>
                                     Navigator.pop(c2, ImageSource.gallery),
                               ),"""
-new = """                              if (PlatformCapabilities.supportsCamera)
+    new = """                              if (PlatformCapabilities.supportsCamera)
                                 ListTile(
                                   leading: const Icon(Icons.photo_camera_outlined),
                                   title: const Text('Tomar foto'),
@@ -194,15 +200,13 @@ new = """                              if (PlatformCapabilities.supportsCamera)
                                 onTap: () =>
                                     Navigator.pop(c2, ImageSource.gallery),
                               ),"""
-if old in t:
-    t = t.replace(old, new, 1)
-    print('cap: wired')
-elif 'PlatformCapabilities.supportsCamera' in t:
-    print('cap: already')
-else:
-    print('cap: pattern missing')
-    raise SystemExit(1)
-p.write_text(t)
+    if old in t:
+        t = t.replace(old, new, 1)
+        print('cap: wired')
+        p.write_text(t)
+    else:
+        print('cap: pattern missing')
+        raise SystemExit(1)
 PY
 
 echo "Sprint 4 patch applied OK"
