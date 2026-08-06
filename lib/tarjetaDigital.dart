@@ -21,6 +21,8 @@ class TarjetaDigitalWidget extends StatefulWidget {
 class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
   DocumentReference? _resolvedRef;
   bool _loading = true;
+  /// One-shot: no recrear Future en cada rebuild (Sprint 1).
+  Future<List<_FotoItem>>? _fotosFuture;
   static const Color primaryColor = AppColors.prestador;
   static const Color accentColor = Color(0xFFE6F7FA);
   static const Color textColor = AppColors.text;
@@ -39,6 +41,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
     super.initState();
     if (widget.usuarioRef != null) {
       _resolvedRef = widget.usuarioRef;
+      _fotosFuture = _cargarFotos(_resolvedRef!.id);
       _loading = false;
     } else {
       try {
@@ -52,6 +55,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
         }
         if (id != null && id.isNotEmpty) {
           _resolvedRef = FirebaseFirestore.instance.collection('usuarios').doc(id);
+          _fotosFuture = _cargarFotos(id);
         }
       } catch (e) {
         debugPrint('URL parse: $e');
@@ -330,7 +334,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                 ]),
               const SizedBox(height: 24),
               FutureBuilder<List<_FotoItem>>(
-                future: _cargarFotos(docId),
+                future: _fotosFuture ?? _cargarFotos(docId),
                 builder: (context, snap) {
                   final items = snap.data ?? [];
                   final loading = snap.connectionState == ConnectionState.waiting;

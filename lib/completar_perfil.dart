@@ -76,7 +76,7 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
   }
 
   Future<void> _inicializarDatos() async {
-    setState(() => _isLoading = true);
+    if (mounted) setState(() => _isLoading = true);
 
     await _cargarPaises();
 
@@ -86,7 +86,7 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
       await _cargarProvinciasDePais('AR');
     }
 
-    setState(() => _isLoading = false);
+    if (mounted) setState(() => _isLoading = false);
   }
 
   Future<void> _cargarPaises() async {
@@ -174,6 +174,7 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
 
   Future<void> _onPaisSelected(String? paisId) async {
     if (paisId == null) return;
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
       _paisDirId = paisId;
@@ -185,7 +186,7 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
       _localidades = [];
     });
     await _cargarProvinciasDePais(paisId);
-    setState(() => _isLoading = false);
+    if (mounted) setState(() => _isLoading = false);
   }
 
   Future<void> _onProvinciaSelected(String? provId) async {
@@ -199,7 +200,7 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
       _localidades = [];
     });
     await _cargarPartidosDeProvincia(provId);
-    setState(() => _isLoading = false);
+    if (mounted) setState(() => _isLoading = false);
   }
 
   Future<void> _onPartidoSelected(String? partId) async {
@@ -211,7 +212,7 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
       _localidades = [];
     });
     await _cargarLocalidadesDePartido(partId);
-    setState(() => _isLoading = false);
+    if (mounted) setState(() => _isLoading = false);
   }
 
   Future<void> _tomarFoto(bool esPerfil, ImageSource source) async {
@@ -341,12 +342,14 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
         Navigator.pop(context);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppCopy.errorGenerico} ($e)')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${AppCopy.errorGenerico} ($e)')),
+        );
+      }
     }
 
-    setState(() => _isLoading = false);
+    if (mounted) setState(() => _isLoading = false);
   }
 
   @override

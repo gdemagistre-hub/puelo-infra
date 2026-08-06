@@ -1,3 +1,6 @@
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -15,9 +18,13 @@ class DniOcrScanner {
   final _picker = ImagePicker();
   TextRecognizer? _recognizer;
 
-  bool get isSupported => true;
+  bool get isSupported {
+    if (kIsWeb) return false;
+    return Platform.isAndroid || Platform.isIOS;
+  }
 
   Future<DniOcrScanResult?> capturarYEscanear({bool camara = true}) async {
+    if (!isSupported) return null;
     final foto = await _picker.pickImage(
       source: camara ? ImageSource.camera : ImageSource.gallery,
       imageQuality: 40,

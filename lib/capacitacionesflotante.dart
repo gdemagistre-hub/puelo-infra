@@ -104,6 +104,7 @@ class _CapacitacionesFlotanteWidgetState
     Uint8List? bytes;
     String? previewHint;
 
+    try {
     final ok = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -358,6 +359,11 @@ class _CapacitacionesFlotanteWidgetState
           SnackBar(content: Text('No se pudo guardar: $e')),
         );
       }
+    }
+    } finally {
+      // Sprint 1: liberar controllers del modal
+      tituloCtrl.dispose();
+      anioCtrl.dispose();
     }
   }
 

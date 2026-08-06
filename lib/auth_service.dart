@@ -57,6 +57,17 @@ class AuthService {
 
   /// Google Sign-In → perfil Firestore → UserSession.
   Future<void> signInWithGoogle() async {
+    // Escritorio nativo: sin flujo estable aún (usar web o modo prueba).
+    if (!kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.windows ||
+            defaultTargetPlatform == TargetPlatform.linux ||
+            defaultTargetPlatform == TargetPlatform.macOS)) {
+      throw UnsupportedError(
+        'Iniciar con Google en escritorio se habilita en una etapa siguiente. '
+        'Usá la versión web o el menú Modo prueba (equipo).',
+      );
+    }
+
     final UserCredential cred;
     if (kIsWeb) {
       final provider = GoogleAuthProvider();
