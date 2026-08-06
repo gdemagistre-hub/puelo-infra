@@ -3,11 +3,12 @@ import 'package:flutter/foundation.dart';
 /// Entorno de la app. Costo cero: se resuelve en compile-time / debug.
 ///
 /// Uso:
-/// - `AppEnv.isProd` → ocultar dropdown dev, botones admin, logs sensibles
-/// - `AppEnv.showDevTools` → solo debug o staging explícito
+/// - `AppEnv.isProd` → ocultar tools sensibles en builds de release público
+/// - `AppEnv.showDevTools` → dropdown "Modo prueba" (se mantiene para el equipo)
+/// - `AppEnv.devLoginSecret` → mintDevSession (solo builds de equipo)
 ///
-/// Para staging en web podés compilar con:
-///   flutter build web --dart-define=PUELLO_ENV=staging
+/// Staging web:
+///   flutter build web --dart-define=PUELLO_ENV=staging --dart-define=DEV_LOGIN_SECRET=...
 enum PueloEnvironment { debug, staging, prod }
 
 class AppEnv {
@@ -15,6 +16,12 @@ class AppEnv {
 
   static const String _envFromDefine = String.fromEnvironment(
     'PUELLO_ENV',
+    defaultValue: '',
+  );
+
+  /// Secreto de equipo para mintDevSession. Vacío en builds públicos.
+  static const String devLoginSecret = String.fromEnvironment(
+    'DEV_LOGIN_SECRET',
     defaultValue: '',
   );
 
@@ -38,8 +45,19 @@ class AppEnv {
   static bool get isStaging => current == PueloEnvironment.staging;
   static bool get isDebug => current == PueloEnvironment.debug;
 
-  /// Herramientas de desarrollo (dropdown usuarios, batch scoring, etc.)
-  static bool get showDevTools => !isProd;
+  /// Menú "Modo prueba (equipo)" — se mantiene visible para el equipo.
+  /// En release público (prod) sigue visible por decisión de producto TEMP;
+  /// apagar con --dart-define=PUELLO_ENV=prod + showDevToolsOverride si se desea.
+  ///
+  /// Política Sprint 0: **siempre true** para no romper el flujo del equipo.
+  /// Para ocultar en un build: --dart-define=HIDE_DEV_LOGIN=1
+  static bool get showDevTools {
+    const hide = String.fromEnvironment('HIDE_DEV_LOGIN', defaultValue: '');
+    if (hide == '1' || hide.toLowerCase() == 'true') return false;
+    return true;
+  }
+
+  static bool get hasDevLoginSecret => devLoginSecret.isNotEmpty;
 
   /// Logs verbosos en consola
   static bool get verboseLogging => isDebug || isStaging;

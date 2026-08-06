@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'user_session.dart';
 import 'Homepage.dart';
 import 'theme/app_colors.dart';
-import 'scoring_service.dart';
 
 class PantallaGraciasValidacionWidget extends StatefulWidget {
   const PantallaGraciasValidacionWidget({super.key});
@@ -43,12 +43,30 @@ class _PantallaGraciasValidacionWidgetState
       final uri = Uri.parse(
         'https://southamerica-east1-lifewalletpuelo.cloudfunctions.net/aplicarValidacionPendiente',
       );
+
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+      };
+      // Preferente: Auth real (Google o mintDevSession)
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        try {
+          final idToken = await user.getIdToken();
+          if (idToken != null && idToken.isNotEmpty) {
+            headers['Authorization'] = 'Bearer $idToken';
+          }
+        } catch (e) {
+          debugPrint('getIdToken: $e');
+        }
+      }
+
       final resp = await http
           .post(
             uri,
-            headers: {'Content-Type': 'application/json'},
+            headers: headers,
             body: jsonEncode({
               'token': token,
+              // Fallback TEMP si ALLOW_DEV_VALIDACION=1 y no hay Bearer
               'validadorId': validadorId,
             }),
           )
@@ -60,6 +78,18 @@ class _PantallaGraciasValidacionWidgetState
           final n = data['targetNombre'] as String?;
           if (n != null && n.isNotEmpty) _nombreTarget = n;
         } catch (_) {}
+      } else if (resp.statusCode == 401) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Necesitás iniciar sesión (Google o modo prueba con token) '
+                'para aplicar la validación.',
+              ),
+              duration: Duration(seconds: 6),
+            ),
+          );
+        }
       } else if (resp.statusCode == 403) {
         try {
           final data = jsonDecode(resp.body) as Map<String, dynamic>;

@@ -113,7 +113,7 @@ class _CargaTrabajoTrabajadorWidgetState
         final fileName =
             '${uid}_${DateTime.now().millisecondsSinceEpoch}_${image.name}';
         final storageRef =
-            FirebaseStorage.instance.ref().child('portfolio/$uid/$fileName');
+            FirebaseStorage.instance.ref().child('usuarios/$uid/portfolio/$fileName');
         final fileBytes = await image.readAsBytes();
 
         final snapshot = await storageRef.putData(

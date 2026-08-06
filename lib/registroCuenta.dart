@@ -68,7 +68,7 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
     setState(() => _isLoading = true);
 
     try {
-      _tokenValidacion = uuid.v4().substring(0, 8).toUpperCase();
+      _tokenValidacion = uuid.v4().toUpperCase();
 
       final Map<String, dynamic> dataUsuario = {
         'nombre': _nombreController.text.trim(),

@@ -75,11 +75,31 @@ class UserSession {
     _persistUid(id, isDev: isDevImpersonation);
   }
 
-  /// Admin de consola Prox (campo en Firestore usuarios/{id}).
+  /// Admin de consola Prox.
+  /// Preferir custom claim `admin` (Auth). Fallback a campo Firestore
+  /// (solo confiable si rules bloquean write de es_admin — Sprint 0).
   bool get isAdmin {
     final d = datosCompletos;
     if (d == null) return false;
-    return d['es_admin'] == true || d['rol'] == 'admin';
+    if (d['es_admin'] == true || d['rol'] == 'admin') return true;
+    return false;
+  }
+
+  /// Refresca claim admin desde Firebase Auth (si hay sesión real).
+  Future<bool> refreshAdminFromClaims() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return isAdmin;
+      final token = await user.getIdTokenResult(true);
+      final claim = token.claims?['admin'] == true;
+      if (claim && datosCompletos != null) {
+        datosCompletos = {...datosCompletos!, 'es_admin': true};
+      }
+      return claim || isAdmin;
+    } catch (e) {
+      debugPrint('UserSession.refreshAdminFromClaims: $e');
+      return isAdmin;
+    }
   }
 
   /// Restaura: Auth real primero, luego prefs del dropdown.

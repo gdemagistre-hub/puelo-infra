@@ -277,15 +277,21 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
       if (_fotoPerfilBytes != null) {
         final ref = storage
             .ref()
-            .child('usuarios_fotos/perfil_$_selectedUsuarioId.jpg');
-        await ref.putData(_fotoPerfilBytes!);
+            .child('usuarios/$_selectedUsuarioId/perfil.jpg');
+        await ref.putData(
+          _fotoPerfilBytes!,
+          SettableMetadata(contentType: 'image/jpeg'),
+        );
         urlPerfil = await ref.getDownloadURL();
       }
 
       if (_fotoDocBytes != null) {
         final ref =
-            storage.ref().child('usuarios_fotos/doc_$_selectedUsuarioId.jpg');
-        await ref.putData(_fotoDocBytes!);
+            storage.ref().child('usuarios/$_selectedUsuarioId/doc.jpg');
+        await ref.putData(
+          _fotoDocBytes!,
+          SettableMetadata(contentType: 'image/jpeg'),
+        );
         urlDoc = await ref.getDownloadURL();
       }
 
