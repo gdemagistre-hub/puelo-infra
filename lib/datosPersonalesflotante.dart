@@ -10,6 +10,7 @@ import 'package:intl/intl.dart';
 import 'dni_ocr_parser.dart';
 import 'dni_ocr_scan.dart';
 import 'user_session.dart';
+import 'usuario_list_sync.dart';
 import 'theme/app_colors.dart';
 
 class DatosPersonalesFlotanteWidget extends StatefulWidget {
@@ -476,16 +477,10 @@ class _DatosPersonalesFlotanteWidgetState
         payload['doc_validado_en'] = FieldValue.delete();
         payload['doc_hash_datos'] = FieldValue.delete();
       }
-      await FirebaseFirestore.instance
-          .collection('usuarios')
-          .doc(uid)
-          .set(payload, SetOptions(merge: true));
+      await UsuarioListSync.mergeUserDoc(uid, payload);
       final session = UserSession();
       session.nombre = _nombreController.text.trim();
       session.apellido = _apellidoController.text.trim();
-      if (session.datosCompletos != null) {
-        session.datosCompletos = {...session.datosCompletos!, ...payload};
-      }
       if (mounted) {
         setState(() {
           _docValidado = sigueValidado;

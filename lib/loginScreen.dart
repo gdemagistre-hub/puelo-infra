@@ -22,7 +22,7 @@ class LoginScreenWidget extends StatefulWidget {
   static const String routePath = '/login';
 
   static const String _mintDevUrl =
-      'https://southamerica-east1-lifewalletpuelo.cloudfunctions.net/mintDevSession';
+      'https://us-east1-lifewalletpuelo.cloudfunctions.net/mintDevSession';
 
   @override
   State<LoginScreenWidget> createState() => _LoginScreenWidgetState();

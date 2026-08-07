@@ -23,7 +23,7 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 
 setGlobalOptions({
-  region: "southamerica-east1",
+  region: "us-east1",
   memory: "1GiB",
   timeoutSeconds: 540,
 });
@@ -69,8 +69,7 @@ function envFlag(name, defaultValue = "0") {
 exports.scoringBatchHttp = onRequest(
   {
     invoker: "public",
-    // Si el secret existe en el proyecto, bindearlo:
-    // secrets: ["BATCH_SECRET"],
+    secrets: ["BATCH_SECRET"],
   },
   async (req, res) => {
     applyCors(req, res);
@@ -133,6 +132,7 @@ exports.mintDevSession = onRequest(
     cors: ALLOWED_ORIGINS,
     memory: "256MiB",
     timeoutSeconds: 30,
+    secrets: ["DEV_LOGIN_SECRET"],
   },
   async (req, res) => {
     applyCors(req, res);

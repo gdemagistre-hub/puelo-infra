@@ -41,7 +41,7 @@ class _PantallaGraciasValidacionWidgetState
 
     try {
       final uri = Uri.parse(
-        'https://southamerica-east1-lifewalletpuelo.cloudfunctions.net/aplicarValidacionPendiente',
+        'https://us-east1-lifewalletpuelo.cloudfunctions.net/aplicarValidacionPendiente',
       );
 
       final headers = <String, String>{
