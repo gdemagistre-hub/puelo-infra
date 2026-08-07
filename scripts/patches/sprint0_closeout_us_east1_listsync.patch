@@ -1,0 +1,70 @@
+diff --git a/functions/index.js b/functions/index.js
+index c762963..302ea85 100644
+--- a/functions/index.js
++++ b/functions/index.js
+@@ -23,7 +23,7 @@ if (!admin.apps.length) {
+ const db = admin.firestore();
+ 
+ setGlobalOptions({
+-  region: "southamerica-east1",
++  region: "us-east1",
+   memory: "1GiB",
+   timeoutSeconds: 540,
+ });
+@@ -69,8 +69,7 @@ function envFlag(name, defaultValue = "0") {
+ exports.scoringBatchHttp = onRequest(
+   {
+     invoker: "public",
+-    // Si el secret existe en el proyecto, bindearlo:
+-    // secrets: ["BATCH_SECRET"],
++    secrets: ["BATCH_SECRET"],
+   },
+   async (req, res) => {
+     applyCors(req, res);
+@@ -133,6 +132,7 @@ exports.mintDevSession = onRequest(
+     cors: ALLOWED_ORIGINS,
+     memory: "256MiB",
+     timeoutSeconds: 30,
++    secrets: ["DEV_LOGIN_SECRET"],
+   },
+   async (req, res) => {
+     applyCors(req, res);
+diff --git a/lib/loginScreen.dart b/lib/loginScreen.dart
+index a13a1ef..4b7d1be 100644
+--- a/lib/loginScreen.dart
++++ b/lib/loginScreen.dart
+@@ -22,7 +22,7 @@ class LoginScreenWidget extends StatefulWidget {
+   static const String routePath = '/login';
+ 
+   static const String _mintDevUrl =
+-      'https://southamerica-east1-lifewalletpuelo.cloudfunctions.net/mintDevSession';
++      'https://us-east1-lifewalletpuelo.cloudfunctions.net/mintDevSession';
+ 
+   @override
+   State<LoginScreenWidget> createState() => _LoginScreenWidgetState();
+diff --git a/lib/pantalla_gracias_validacion.dart b/lib/pantalla_gracias_validacion.dart
+index 0e00f31..2700e56 100644
+--- a/lib/pantalla_gracias_validacion.dart
++++ b/lib/pantalla_gracias_validacion.dart
+@@ -41,7 +41,7 @@ class _PantallaGraciasValidacionWidgetState
+ 
+     try {
+       final uri = Uri.parse(
+-        'https://southamerica-east1-lifewalletpuelo.cloudfunctions.net/aplicarValidacionPendiente',
++        'https://us-east1-lifewalletpuelo.cloudfunctions.net/aplicarValidacionPendiente',
+       );
+ 
+       final headers = <String, String>{
+diff --git a/lib/validar_domicilio.dart b/lib/validar_domicilio.dart
+index d57a753..5c7bb9c 100644
+--- a/lib/validar_domicilio.dart
++++ b/lib/validar_domicilio.dart
+@@ -210,7 +210,7 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
+       // 1) Cloud Function (Admin SDK) — si está desplegada
+       try {
+         final uri = Uri.parse(
+-          'https://southamerica-east1-lifewalletpuelo.cloudfunctions.net/submitValidacionPendiente',
++          'https://us-east1-lifewalletpuelo.cloudfunctions.net/submitValidacionPendiente',
+         );
+         final resp = await http
+             .post(

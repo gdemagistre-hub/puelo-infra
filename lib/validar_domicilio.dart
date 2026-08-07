@@ -210,7 +210,7 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
       // 1) Cloud Function (Admin SDK) — si está desplegada
       try {
         final uri = Uri.parse(
-          'https://southamerica-east1-lifewalletpuelo.cloudfunctions.net/submitValidacionPendiente',
+          'https://us-east1-lifewalletpuelo.cloudfunctions.net/submitValidacionPendiente',
         );
         final resp = await http
             .post(

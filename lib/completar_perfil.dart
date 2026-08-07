@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
+import 'platform_capabilities.dart';
+import 'usuario_list_sync.dart';
 import 'package:intl/intl.dart';
 import 'user_session.dart';
 import 'theme/app_colors.dart';
@@ -216,10 +218,19 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
   }
 
   Future<void> _tomarFoto(bool esPerfil, ImageSource source) async {
-    final XFile? image =
-        await picker.pickImage(source: source, imageQuality: 70);
-    if (image != null) {
+    if (source == ImageSource.camera && !PlatformCapabilities.supportsCamera) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(PlatformCapabilities.cameraUnsupportedMessage)),
+      );
+      return;
+    }
+    try {
+      final XFile? image =
+          await picker.pickImage(source: source, imageQuality: 70);
+      if (image == null) return;
       final bytes = await image.readAsBytes();
+      if (!mounted) return;
       setState(() {
         if (esPerfil) {
           _fotoPerfilBytes = bytes;
@@ -227,6 +238,11 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
           _fotoDocBytes = bytes;
         }
       });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo cargar la imagen: $e')),
+      );
     }
   }
 
@@ -327,10 +343,7 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
             Timestamp.fromDate(_fechaNacimiento!);
       }
 
-      await db
-          .collection('usuarios')
-          .doc(_selectedUsuarioId)
-          .set(actualizacion, SetOptions(merge: true));
+      await UsuarioListSync.mergeUserDoc(_selectedUsuarioId!, actualizacion);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
