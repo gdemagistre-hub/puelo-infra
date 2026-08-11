@@ -245,50 +245,48 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             child: Text('Oficios', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
           ),
         ),
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          sliver: Sli verGrid(
-            gridDelegate: const Sli verGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 1.18,
-            ),
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final cat = _categorias[index];
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: _categorias.map((cat) {
                 final Color accent = (cat['color'] as Color?) ?? _clientePrimary;
-                return Material(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(18),
-                  child: InkWell(
+                return SizedBox(
+                  width: (MediaQuery.of(context).size.width - 44) / 2,
+                  child: Material(
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(18),
-                    onTap: () => _abrirBuscador(oficio: cat['id'] as String),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: accent.withOpacity(0.18)),
-                        gradient: LinearGradient(colors: [accent.withOpacity(0.08), Colors.white], begin: Alignment.topLeft, end: Alignment.bottomRight),
-                      ),
-                      padding: const EdgeInsets.all(14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(color: accent.withOpacity(0.16), borderRadius: BorderRadius.circular(12)),
-                            child: Icon(cat['icon'] as IconData, color: accent, size: 24),
-                          ),
-                          Text(cat['label'] as String, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: accent.withOpacity(0.95)), maxLines: 1, overflow: TextOverflow.ellipsis),
-                        ],
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(18),
+                      onTap: () => _abrirBuscador(oficio: cat['id'] as String),
+                      child: Container(
+                        height: 90,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: accent.withOpacity(0.18)),
+                          gradient: LinearGradient(colors: [accent.withOpacity(0.08), Colors.white], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                        ),
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(color: accent.withOpacity(0.16), borderRadius: BorderRadius.circular(10)),
+                              child: Icon(cat['icon'] as IconData, color: accent, size: 20),
+                            ),
+                            Text(cat['label'] as String, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: accent.withOpacity(0.95)), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 );
-              },
-              childCount: _categorias.length,
+              }).toList(),
             ),
           ),
         ),
