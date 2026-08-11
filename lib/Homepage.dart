@@ -6,6 +6,11 @@ import 'menuEvaluaciones.dart';
 import 'menuPerfilOpciones.dart';
 import 'tarjetaDigital.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:typed_data';
+import 'platform_capabilities.dart';
 import 'catalogo_oficios.dart';
 
 class HomePageWidget extends StatefulWidget {
@@ -32,6 +37,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   final FocusNode _searchFocus = FocusNode();
   List<OficioEspecialidad> _sugerencias = [];
 
+  String? _urlFotoPerfil;
+  bool _subiendoFoto = false;
+
   Color get primaryColor => _modoPrestador ? _prestadorPrimary : _clientePrimary;
   Color get primaryDark => _modoPrestador ? _prestadorDark : _clienteDark;
 
@@ -50,6 +58,12 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   void initState() {
     super.initState();
     _detectarRol();
+    final foto = (UserSession().datosCompletos?['url_foto_perfil'] ??
+            UserSession().datosCompletos?['foto_perfil'] ??
+            '')
+        .toString()
+        .trim();
+    if (foto.isNotEmpty) _urlFotoPerfil = foto;
   }
 
   @override
@@ -125,6 +139,222 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           usuarioRef: FirebaseFirestore.instance.collection('usuarios').doc(userId),
         ),
       ),
+    );
+  }
+
+  void _mostrarOpcionesSelfie() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 12, 8, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Foto de perfil',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Una selfie ayuda a que te reconozcan y generen confianza.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.35),
+                ),
+                const SizedBox(height: 12),
+                if (PlatformCapabilities.supportsCamera)
+                  ListTile(
+                    leading: Icon(Icons.photo_camera_outlined, color: primaryColor),
+                    title: const Text('Tomar selfie'),
+                    subtitle: const Text('Cámara frontal'),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _elegirYSubirFoto(ImageSource.camera);
+                    },
+                  ),
+                ListTile(
+                  leading: Icon(Icons.photo_library_outlined, color: primaryColor),
+                  title: const Text('Elegir de galería'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _elegirYSubirFoto(ImageSource.gallery);
+                  },
+                ),
+                if (_urlFotoPerfil != null && _urlFotoPerfil!.isNotEmpty)
+                  ListTile(
+                    leading: const Icon(Icons.delete_outline, color: Colors.red),
+                    title: const Text('Quitar foto'),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _quitarFotoPerfil();
+                    },
+                  ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text('Ahora no', style: TextStyle(color: Colors.grey.shade600)),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _elegirYSubirFoto(ImageSource source) async {
+    final uid = UserSession().uid;
+    if (uid == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Iniciá sesión para subir tu foto.')),
+      );
+      return;
+    }
+    if (source == ImageSource.camera && !PlatformCapabilities.supportsCamera) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(PlatformCapabilities.cameraUnsupportedMessage)),
+      );
+      return;
+    }
+    try {
+      final picker = ImagePicker();
+      final XFile? file = await picker.pickImage(
+        source: source,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+        preferredCameraDevice: CameraDevice.front,
+      );
+      if (file == null) return;
+      if (!mounted) return;
+      setState(() => _subiendoFoto = true);
+
+      final bytes = await file.readAsBytes();
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('usuarios')
+          .child(uid)
+          .child('foto_perfil.jpg');
+      final upload = await ref.putData(
+        Uint8List.fromList(bytes),
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
+      final url = await upload.ref.getDownloadURL();
+
+      await FirebaseFirestore.instance.collection('usuarios').doc(uid).set({
+        'url_foto_perfil': url,
+        'foto_perfil': url,
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      final session = UserSession();
+      if (session.datosCompletos != null) {
+        session.datosCompletos = {
+          ...session.datosCompletos!,
+          'url_foto_perfil': url,
+          'foto_perfil': url,
+        };
+      } else {
+        session.datosCompletos = {'url_foto_perfil': url, 'foto_perfil': url};
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _urlFotoPerfil = url;
+        _subiendoFoto = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('¡Listo! Tu foto de perfil quedó actualizada.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _subiendoFoto = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo subir la foto: $e')),
+      );
+    }
+  }
+
+  Future<void> _quitarFotoPerfil() async {
+    final uid = UserSession().uid;
+    if (uid == null) return;
+    try {
+      setState(() => _subiendoFoto = true);
+      await FirebaseFirestore.instance.collection('usuarios').doc(uid).set({
+        'url_foto_perfil': FieldValue.delete(),
+        'foto_perfil': FieldValue.delete(),
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      try {
+        await FirebaseStorage.instance
+            .ref()
+            .child('usuarios')
+            .child(uid)
+            .child('foto_perfil.jpg')
+            .delete();
+      } catch (_) {}
+      final session = UserSession();
+      if (session.datosCompletos != null) {
+        session.datosCompletos = Map<String, dynamic>.from(session.datosCompletos!)
+          ..remove('url_foto_perfil')
+          ..remove('foto_perfil');
+      }
+      if (!mounted) return;
+      setState(() {
+        _urlFotoPerfil = null;
+        _subiendoFoto = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _subiendoFoto = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo quitar la foto: $e')),
+      );
+    }
+  }
+
+  Widget _buildAvatarHeader() {
+    final hasFoto = _urlFotoPerfil != null && _urlFotoPerfil!.isNotEmpty;
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 8, offset: const Offset(0, 2)),
+        ],
+        image: hasFoto
+            ? DecorationImage(
+                image: NetworkImage(_urlFotoPerfil!),
+                fit: BoxFit.cover,
+              )
+            : null,
+      ),
+      alignment: Alignment.center,
+      child: hasFoto
+          ? null
+          : Text(
+              _getInitials(),
+              style: TextStyle(color: primaryColor, fontWeight: FontWeight.w800, fontSize: 15),
+            ),
     );
   }
 
@@ -249,16 +479,43 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                     ),
                     const SizedBox(width: 10),
                   ],
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 8, offset: const Offset(0, 2))],
+                  GestureDetector(
+                    onTap: _subiendoFoto ? null : _mostrarOpcionesSelfie,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        _buildAvatarHeader(),
+                        Positioned(
+                          right: -2,
+                          bottom: -2,
+                          child: Container(
+                            width: 18,
+                            height: 18,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: primaryColor.withOpacity(0.35), width: 1.2),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.12),
+                                  blurRadius: 3,
+                                  offset: const Offset(0, 1),
+                                ),
+                              ],
+                            ),
+                            child: _subiendoFoto
+                                ? Padding(
+                                    padding: const EdgeInsets.all(3),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 1.5,
+                                      color: primaryColor,
+                                    ),
+                                  )
+                                : Icon(Icons.photo_camera_rounded, size: 11, color: primaryColor),
+                          ),
+                        ),
+                      ],
                     ),
-                    alignment: Alignment.center,
-                    child: Text(_getInitials(), style: TextStyle(color: primaryColor, fontWeight: FontWeight.w800, fontSize: 15)),
                   ),
                 ],
               ),
@@ -369,20 +626,20 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
         ),
-        SliverToBoxAdapter(
+        Sli verToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
             child: Text('Oficios', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
           ),
         ),
-        SliverToBoxAdapter(
+        Sli verToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
             child: GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: _categorias.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              gridDelegate: const Sli verGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 4,
                 mainAxisSpacing: 14,
                 crossAxisSpacing: 8,
@@ -429,7 +686,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
         ),
-        SliverToBoxAdapter(
+        Sli verToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
             child: Material(
@@ -477,7 +734,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
         ),
-        const SliverToBoxAdapter(child: SizedBox(height: 32)),
+        const Sli verToBoxAdapter(child: SizedBox(height: 32)),
       ],
     );
   }
@@ -485,8 +742,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   Widget _buildPrestadorHome() {
     return CustomScrollView(
       slivers: [
-        SliverToBoxAdapter(child: _buildBrandHeader(subtitle: 'Tu perfil profesional en Puelo')),
-        SliverToBoxAdapter(
+        Sli verToBoxAdapter(child: _buildBrandHeader(subtitle: 'Tu perfil profesional en Puelo')),
+        Sli verToBoxAdapter(
           child: Transform.translate(
             offset: const Offset(0, -18),
             child: Padding(
@@ -532,8 +789,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
         ),
-        const SliverToBoxAdapter(child: SizedBox(height: 28)),
-        SliverToBoxAdapter(
+        const Sli verToBoxAdapter(child: SizedBox(height: 28)),
+        Sli verToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Material(
@@ -572,7 +829,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
         ),
-        const SliverToBoxAdapter(child: SizedBox(height: 40)),
+        const Sli verToBoxAdapter(child: SizedBox(height: 40)),
       ],
     );
   }
