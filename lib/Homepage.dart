@@ -477,14 +477,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       final sc = _dp['scoring'];
       if (sc is Map && sc['score_identidad'] is num) score = (sc['score_identidad'] as num).toInt();
     }
-    String motiv;
-    if (nEval > 0 && stars > 0) {
-      motiv = 'Los clientes ya confían en vos · seguí sumando trabajos';
-    } else if ({'bronce', 'bronce_plus', 'plata', 'oro', 'diamante', 'registrado'}.contains(badge)) {
-      motiv = 'Vas bien · compartí tu tarjeta para que te contacten';
-    } else {
-      motiv = 'Completá tu perfil y pedí una validación para subir tu confianza';
-    }
+    final scoreClamped = score.clamp(0, 100);
+    final scoreProgress = scoreClamped / 100.0;
 
     return ListView(
       padding: EdgeInsets.zero,
@@ -503,13 +497,24 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(22),
-                  gradient: LinearGradient(colors: [Colors.white, _prestadorPrimary.withOpacity(0.08)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                  gradient: LinearGradient(
+                    colors: [Colors.white, _prestadorPrimary.withOpacity(0.08)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                   border: Border.all(color: _prestadorPrimary.withOpacity(0.18)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Tu confianza', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey.shade600)),
+                    Text(
+                      'Así te ven los clientes',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
                     const SizedBox(height: 6),
                     Text(
                       label.isNotEmpty ? label : 'Sin nivel aún',
@@ -517,7 +522,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                         fontSize: 28,
                         fontWeight: FontWeight.w900,
                         letterSpacing: -0.6,
-                        color: label.isNotEmpty ? Color(colors.foreground) : const Color(0xFF94A3B8),
+                        color: label.isNotEmpty
+                            ? Color(colors.foreground)
+                            : const Color(0xFF94A3B8),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -526,7 +533,11 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                         Expanded(
                           child: Container(
                             padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
                             child: Row(
                               children: [
                                 Icon(Icons.star_rounded, color: Colors.amber.shade700, size: 22),
@@ -535,8 +546,22 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text(nEval > 0 ? '${stars.toStringAsFixed(1)} ($nEval)' : '—', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
-                                      Text(nEval > 0 ? 'Calificación' : 'Sin evaluaciones', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                                      Text(
+                                        nEval > 0
+                                            ? '${stars.toStringAsFixed(1)} ($nEval)'
+                                            : '—',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                      Text(
+                                        nEval > 0 ? 'Calificación' : 'Sin evaluaciones',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -547,18 +572,62 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
                             child: Row(
                               children: [
-                                Icon(Icons.verified_user_outlined, color: _prestadorPrimary, size: 22),
+                                SizedBox(
+                                  width: 44,
+                                  height: 44,
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      SizedBox(
+                                        width: 44,
+                                        height: 44,
+                                        child: CircularProgressIndicator(
+                                          value: score > 0 ? scoreProgress : 0,
+                                          strokeWidth: 5,
+                                          backgroundColor: const Color(0xFFE2E8F0),
+                                          color: const Color(0xFF16A34A),
+                                          strokeCap: StrokeCap.round,
+                                        ),
+                                      ),
+                                      Text(
+                                        score > 0 ? '$scoreClamped' : '—',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w900,
+                                          color: Color(0xFF0F172A),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text(score > 0 ? '$score' : '—', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
-                                      Text(score > 0 ? 'Confianza' : 'Sin score', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                                      Text(
+                                        score > 0 ? '$scoreClamped / 100' : '—',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w900,
+                                          color: Color(0xFF0F172A),
+                                        ),
+                                      ),
+                                      Text(
+                                        'Confianza',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -567,17 +636,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                           ),
                         ),
                       ],
-                    ),
-                    if (nEval == 0) ...[
-                      const SizedBox(height: 12),
-                      Text('Todavía no tenés evaluaciones · pedí que te califiquen tras un trabajo', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                    ],
-                    const SizedBox(height: 14),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      decoration: BoxDecoration(color: _prestadorPrimary.withOpacity(0.10), borderRadius: BorderRadius.circular(12)),
-                      child: Text(motiv, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _prestadorDark)),
                     ),
                   ],
                 ),
@@ -607,9 +665,19 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Tu tarjeta digital', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+                          Text(
+                            'Tu tarjeta digital',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                            ),
+                          ),
                           SizedBox(height: 2),
-                          Text('Compartila y que te contacten', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                          Text(
+                            'Compartila y que te contacten',
+                            style: TextStyle(color: Colors.white70, fontSize: 13),
+                          ),
                         ],
                       ),
                     ),
