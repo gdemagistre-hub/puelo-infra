@@ -80,7 +80,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
       origen: 'tarjeta',
       prestadorNombre: nombre.isEmpty ? null : nombre,
     );
-    final tel = telefono.replaceAll(RegExp(r'[^\\d+]'), '');
+    final tel = telefono.replaceAll(RegExp(r'[^\d+]'), '');
     final url = Uri.parse(
       'https://wa.me/$tel?text=${Uri.encodeComponent('Hola $nombre, vi tu tarjeta en Puelo y me gustaría hacerte una consulta.')}',
     );
@@ -98,7 +98,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
       origen: 'tarjeta',
       prestadorNombre: prestadorNombre,
     );
-    final url = Uri.parse('tel:${telefono.replaceAll(RegExp(r'[^\\d+]'), '')}');
+    final url = Uri.parse('tel:${telefono.replaceAll(RegExp(r'[^\d+]'), '')}');
     if (await canLaunchUrl(url)) {
       await launchUrl(url);
     } else {
@@ -109,7 +109,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
   Future<void> _compartirPorWhatsApp(String nombre, String idDocumento) async {
     final link = 'https://lifewalletpuelo.web.app/#/tarjetaDigital?id=$idDocumento';
     final url = Uri.parse(
-      'https://wa.me/?text=${Uri.encodeComponent('¡Hola! Te comparto mi tarjeta de servicios en Puelo:\\n\\n$link')}',
+      'https://wa.me/?text=${Uri.encodeComponent('¡Hola! Te comparto mi tarjeta de servicios en Puelo:\n\n$link')}',
     );
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
@@ -532,10 +532,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                                             ),
                                           ),
                                         const SizedBox(height: 4),
-                                        Text(
-                                          'Nivel',
-                                          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                                        ),
+                                        Text('Nivel', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
                                       ],
                                     ),
                                   ),
@@ -616,11 +613,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                             const SizedBox(height: 12),
                             Text(
                               microcopy,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade600,
-                                height: 1.35,
-                              ),
+                              style: TextStyle(fontSize: 12, color: Colors.grey.shade600, height: 1.35),
                             ),
                           ],
                         ),
@@ -654,10 +647,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                             ),
                             icon: const FaIcon(FontAwesomeIcons.whatsapp, size: 20),
-                            label: const Text(
-                              'WhatsApp',
-                              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-                            ),
+                            label: const Text('WhatsApp', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
                           ),
                         ),
                       ),
@@ -680,10 +670,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                             ),
                             icon: const Icon(Icons.phone_outlined, size: 20),
-                            label: const Text(
-                              'Llamar',
-                              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
-                            ),
+                            label: const Text('Llamar', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
                           ),
                         ),
                       ),
@@ -705,11 +692,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                             Expanded(
                               child: Text(
                                 'Compartí tu tarjeta con clientes',
-                                style: TextStyle(
-                                  color: primaryDark,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 13,
-                                ),
+                                style: TextStyle(color: primaryDark, fontWeight: FontWeight.w700, fontSize: 13),
                               ),
                             ),
                             IconButton(
@@ -743,27 +726,16 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                             children: [
                               const Text(
                                 'Trabajos realizados',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w800,
-                                  color: textColor,
-                                ),
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: textColor),
                               ),
                               const Spacer(),
                               if (!loading && items.isNotEmpty)
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: accentColor,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
+                                  decoration: BoxDecoration(color: accentColor, borderRadius: BorderRadius.circular(6)),
                                   child: Text(
                                     '${items.length} FOTO${items.length == 1 ? '' : 'S'}',
-                                    style: const TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w800,
-                                      color: primaryColor,
-                                    ),
+                                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: primaryColor),
                                   ),
                                 ),
                             ],
@@ -772,9 +744,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                           if (loading)
                             const Padding(
                               padding: EdgeInsets.all(24),
-                              child: Center(
-                                child: CircularProgressIndicator(color: primaryColor, strokeWidth: 2),
-                              ),
+                              child: Center(child: CircularProgressIndicator(color: primaryColor, strokeWidth: 2)),
                             )
                           else if (items.isEmpty)
                             Container(
@@ -794,11 +764,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                                         ? 'Subí fotos de trabajos hechos para que el cliente vea tu experiencia.'
                                         : 'Aún no publicó fotos de trabajos.',
                                     textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: Colors.grey.shade600,
-                                      fontSize: 13,
-                                      height: 1.35,
-                                    ),
+                                    style: TextStyle(color: Colors.grey.shade600, fontSize: 13, height: 1.35),
                                   ),
                                   if (!esPropietario) ...[
                                     const SizedBox(height: 12),
@@ -877,11 +843,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
       ),
       child: Text(
         label,
-        style: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: primaryDark,
-        ),
+        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: primaryDark),
       ),
     );
   }
