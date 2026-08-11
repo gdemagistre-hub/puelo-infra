@@ -58,11 +58,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   void initState() {
     super.initState();
     _detectarRol();
-    final foto = (UserSession().datosCompletos?['url_foto_perfil'] ??
-            UserSession().datosCompletos?['foto_perfil'] ??
-            '')
-        .toString()
-        .trim();
+    final foto = (UserSession().datosCompletos?['url_foto_perfil'] ?? UserSession().datosCompletos?['foto_perfil'] ?? '').toString().trim();
     if (foto.isNotEmpty) _urlFotoPerfil = foto;
   }
 
@@ -77,10 +73,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     final data = UserSession().datosCompletos;
     final esPrestador = data?['es_trabajador'] == true || data?['rol'] == 'trabajador';
     final forzado = widget.initialModoPrestador;
-    final modo = forzado ?? esPrestador;
     setState(() {
       _puedeSerAmbos = esPrestador;
-      _modoPrestador = modo;
+      _modoPrestador = forzado ?? esPrestador;
     });
   }
 
@@ -99,118 +94,59 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   }
 
   void _abrirBuscador({String? oficio}) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => BuscadorPrestadoresWidget(initialQuery: oficio)),
-    );
+    Navigator.push(context, MaterialPageRoute(builder: (_) => BuscadorPrestadoresWidget(initialQuery: oficio)));
   }
 
   void _onSearchChanged(String value) {
-    final list = CatalogoOficios.sugerencias(value, limit: 8);
-    setState(() => _sugerencias = list);
+    setState(() => _sugerencias = CatalogoOficios.sugerencias(value, limit: 8));
   }
 
   void _submitBusqueda([String? raw]) {
     final q = (raw ?? _searchCtrl.text).trim();
     _searchFocus.unfocus();
     setState(() => _sugerencias = []);
-    if (q.isEmpty) {
-      _abrirBuscador();
-      return;
-    }
+    if (q.isEmpty) { _abrirBuscador(); return; }
     _abrirBuscador(oficio: q);
   }
 
   void _elegirSugerencia(OficioEspecialidad e) {
     _searchCtrl.text = e.label;
-    _searchCtrl.selection = TextSelection.fromPosition(
-      TextPosition(offset: _searchCtrl.text.length),
-    );
+    _searchCtrl.selection = TextSelection.fromPosition(TextPosition(offset: _searchCtrl.text.length));
     _submitBusqueda(e.id);
   }
 
   void _compartirTarjeta() {
     final userId = UserSession().uid;
     if (userId == null) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => TarjetaDigitalWidget(
-          usuarioRef: FirebaseFirestore.instance.collection('usuarios').doc(userId),
-        ),
-      ),
-    );
+    Navigator.push(context, MaterialPageRoute(builder: (_) => TarjetaDigitalWidget(usuarioRef: FirebaseFirestore.instance.collection('usuarios').doc(userId))));
   }
 
   void _mostrarOpcionesSelfie() {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(8, 12, 8, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Foto de perfil',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Una selfie ayuda a que te reconozcan y generen confianza.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.35),
-                ),
-                const SizedBox(height: 12),
-                if (PlatformCapabilities.supportsCamera)
-                  ListTile(
-                    leading: Icon(Icons.photo_camera_outlined, color: primaryColor),
-                    title: const Text('Tomar selfie'),
-                    subtitle: const Text('Cámara frontal'),
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      _elegirYSubirFoto(ImageSource.camera);
-                    },
-                  ),
-                ListTile(
-                  leading: Icon(Icons.photo_library_outlined, color: primaryColor),
-                  title: const Text('Elegir de galería'),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _elegirYSubirFoto(ImageSource.gallery);
-                  },
-                ),
-                if (_urlFotoPerfil != null && _urlFotoPerfil!.isNotEmpty)
-                  ListTile(
-                    leading: const Icon(Icons.delete_outline, color: Colors.red),
-                    title: const Text('Quitar foto'),
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      _quitarFotoPerfil();
-                    },
-                  ),
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: Text('Ahora no', style: TextStyle(color: Colors.grey.shade600)),
-                ),
-              ],
-            ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 12, 8, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 16),
+              const Text('Foto de perfil', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+              const SizedBox(height: 6),
+              Text('Una selfie ayuda a que te reconozcan y generen confianza.', textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.35)),
+              const SizedBox(height: 12),
+              if (PlatformCapabilities.supportsCamera)
+                ListTile(leading: Icon(Icons.photo_camera_outlined, color: primaryColor), title: const Text('Tomar selfie'), subtitle: const Text('Cámara frontal'), onTap: () { Navigator.pop(ctx); _elegirYSubirFoto(ImageSource.camera); }),
+              ListTile(leading: Icon(Icons.photo_library_outlined, color: primaryColor), title: const Text('Elegir de galería'), onTap: () { Navigator.pop(ctx); _elegirYSubirFoto(ImageSource.gallery); }),
+              if (_urlFotoPerfil != null && _urlFotoPerfil!.isNotEmpty)
+                ListTile(leading: const Icon(Icons.delete_outline, color: Colors.red), title: const Text('Quitar foto'), onTap: () { Navigator.pop(ctx); _quitarFotoPerfil(); }),
+              TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Ahora no', style: TextStyle(color: Colors.grey.shade600))),
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
@@ -218,77 +154,38 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     final uid = UserSession().uid;
     if (uid == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Iniciá sesión para subir tu foto.')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Iniciá sesión para subir tu foto.')));
       return;
     }
     if (source == ImageSource.camera && !PlatformCapabilities.supportsCamera) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(PlatformCapabilities.cameraUnsupportedMessage)),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(PlatformCapabilities.cameraUnsupportedMessage)));
       return;
     }
     try {
       final picker = ImagePicker();
-      final XFile? file = await picker.pickImage(
-        source: source,
-        maxWidth: 800,
-        maxHeight: 800,
-        imageQuality: 85,
-        preferredCameraDevice: CameraDevice.front,
-      );
+      final XFile? file = await picker.pickImage(source: source, maxWidth: 800, maxHeight: 800, imageQuality: 85, preferredCameraDevice: CameraDevice.front);
       if (file == null) return;
       if (!mounted) return;
       setState(() => _subiendoFoto = true);
-
       final bytes = await file.readAsBytes();
-      final ref = FirebaseStorage.instance
-          .ref()
-          .child('usuarios')
-          .child(uid)
-          .child('foto_perfil.jpg');
-      final upload = await ref.putData(
-        Uint8List.fromList(bytes),
-        SettableMetadata(contentType: 'image/jpeg'),
-      );
+      final ref = FirebaseStorage.instance.ref().child('usuarios').child(uid).child('foto_perfil.jpg');
+      final upload = await ref.putData(Uint8List.fromList(bytes), SettableMetadata(contentType: 'image/jpeg'));
       final url = await upload.ref.getDownloadURL();
-
-      await FirebaseFirestore.instance.collection('usuarios').doc(uid).set({
-        'url_foto_perfil': url,
-        'foto_perfil': url,
-        'updated_at': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
+      await FirebaseFirestore.instance.collection('usuarios').doc(uid).set({'url_foto_perfil': url, 'foto_perfil': url, 'updated_at': FieldValue.serverTimestamp()}, SetOptions(merge: true));
       final session = UserSession();
       if (session.datosCompletos != null) {
-        session.datosCompletos = {
-          ...session.datosCompletos!,
-          'url_foto_perfil': url,
-          'foto_perfil': url,
-        };
+        session.datosCompletos = {...session.datosCompletos!, 'url_foto_perfil': url, 'foto_perfil': url};
       } else {
         session.datosCompletos = {'url_foto_perfil': url, 'foto_perfil': url};
       }
-
       if (!mounted) return;
-      setState(() {
-        _urlFotoPerfil = url;
-        _subiendoFoto = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('¡Listo! Tu foto de perfil quedó actualizada.'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      setState(() { _urlFotoPerfil = url; _subiendoFoto = false; });
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('¡Listo! Tu foto de perfil quedó actualizada.'), backgroundColor: Colors.green));
     } catch (e) {
       if (!mounted) return;
       setState(() => _subiendoFoto = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo subir la foto: $e')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No se pudo subir la foto: $e')));
     }
   }
 
@@ -297,64 +194,32 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     if (uid == null) return;
     try {
       setState(() => _subiendoFoto = true);
-      await FirebaseFirestore.instance.collection('usuarios').doc(uid).set({
-        'url_foto_perfil': FieldValue.delete(),
-        'foto_perfil': FieldValue.delete(),
-        'updated_at': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-      try {
-        await FirebaseStorage.instance
-            .ref()
-            .child('usuarios')
-            .child(uid)
-            .child('foto_perfil.jpg')
-            .delete();
-      } catch (_) {}
+      await FirebaseFirestore.instance.collection('usuarios').doc(uid).set({'url_foto_perfil': FieldValue.delete(), 'foto_perfil': FieldValue.delete(), 'updated_at': FieldValue.serverTimestamp()}, SetOptions(merge: true));
+      try { await FirebaseStorage.instance.ref().child('usuarios').child(uid).child('foto_perfil.jpg').delete(); } catch (_) {}
       final session = UserSession();
       if (session.datosCompletos != null) {
-        session.datosCompletos = Map<String, dynamic>.from(session.datosCompletos!)
-          ..remove('url_foto_perfil')
-          ..remove('foto_perfil');
+        session.datosCompletos = Map<String, dynamic>.from(session.datosCompletos!)..remove('url_foto_perfil')..remove('foto_perfil');
       }
       if (!mounted) return;
-      setState(() {
-        _urlFotoPerfil = null;
-        _subiendoFoto = false;
-      });
+      setState(() { _urlFotoPerfil = null; _subiendoFoto = false; });
     } catch (e) {
       if (!mounted) return;
       setState(() => _subiendoFoto = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo quitar la foto: $e')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No se pudo quitar la foto: $e')));
     }
   }
 
   Widget _buildAvatarHeader() {
     final hasFoto = _urlFotoPerfil != null && _urlFotoPerfil!.isNotEmpty;
     return Container(
-      width: 44,
-      height: 44,
+      width: 44, height: 44,
       decoration: BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 8, offset: const Offset(0, 2)),
-        ],
-        image: hasFoto
-            ? DecorationImage(
-                image: NetworkImage(_urlFotoPerfil!),
-                fit: BoxFit.cover,
-              )
-            : null,
+        color: Colors.white, shape: BoxShape.circle,
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 8, offset: const Offset(0, 2))],
+        image: hasFoto ? DecorationImage(image: NetworkImage(_urlFotoPerfil!), fit: BoxFit.cover) : null,
       ),
       alignment: Alignment.center,
-      child: hasFoto
-          ? null
-          : Text(
-              _getInitials(),
-              style: TextStyle(color: primaryColor, fontWeight: FontWeight.w800, fontSize: 15),
-            ),
+      child: hasFoto ? null : Text(_getInitials(), style: TextStyle(color: primaryColor, fontWeight: FontWeight.w800, fontSize: 15)),
     );
   }
 
@@ -364,21 +229,13 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: onHome ? null : AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        title: Text(
-          _currentIndex == 1 ? 'Evaluar' : 'Perfil',
-          style: TextStyle(color: primaryColor, fontWeight: FontWeight.w800, fontSize: 18),
-        ),
+        backgroundColor: Colors.white, elevation: 0, surfaceTintColor: Colors.transparent,
+        title: Text(_currentIndex == 1 ? 'Evaluar' : 'Perfil', style: TextStyle(color: primaryColor, fontWeight: FontWeight.w800, fontSize: 18)),
       ),
       body: _currentIndex == 1
           ? const MenuEvaluacionesWidget(embedded: true)
           : _currentIndex == 2
-              ? MenuPerfilOpcionesWidget(
-                  modoPrestador: _modoPrestador,
-                  onClose: () => setState(() => _currentIndex = 0),
-                )
+              ? MenuPerfilOpcionesWidget(modoPrestador: _modoPrestador, onClose: () => setState(() => _currentIndex = 0))
               : (_modoPrestador ? _buildPrestadorHome() : _buildClienteHome()),
       bottomNavigationBar: _buildBottomNav(),
     );
@@ -386,21 +243,16 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
   Widget _buildBottomNav() {
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 16, offset: const Offset(0, -4))],
-      ),
+      decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 16, offset: const Offset(0, -4))]),
       child: SafeArea(
         top: false,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          child: Row(
-            children: [
-              _navItem(0, Icons.home_rounded, 'Home'),
-              _navItem(1, Icons.star_outline_rounded, 'Evaluar'),
-              _navItem(2, Icons.person_rounded, 'Perfil'),
-            ],
-          ),
+          child: Row(children: [
+            _navItem(0, Icons.home_rounded, 'Home'),
+            _navItem(1, Icons.star_outline_rounded, 'Evaluar'),
+            _navItem(2, Icons.person_rounded, 'Perfil'),
+          ]),
         ),
       ),
     );
@@ -415,10 +267,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: selected ? primaryColor.withOpacity(0.14) : Colors.transparent,
-            borderRadius: BorderRadius.circular(14),
-          ),
+          decoration: BoxDecoration(color: selected ? primaryColor.withOpacity(0.14) : Colors.transparent, borderRadius: BorderRadius.circular(14)),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -435,9 +284,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   Widget _buildBrandHeader({required String subtitle}) {
     return Container(
       width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [primaryColor, primaryDark], begin: Alignment.topLeft, end: Alignment.bottomRight),
-      ),
+      decoration: BoxDecoration(gradient: LinearGradient(colors: [primaryColor, primaryDark], begin: Alignment.topLeft, end: Alignment.bottomRight)),
       child: SafeArea(
         bottom: false,
         child: Padding(
@@ -462,11 +309,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                       onTap: () => setState(() => _modoPrestador = !_modoPrestador),
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.18),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white.withOpacity(0.35)),
-                        ),
+                        decoration: BoxDecoration(color: Colors.white.withOpacity(0.18), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white.withOpacity(0.35))),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -486,31 +329,16 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                       children: [
                         _buildAvatarHeader(),
                         Positioned(
-                          right: -2,
-                          bottom: -2,
+                          right: -2, bottom: -2,
                           child: Container(
-                            width: 18,
-                            height: 18,
+                            width: 18, height: 18,
                             decoration: BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
+                              color: Colors.white, shape: BoxShape.circle,
                               border: Border.all(color: primaryColor.withOpacity(0.35), width: 1.2),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.12),
-                                  blurRadius: 3,
-                                  offset: const Offset(0, 1),
-                                ),
-                              ],
+                              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 3, offset: const Offset(0, 1))],
                             ),
                             child: _subiendoFoto
-                                ? Padding(
-                                    padding: const EdgeInsets.all(3),
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 1.5,
-                                      color: primaryColor,
-                                    ),
-                                  )
+                                ? Padding(padding: const EdgeInsets.all(3), child: CircularProgressIndicator(strokeWidth: 1.5, color: primaryColor))
                                 : Icon(Icons.photo_camera_rounded, size: 11, color: primaryColor),
                           ),
                         ),
@@ -529,9 +357,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   Widget _buildClienteHome() {
     return CustomScrollView(
       slivers: [
-        SliverToBoxAdapter(
-          child: _buildBrandHeader(subtitle: '¿Qué servicio necesitás hoy?'),
-        ),
+        SliverToBoxAdapter(child: _buildBrandHeader(subtitle: '¿Qué servicio necesitás hoy?')),
         Sli verToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
@@ -539,48 +365,20 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Material(
-                  color: Colors.white,
-                  elevation: 2,
-                  shadowColor: Colors.black.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(16),
+                  color: Colors.white, elevation: 2, shadowColor: Colors.black.withOpacity(0.08), borderRadius: BorderRadius.circular(16),
                   child: Container(
-                    height: 52,
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
+                    height: 52, padding: const EdgeInsets.symmetric(horizontal: 4),
+                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE2E8F0))),
                     child: TextField(
-                      controller: _searchCtrl,
-                      focusNode: _searchFocus,
-                      textInputAction: TextInputAction.search,
-                      onChanged: _onSearchChanged,
-                      onSubmitted: _submitBusqueda,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF0F172A),
-                      ),
+                      controller: _searchCtrl, focusNode: _searchFocus, textInputAction: TextInputAction.search,
+                      onChanged: _onSearchChanged, onSubmitted: _submitBusqueda,
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
                       decoration: InputDecoration(
                         hintText: '¿Qué servicio necesitás?',
-                        hintStyle: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey.shade500,
-                        ),
+                        hintStyle: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: Colors.grey.shade500),
                         prefixIcon: Icon(Icons.search_rounded, color: _clientePrimary, size: 24),
-                        suffixIcon: _searchCtrl.text.isEmpty
-                            ? null
-                            : IconButton(
-                                icon: const Icon(Icons.close_rounded, size: 20),
-                                color: const Color(0xFF94A3B8),
-                                onPressed: () {
-                                  _searchCtrl.clear();
-                                  setState(() => _sugerencias = []);
-                                },
-                              ),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                        suffixIcon: _searchCtrl.text.isEmpty ? null : IconButton(icon: const Icon(Icons.close_rounded, size: 20), color: const Color(0xFF94A3B8), onPressed: () { _searchCtrl.clear(); setState(() => _sugerencias = []); }),
+                        border: InputBorder.none, contentPadding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                     ),
                   ),
@@ -588,13 +386,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                 if (_sugerencias.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Material(
-                    color: Colors.white,
-                    elevation: 3,
-                    shadowColor: Colors.black.withOpacity(0.10),
-                    borderRadius: BorderRadius.circular(14),
+                    color: Colors.white, elevation: 3, shadowColor: Colors.black.withOpacity(0.10), borderRadius: BorderRadius.circular(14),
                     child: ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
+                      shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
                       itemCount: _sugerencias.length,
                       separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
                       itemBuilder: (context, i) {
@@ -602,18 +396,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                         return ListTile(
                           dense: true,
                           leading: Icon(CatalogoOficios.iconFor(e.id), color: _clientePrimary, size: 22),
-                          title: Text(
-                            e.label,
-                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF0F172A)),
-                          ),
-                          subtitle: e.sinonimos.isEmpty
-                              ? null
-                              : Text(
-                                  e.sinonimos.take(3).join(' · '),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                                ),
+                          title: Text(e.label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF0F172A))),
+                          subtitle: e.sinonimos.isEmpty ? null : Text(e.sinonimos.take(3).join(' · '), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                           trailing: const Icon(Icons.north_west_rounded, size: 16, color: Color(0xFF94A3B8)),
                           onTap: () => _elegirSugerencia(e),
                         );
@@ -625,25 +409,13 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
         ),
-        Sli verToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-            child: Text('Oficios', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
-          ),
-        ),
+        Sli verToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(20, 16, 20, 12), child: Text('Oficios', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))))),
         Sli verToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
             child: GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _categorias.length,
-              gridDelegate: const Sli verGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-                mainAxisSpacing: 14,
-                crossAxisSpacing: 8,
-                childAspectRatio: 0.78,
-              ),
+              shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), itemCount: _categorias.length,
+              gridDelegate: const Sli verGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4, mainAxisSpacing: 14, crossAxisSpacing: 8, childAspectRatio: 0.78),
               itemBuilder: (context, index) {
                 final cat = _categorias[index];
                 final Color accent = (cat['color'] as Color?) ?? _clientePrimary;
@@ -654,30 +426,16 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Container(
-                        width: 64,
-                        height: 64,
+                        width: 64, height: 64,
                         decoration: BoxDecoration(
-                          color: accent.withOpacity(0.14),
-                          shape: BoxShape.circle,
+                          color: accent.withOpacity(0.14), shape: BoxShape.circle,
                           border: Border.all(color: accent.withOpacity(0.35), width: 1.5),
-                          boxShadow: [
-                            BoxShadow(
-                              color: accent.withOpacity(0.18),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
+                          boxShadow: [BoxShadow(color: accent.withOpacity(0.18), blurRadius: 10, offset: const Offset(0, 4))],
                         ),
                         child: Icon(cat['icon'] as IconData, color: accent, size: 30),
                       ),
                       const SizedBox(height: 8),
-                      Text(
-                        cat['label'] as String,
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF1E293B), height: 1.15),
-                      ),
+                      Text(cat['label'] as String, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF1E293B), height: 1.15)),
                     ],
                   ),
                 );
@@ -689,18 +447,12 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
             child: Material(
-              borderRadius: BorderRadius.circular(20),
-              elevation: 4,
-              shadowColor: _clientePrimary.withOpacity(0.30),
+              borderRadius: BorderRadius.circular(20), elevation: 4, shadowColor: _clientePrimary.withOpacity(0.30),
               child: InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: () => _abrirBuscador(),
+                borderRadius: BorderRadius.circular(20), onTap: () => _abrirBuscador(),
                 child: Container(
                   padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    gradient: LinearGradient(colors: [_clientePrimary, _clienteDark], begin: Alignment.topLeft, end: Alignment.bottomRight),
-                  ),
+                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), gradient: LinearGradient(colors: [_clientePrimary, _clienteDark], begin: Alignment.topLeft, end: Alignment.bottomRight)),
                   child: Row(
                     children: [
                       Expanded(
@@ -720,12 +472,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(color: Colors.white.withOpacity(0.18), borderRadius: BorderRadius.circular(18)),
-                        child: const Icon(Icons.verified_user_rounded, color: Colors.white, size: 34),
-                      ),
+                      Container(width: 64, height: 64, decoration: BoxDecoration(color: Colors.white.withOpacity(0.18), borderRadius: BorderRadius.circular(18)), child: const Icon(Icons.verified_user_rounded, color: Colors.white, size: 34)),
                     ],
                   ),
                 ),
@@ -748,37 +495,21 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Material(
-                borderRadius: BorderRadius.circular(22),
-                elevation: 8,
-                shadowColor: _prestadorPrimary.withOpacity(0.40),
+                borderRadius: BorderRadius.circular(22), elevation: 8, shadowColor: _prestadorPrimary.withOpacity(0.40),
                 child: InkWell(
-                  onTap: _compartirTarjeta,
-                  borderRadius: BorderRadius.circular(22),
+                  onTap: _compartirTarjeta, borderRadius: BorderRadius.circular(22),
                   child: Container(
                     padding: const EdgeInsets.all(22),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(22),
-                      gradient: LinearGradient(colors: [_prestadorPrimary, _prestadorDark], begin: Alignment.topLeft, end: Alignment.bottomRight),
-                    ),
+                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(22), gradient: LinearGradient(colors: [_prestadorPrimary, _prestadorDark], begin: Alignment.topLeft, end: Alignment.bottomRight)),
                     child: Row(
                       children: [
-                        Container(
-                          width: 64,
-                          height: 64,
-                          decoration: BoxDecoration(color: Colors.white.withOpacity(0.22), borderRadius: BorderRadius.circular(16)),
-                          child: const Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 34),
-                        ),
+                        Container(width: 64, height: 64, decoration: BoxDecoration(color: Colors.white.withOpacity(0.22), borderRadius: BorderRadius.circular(16)), child: const Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 34)),
                         const SizedBox(width: 16),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Tu tarjeta digital', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: -0.2)),
-                              SizedBox(height: 4),
-                              Text('Compartila y que te contacten', style: TextStyle(color: Colors.white70, fontSize: 14)),
-                            ],
-                          ),
-                        ),
+                        const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text('Tu tarjeta digital', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: -0.2)),
+                          SizedBox(height: 4),
+                          Text('Compartila y que te contacten', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                        ])),
                         const Icon(Icons.ios_share_rounded, color: Colors.white, size: 26),
                       ],
                     ),
@@ -793,33 +524,20 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Material(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              elevation: 1.5,
+              color: Colors.white, borderRadius: BorderRadius.circular(18), elevation: 1.5,
               child: InkWell(
-                onTap: () {},
-                borderRadius: BorderRadius.circular(18),
+                onTap: () {}, borderRadius: BorderRadius.circular(18),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   child: Row(
                     children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(color: _prestadorPrimary.withOpacity(0.12), borderRadius: BorderRadius.circular(12)),
-                        child: Icon(Icons.how_to_reg_outlined, color: _prestadorPrimary, size: 24),
-                      ),
+                      Container(width: 44, height: 44, decoration: BoxDecoration(color: _prestadorPrimary.withOpacity(0.12), borderRadius: BorderRadius.circular(12)), child: Icon(Icons.how_to_reg_outlined, color: _prestadorPrimary, size: 24)),
                       const SizedBox(width: 14),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Pedí que validen quién sos', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF0F172A))),
-                            SizedBox(height: 2),
-                            Text('Un conocido confirma tu perfil · suma confianza', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                          ],
-                        ),
-                      ),
+                      const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text('Pedí que validen quién sos', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF0F172A))),
+                        SizedBox(height: 2),
+                        Text('Un conocido confirma tu perfil · suma confianza', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                      ])),
                       Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
                     ],
                   ),
