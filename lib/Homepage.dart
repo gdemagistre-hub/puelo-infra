@@ -236,7 +236,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   Widget _buildClienteHome() {
     return CustomScrollView(
       slivers: [
-        SliverToBoxAdapter(
+        Sli verToBoxAdapter(
           child: _buildBrandHeader(subtitle: '¿Qué servicio necesitás hoy?'),
         ),
         Sli verToBoxAdapter(
@@ -297,13 +297,13 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           sliver: SliverGrid(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            gridDelegate: const Sli verGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
               childAspectRatio: 1.18,
             ),
-            delegate: SliverChildBuilderDelegate(
+            delegate: Sli verChildBuilderDelegate(
               (context, index) {
                 final cat = _categorias[index];
                 final Color accent = (cat['color'] as Color?) ?? _clientePrimary;
@@ -341,7 +341,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
         ),
-        const SliverToBoxAdapter(child: SizedBox(height: 32)),
+        const Sli verToBoxAdapter(child: SizedBox(height: 32)),
       ],
     );
   }
@@ -349,10 +349,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   Widget _buildPrestadorHome() {
     return CustomScrollView(
       slivers: [
-        SliverToBoxAdapter(
+        Sli verToBoxAdapter(
           child: _buildBrandHeader(subtitle: 'Tu perfil profesional en Puelo'),
         ),
-        SliverToBoxAdapter(
+        Sli verToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Material(
@@ -395,7 +395,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
         ),
-        const SliverToBoxAdapter(child: SizedBox(height: 36)),
+        const Sli verToBoxAdapter(child: SizedBox(height: 36)),
       ],
     );
   }
