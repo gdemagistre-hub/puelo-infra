@@ -239,7 +239,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         SliverToBoxAdapter(
           child: _buildBrandHeader(subtitle: '¿Qué servicio necesitás hoy?'),
         ),
-        SliverToBoxAdapter(
+        Sli verToBoxAdapter(
           child: Transform.translate(
             offset: const Offset(0, -18),
             child: Padding(
@@ -282,7 +282,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
         ),
-        SliverToBoxAdapter(
+        Sli verToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
             child: Row(
@@ -294,16 +294,16 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
         ),
-        SliverPadding(
+        Sli verPadding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          sliver: SliverGrid(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          sliver: Sli verGrid(
+            gridDelegate: const Sli verGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
               childAspectRatio: 1.18,
             ),
-            delegate: SliverChildBuilderDelegate(
+            delegate: Sli verChildBuilderDelegate(
               (context, index) {
                 final cat = _categorias[index];
                 final Color accent = (cat['color'] as Color?) ?? _clientePrimary;
@@ -341,7 +341,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
         ),
-        const Sli verToBoxAdapter(child: SizedBox(height: 32)),
+        const SliverToBoxAdapter(child: SizedBox(height: 32)),
       ],
     );
   }
@@ -349,10 +349,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   Widget _buildPrestadorHome() {
     return CustomScrollView(
       slivers: [
-        SliverToBoxAdapter(
+        Sli verToBoxAdapter(
           child: _buildBrandHeader(subtitle: 'Tu perfil profesional en Puelo'),
         ),
-        SliverToBoxAdapter(
+        Sli verToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Material(
