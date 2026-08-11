@@ -278,7 +278,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     final onHome = _currentIndex == 0;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9),
+      backgroundColor: const Color(0xFFF1F5F9);
       appBar: onHome
           ? null
           : AppBar(
@@ -498,12 +498,12 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   Widget _buildClienteHome() {
     return CustomScrollView(
       slivers: [
-        SliverToBoxAdapter(
+        Sli verToBoxAdapter(
           child: _buildBrandHeader(
             subtitle: '¿Qué servicio necesitás hoy?',
           ),
         ),
-        Sli verToBoxAdapter(
+        SliverToBoxAdapter(
           child: Transform.translate(
             offset: const Offset(0, -18),
             child: Padding(
@@ -601,7 +601,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         ),
         Sli verPadding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          sliver: SliverGrid(
+          sliver: Sli verGrid(
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 4,
               crossAxisSpacing: 10,
@@ -669,12 +669,12 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   Widget _buildPrestadorHome() {
     return CustomScrollView(
       slivers: [
-        SliverToBoxAdapter(
+        Sli verToBoxAdapter(
           child: _buildBrandHeader(
             subtitle: 'Tu perfil profesional en Puelo',
           ),
         ),
-        Sli verToBoxAdapter(
+        SliverToBoxAdapter(
           child: Transform.translate(
             offset: const Offset(0, -18),
             child: Padding(
