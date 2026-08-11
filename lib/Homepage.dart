@@ -13,6 +13,12 @@ import 'dart:typed_data';
 import 'platform_capabilities.dart';
 import 'catalogo_oficios.dart';
 import 'scoring_service.dart';
+import 'datosPersonalesflotante.dart';
+import 'Domicilioflotante.dart';
+import 'solicitar_validacion.dart';
+import 'especialidadesLaboralesflotante.dart';
+import 'ZonaDeTrabajoflotante.dart';
+import 'cargaTrabajoTrabajador.dart';
 
 class HomePageWidget extends StatefulWidget {
   final bool? initialModoPrestador;
@@ -461,6 +467,140 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
   Map<String, dynamic> get _dp => Map<String, dynamic>.from(UserSession().datosCompletos ?? {});
 
+  bool _noVacio(dynamic v) {
+    if (v == null) return false;
+    return v.toString().trim().isNotEmpty;
+  }
+
+  void _abrirFlotante(Widget page) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+  }
+
+  List<_RecoItem> _recomendacionesPrestador(Map<String, dynamic> data) {
+    final out = <_RecoItem>[];
+    void add(_RecoItem r) {
+      if (out.length < 5) out.add(r);
+    }
+
+    final geo = data['direccion_geo'] is Map
+        ? Map<String, dynamic>.from(data['direccion_geo'] as Map)
+        : <String, dynamic>{};
+    final profesiones = data['profesiones'] as List? ?? [];
+    final zonas = data['zonas_cobertura'] is Map
+        ? Map<String, dynamic>.from(data['zonas_cobertura'] as Map)
+        : <String, dynamic>{};
+    final locs = zonas['localidades'] as List? ?? [];
+    final vals = data['validaciones_recibidas'] as List? ?? [];
+    final fotoPerfil = _noVacio(data['url_foto_perfil'] ?? data['foto_perfil']);
+    final docValidado = data['doc_validado'] == true;
+    final tieneTel = _noVacio(data['telefono']);
+    final tieneEmail = _noVacio(data['email']);
+    final tieneLocalidad = _noVacio(geo['localidad_id'] ?? geo['localidad_nombre']);
+    final tieneCalle = _noVacio(data['calle']);
+    final tieneDoc = _noVacio(data['doc_numero'] ?? data['numero_documento'] ?? data['documento']);
+
+    if (!fotoPerfil) {
+      add(_RecoItem(
+        id: 'foto_perfil',
+        title: 'Sumá una foto de perfil',
+        subtitle: 'Selfie clara · suma fuerte a tu Confianza',
+        icon: Icons.photo_camera_rounded,
+        onTap: _mostrarOpcionesSelfie,
+      ));
+    }
+    if (!docValidado) {
+      add(_RecoItem(
+        id: 'ocr',
+        title: 'Validá tu documento con la cámara',
+        subtitle: 'El mayor salto de Confianza · DNI escaneado',
+        icon: Icons.badge_outlined,
+        onTap: () => _abrirFlotante(DatosPersonalesFlotanteWidget(modoPrestador: true)),
+      ));
+    } else if (!_noVacio(data['url_foto_documento'])) {
+      add(_RecoItem(
+        id: 'foto_doc',
+        title: 'Adjuntá la foto de tu documento',
+        subtitle: 'Refuerza que el documento es real',
+        icon: Icons.image_outlined,
+        onTap: () => _abrirFlotante(DatosPersonalesFlotanteWidget(modoPrestador: true)),
+      ));
+    }
+    if (!tieneTel) {
+      add(_RecoItem(
+        id: 'tel',
+        title: 'Cargá tu celular',
+        subtitle: 'Para que te contacten por WhatsApp o llamada',
+        icon: Icons.phone_outlined,
+        onTap: () => _abrirFlotante(DatosPersonalesFlotanteWidget(modoPrestador: true)),
+      ));
+    }
+    if (!tieneLocalidad || !tieneCalle) {
+      add(_RecoItem(
+        id: 'domicilio',
+        title: 'Completá tu domicilio',
+        subtitle: 'Provincia, partido y localidad · suma Confianza',
+        icon: Icons.home_outlined,
+        onTap: () => _abrirFlotante(DomicilioFlotanteWidget(modoPrestador: true)),
+      ));
+    }
+    if (vals.isEmpty) {
+      add(_RecoItem(
+        id: 'validacion',
+        title: 'Pedí que validen quién sos',
+        subtitle: 'Un conocido confirma tu perfil · reputación real',
+        icon: Icons.how_to_reg_outlined,
+        onTap: () => _abrirFlotante(const SolicitarValidacionWidget()),
+      ));
+    }
+    if (!tieneEmail) {
+      add(_RecoItem(
+        id: 'email',
+        title: 'Cargá tu email en el perfil',
+        subtitle: 'Suma a tu Confianza y facilita el contacto',
+        icon: Icons.email_outlined,
+        onTap: () => _abrirFlotante(DatosPersonalesFlotanteWidget(modoPrestador: true)),
+      ));
+    }
+    if (!tieneDoc) {
+      add(_RecoItem(
+        id: 'doc_numero',
+        title: 'Cargá tipo y número de documento',
+        subtitle: 'No se muestra al cliente · valida tu identidad',
+        icon: Icons.credit_card_outlined,
+        onTap: () => _abrirFlotante(DatosPersonalesFlotanteWidget(modoPrestador: true)),
+      ));
+    }
+    if (profesiones.isEmpty) {
+      add(_RecoItem(
+        id: 'oficios',
+        title: 'Indicá los servicios que ofrecés',
+        subtitle: 'Así aparecés cuando buscan tu rubro',
+        icon: Icons.handyman_outlined,
+        onTap: () => _abrirFlotante(const EspecialidadesLaboralesFlotanteWidget()),
+      ));
+    }
+    if (locs.isEmpty) {
+      add(_RecoItem(
+        id: 'zona',
+        title: 'Definí tu zona de trabajo',
+        subtitle: 'Para que te encuentren en tu área',
+        icon: Icons.map_outlined,
+        onTap: () => _abrirFlotante(const ZonaDeTrabajoFlotanteWidget()),
+      ));
+    }
+    if (out.length < 5) {
+      add(_RecoItem(
+        id: 'fotos_trabajo',
+        title: 'Subí fotos de trabajos hechos',
+        subtitle: 'Hasta 5 cuentan en tu Confianza',
+        icon: Icons.photo_library_outlined,
+        onTap: () => _abrirFlotante(const CargaTrabajoTrabajadorWidget()),
+      ));
+    }
+
+    return out;
+  }
+
   Widget _buildPrestadorHome() {
     final badge = (_dp['list_badge'] ?? _dp['badge_prestador'] ?? '').toString().trim();
     final label = ScoringService.labelBadge(badge.isEmpty ? null : badge);
@@ -522,9 +662,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                         fontSize: 28,
                         fontWeight: FontWeight.w900,
                         letterSpacing: -0.6,
-                        color: label.isNotEmpty
-                            ? Color(colors.foreground)
-                            : const Color(0xFF94A3B8),
+                        color: label.isNotEmpty ? Color(colors.foreground) : const Color(0xFF94A3B8),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -547,20 +685,12 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        nEval > 0
-                                            ? '${stars.toStringAsFixed(1)} ($nEval)'
-                                            : '—',
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w900,
-                                        ),
+                                        nEval > 0 ? '${stars.toStringAsFixed(1)} ($nEval)' : '—',
+                                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
                                       ),
                                       Text(
                                         nEval > 0 ? 'Calificación' : 'Sin evaluaciones',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: Colors.grey.shade600,
-                                        ),
+                                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                                       ),
                                     ],
                                   ),
@@ -623,10 +753,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                                       ),
                                       Text(
                                         'Confianza',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: Colors.grey.shade600,
-                                        ),
+                                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                                       ),
                                     ],
                                   ),
@@ -667,11 +794,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                         children: [
                           Text(
                             'Tu tarjeta digital',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 16,
-                            ),
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16),
                           ),
                           SizedBox(height: 2),
                           Text(
@@ -688,8 +811,100 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
         ),
-        const SizedBox(height: 48),
+        Builder(
+          builder: (context) {
+            final recos = _recomendacionesPrestador(_dp);
+            if (recos.isEmpty) {
+              return const SizedBox(height: 32);
+            }
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Para subir tu Confianza',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Atajos que suman puntos ya',
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                  ),
+                  const SizedBox(height: 12),
+                  ...recos.map((r) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Material(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        elevation: 1,
+                        child: InkWell(
+                          onTap: r.onTap,
+                          borderRadius: BorderRadius.circular(14),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: _prestadorPrimary.withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Icon(r.icon, color: _prestadorPrimary, size: 22),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        r.title,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 14,
+                                          color: Color(0xFF0F172A),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        r.subtitle,
+                                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600, height: 1.3),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            );
+          },
+        ),
       ],
     );
   }
+}
+
+class _RecoItem {
+  final String id;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final VoidCallback onTap;
+  const _RecoItem({
+    required this.id,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.onTap,
+  });
 }
