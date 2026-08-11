@@ -236,7 +236,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   Widget _buildClienteHome() {
     return CustomScrollView(
       slivers: [
-        SliverToBoxAdapter(
+        Sli verToBoxAdapter(
           child: _buildBrandHeader(subtitle: '¿Qué servicio necesitás hoy?'),
         ),
         Sli verToBoxAdapter(
@@ -395,7 +395,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
         ),
-        const SliverToBoxAdapter(child: SizedBox(height: 36)),
+        const Sli verToBoxAdapter(child: SizedBox(height: 36)),
       ],
     );
   }
