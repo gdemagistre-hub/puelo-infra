@@ -259,7 +259,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
   }
 
   Future<QuerySnapshot> _queryPrestadores({required bool reset}) async {
-    final catId = CatalogoOficios.idDesdeLabel(_selectedRubro);
+    final catId = CatalogoOficios.categoriaIdDesdeChip(_selectedRubro);
     final zonaId = _zonaServerFilter;
 
     Query query = db.collection('usuarios').where('es_trabajador', isEqualTo: true);
@@ -325,7 +325,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     return 0;
   }
 
-  /// Score compuesto de confianza para ordenar listados.
   double _scoreConfianza(Map<String, dynamic> data) {
     num? scoreId = data['list_score_identidad'] as num?;
     if (scoreId == null) {
