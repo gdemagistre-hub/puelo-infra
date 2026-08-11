@@ -236,64 +236,81 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   Widget _buildClienteHome() {
     return CustomScrollView(
       slivers: [
-        SliverToBoxAdapter(
+        Sli verToBoxAdapter(
           child: _buildBrandHeader(subtitle: '¿Qué servicio necesitás hoy?'),
         ),
-        SliverToBoxAdapter(
+        Sli verToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
             child: Text('Oficios', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
           ),
         ),
-        SliverToBoxAdapter(
+        // Oficios estilo YPF: ícono circular de color + leyenda debajo
+        Sli verToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: _categorias.map((cat) {
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+            child: GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _categorias.length,
+              gridDelegate: const Sli verGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                mainAxisSpacing: 14,
+                crossAxisSpacing: 8,
+                childAspectRatio: 0.78,
+              ),
+              itemBuilder: (context, index) {
+                final cat = _categorias[index];
                 final Color accent = (cat['color'] as Color?) ?? _clientePrimary;
-                return SizedBox(
-                  width: (MediaQuery.of(context).size.width - 44) / 2,
-                  child: Material(
-                    color: Colors.white,
-                    elevation: 2.5,
-                    shadowColor: accent.withOpacity(0.20),
-                    borderRadius: BorderRadius.circular(18),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(18),
-                      onTap: () => _abrirBuscador(oficio: cat['id'] as String),
-                      child: Container(
-                        height: 100,
+                return InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () => _abrirBuscador(oficio: cat['id'] as String),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 64,
+                        height: 64,
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: accent.withOpacity(0.28), width: 1.2),
-                          gradient: LinearGradient(colors: [accent.withOpacity(0.12), Colors.white], begin: Alignment.topLeft, end: Alignment.bottomRight),
-                        ),
-                        padding: const EdgeInsets.all(14),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Container(
-                              width: 42,
-                              height: 42,
-                              decoration: BoxDecoration(color: accent.withOpacity(0.18), borderRadius: BorderRadius.circular(12)),
-                              child: Icon(cat['icon'] as IconData, color: accent, size: 24),
+                          color: accent.withOpacity(0.14),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: accent.withOpacity(0.35), width: 1.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: accent.withOpacity(0.18),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
                             ),
-                            Text(cat['label'] as String, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: accent.withOpacity(0.95)), maxLines: 1, overflow: TextOverflow.ellipsis),
                           ],
                         ),
+                        child: Icon(
+                          cat['icon'] as IconData,
+                          color: accent,
+                          size: 30,
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 8),
+                      Text(
+                        cat['label'] as String,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1E293B),
+                          height: 1.15,
+                        ),
+                      ),
+                    ],
                   ),
                 );
-              }).toList(),
+              },
             ),
           ),
         ),
         // Banner: prestadores con más confianza
-        SliverToBoxAdapter(
+        Sli verToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
             child: Material(
@@ -380,7 +397,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
         ),
-        const SliverToBoxAdapter(child: SizedBox(height: 32)),
+        const Sli verToBoxAdapter(child: SizedBox(height: 32)),
       ],
     );
   }
@@ -388,10 +405,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   Widget _buildPrestadorHome() {
     return CustomScrollView(
       slivers: [
-        SliverToBoxAdapter(
+        Sli verToBoxAdapter(
           child: _buildBrandHeader(subtitle: 'Tu perfil profesional en Puelo'),
         ),
-        SliverToBoxAdapter(
+        Sli verToBoxAdapter(
           child: Transform.translate(
             offset: const Offset(0, -18),
             child: Padding(
@@ -455,8 +472,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
         ),
-        const SliverToBoxAdapter(child: SizedBox(height: 28)),
-        SliverToBoxAdapter(
+        const Sli verToBoxAdapter(child: SizedBox(height: 28)),
+        Sli verToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Material(
@@ -504,7 +521,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
         ),
-        const SliverToBoxAdapter(child: SizedBox(height: 40)),
+        const Sli verToBoxAdapter(child: SizedBox(height: 40)),
       ],
     );
   }
