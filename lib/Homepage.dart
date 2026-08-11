@@ -546,7 +546,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   Widget _buildClienteHome() {
     return CustomScrollView(
       slivers: [
-        Sli verToBoxAdapter(
+        SliverToBoxAdapter(
           child: _buildBrandHeader(
             subtitle: '¿Qué servicio necesitás hoy?',
           ),
@@ -652,14 +652,14 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         // Category grid — heavier cards
         SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          sliver: Sli verGrid(
-            gridDelegate: const Sli verGridDelegateWithFixedCrossAxisCount(
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
               childAspectRatio: 1.35,
             ),
-            delegate: Sli verChildBuilderDelegate(
+            delegate: SliverChildBuilderDelegate(
               (context, index) {
                 final cat = _categorias[index];
                 final Color accent =
