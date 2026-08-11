@@ -118,67 +118,89 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     );
   }
 
+  Widget _buildBottomNav() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 16, offset: const Offset(0, -4))],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Row(
+            children: [
+              _navItem(0, Icons.home_rounded, 'Home'),
+              _navItem(1, Icons.star_outline_rounded, 'Evaluar'),
+              _navItem(2, Icons.person_rounded, 'Perfil'),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _navItem(int index, IconData icon, String label) {
+    final selected = _currentIndex == index;
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _currentIndex = index),
+        borderRadius: BorderRadius.circular(14),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: selected ? primaryColor.withOpacity(0.14) : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: selected ? 26 : 24, color: selected ? primaryColor : const Color(0xFF94A3B8)),
+              const SizedBox(height: 2),
+              Text(label, style: TextStyle(fontSize: 11, fontWeight: selected ? FontWeight.w800 : FontWeight.w500, color: selected ? primaryColor : const Color(0xFF94A3B8))),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildBrandHeader({required String subtitle}) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 48, 20, 28),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [primaryColor, primaryDark],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(28),
-          bottomRight: Radius.circular(28),
-        ),
+        gradient: LinearGradient(colors: [primaryColor, primaryDark], begin: Alignment.topLeft, end: Alignment.bottomRight),
       ),
       child: SafeArea(
         bottom: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.22),
-                    borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 16, 40),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Hola, $_nombreMostrar', style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.4, height: 1.15)),
+                        const SizedBox(height: 6),
+                        Text(subtitle, style: TextStyle(color: Colors.white.withOpacity(0.90), fontSize: 14, fontWeight: FontWeight.w500)),
+                      ],
+                    ),
                   ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    _getInitials(),
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Hola, $_nombreMostrar',
-                        style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800, height: 1.15),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: TextStyle(color: Colors.white.withOpacity(0.88), fontSize: 14, fontWeight: FontWeight.w500),
-                      ),
-                    ],
-                  ),
-                ),
-                if (_puedeSerAmbos)
-                  Material(
-                    color: Colors.white.withOpacity(0.18),
-                    borderRadius: BorderRadius.circular(20),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(20),
+                  if (_puedeSerAmbos) ...[
+                    GestureDetector(
                       onTap: () => setState(() => _modoPrestador = !_modoPrestador),
-                      child: Padding(
+                      child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white.withOpacity(0.35)),
+                        ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -189,10 +211,23 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                         ),
                       ),
                     ),
+                    const SizedBox(width: 10),
+                  ],
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 8, offset: const Offset(0, 2))],
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(_getInitials(), style: TextStyle(color: primaryColor, fontWeight: FontWeight.w800, fontSize: 15)),
                   ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -388,17 +423,17 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                           child: const Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 34),
                         ),
                         const SizedBox(width: 16),
-                        Expanded(
+                        const Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Mi tarjeta digital', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
-                              const SizedBox(height: 6),
-                              Text('Compartila y recibí contactos', style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 13, fontWeight: FontWeight.w500)),
+                              Text('Tu tarjeta digital', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: -0.2)),
+                              SizedBox(height: 4),
+                              Text('Compartila y que te contacten', style: TextStyle(color: Colors.white70, fontSize: 14)),
                             ],
                           ),
                         ),
-                        const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 28),
+                        const Icon(Icons.ios_share_rounded, color: Colors.white, size: 26),
                       ],
                     ),
                   ),
@@ -407,58 +442,48 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
         ),
-        const SliverToBoxAdapter(child: SizedBox(height: 24)),
-      ],
-    );
-  }
-
-  Widget _buildBottomNav() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, -2)),
-        ],
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _navItem(icon: Icons.home_rounded, label: 'Inicio', index: 0),
-              _navItem(icon: Icons.star_rounded, label: 'Evaluar', index: 1),
-              _navItem(icon: Icons.person_rounded, label: 'Perfil', index: 2),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _navItem({required IconData icon, required String label, required int index}) {
-    final selected = _currentIndex == index;
-    return InkWell(
-      onTap: () => setState(() => _currentIndex = index),
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: selected ? primaryColor : const Color(0xFF94A3B8), size: 26),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                color: selected ? primaryColor : const Color(0xFF94A3B8),
+        const SliverToBoxAdapter(child: SizedBox(height: 28)),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Material(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              elevation: 1.5,
+              child: InkWell(
+                onTap: () {},
+                borderRadius: BorderRadius.circular(18),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(color: _prestadorPrimary.withOpacity(0.12), borderRadius: BorderRadius.circular(12)),
+                        child: Icon(Icons.how_to_reg_outlined, color: _prestadorPrimary, size: 24),
+                      ),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Pedí que validen quién sos', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF0F172A))),
+                            SizedBox(height: 2),
+                            Text('Un conocido confirma tu perfil · suma confianza', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
+                    ],
+                  ),
+                ),
               ),
             ),
-          ],
+          ),
         ),
-      ),
+        const SliverToBoxAdapter(child: SizedBox(height: 40)),
+      ],
     );
   }
 }
