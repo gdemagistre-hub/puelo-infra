@@ -279,38 +279,25 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     return query.get();
   }
 
-  /// Ranking del listado (cliente):
-  /// 1) Zona de trabajo coincidente con el domicilio del cliente
-  ///    (localidad > partido > provincia > sin match)
-  /// 2) Confianza del prestador (score_identidad / badge / estrellas)
   void _ordenarPorPreferenciaZona(List<QueryDocumentSnapshot> docs) {
     docs.sort((a, b) {
       final da = a.data() as Map<String, dynamic>;
       final dbMap = b.data() as Map<String, dynamic>;
-
       final za = _scoreZonaPref(da);
       final zb = _scoreZonaPref(dbMap);
       if (za != zb) return zb.compareTo(za);
-
       final ca = _scoreConfianza(da);
       final cb = _scoreConfianza(dbMap);
       if (ca != cb) return cb.compareTo(ca);
-
-      final pa = (da['list_promedio'] as num?) ??
-          (da['promedioEstrellas'] as num?) ??
-          0;
-      final pb = (dbMap['list_promedio'] as num?) ??
-          (dbMap['promedioEstrellas'] as num?) ??
-          0;
+      final pa = (da['list_promedio'] as num?) ?? (da['promedioEstrellas'] as num?) ?? 0;
+      final pb = (dbMap['list_promedio'] as num?) ?? (dbMap['promedioEstrellas'] as num?) ?? 0;
       return pb.compareTo(pa);
     });
   }
 
   int _scoreZonaPref(Map<String, dynamic> data) {
     if (!_tienePreferenciaZona) return 0;
-    final zonaIds = (data['zona_ids'] as List<dynamic>? ?? [])
-        .map((e) => e.toString())
-        .toSet();
+    final zonaIds = (data['zona_ids'] as List<dynamic>? ?? []).map((e) => e.toString()).toSet();
     if (zonaIds.isEmpty) {
       final cob = data['zonas_cobertura'] as Map<String, dynamic>?;
       if (cob != null) {
@@ -329,16 +316,10 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     num? scoreId = data['list_score_identidad'] as num?;
     if (scoreId == null) {
       final sc = data['scoring'];
-      if (sc is Map) {
-        scoreId = sc['score_identidad'] as num?;
-      }
+      if (sc is Map) scoreId = sc['score_identidad'] as num?;
     }
     final identidad = (scoreId ?? 0).toDouble();
-
-    final badge = (data['list_badge'] ?? data['badge_prestador'] ?? '')
-        .toString()
-        .toLowerCase()
-        .trim();
+    final badge = (data['list_badge'] ?? data['badge_prestador'] ?? '').toString().toLowerCase().trim();
     final badgeRank = switch (badge) {
       'diamante' => 6.0,
       'oro' => 5.0,
@@ -349,12 +330,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
       'nuevo' => 0.5,
       _ => 0.0,
     };
-
-    final estrellas = ((data['list_promedio'] as num?) ??
-            (data['promedioEstrellas'] as num?) ??
-            0)
-        .toDouble();
-
+    final estrellas = ((data['list_promedio'] as num?) ?? (data['promedioEstrellas'] as num?) ?? 0).toDouble();
     return identidad * 10 + badgeRank * 20 + estrellas;
   }
 
@@ -379,9 +355,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => TarjetaDigitalWidget(
-          usuarioRef: doc.reference,
-        ),
+        builder: (_) => TarjetaDigitalWidget(usuarioRef: doc.reference),
       ),
     );
   }
@@ -396,11 +370,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
         surfaceTintColor: Colors.transparent,
         title: Text(
           _selectedRubro == 'Todos' ? 'Prestadores' : _selectedRubro,
-          style: const TextStyle(
-            color: _clientePrimary,
-            fontWeight: FontWeight.w800,
-            fontSize: 18,
-          ),
+          style: const TextStyle(color: _clientePrimary, fontWeight: FontWeight.w800, fontSize: 18),
         ),
         actions: [
           if (_tienePreferenciaZona)
@@ -415,11 +385,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                   ),
                   child: Text(
                     'Cerca tuyo',
-                    style: TextStyle(
-                      color: _clientePrimary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: _clientePrimary, fontWeight: FontWeight.w700, fontSize: 12),
                   ),
                 ),
               ),
@@ -441,9 +407,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                             padding: const EdgeInsets.all(16),
                             child: Center(
                               child: TextButton(
-                                onPressed: _loadingMore
-                                    ? null
-                                    : () => _cargarPrestadores(reset: false),
+                                onPressed: _loadingMore ? null : () => _cargarPrestadores(reset: false),
                                 child: Text(_loadingMore ? 'Cargando…' : 'Ver más'),
                               ),
                             ),
@@ -453,44 +417,142 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                         final data = doc.data() as Map<String, dynamic>;
                         final nombre = _nombreDe(data);
                         final oficio = _oficioDe(data);
-                        final score = _scoreConfianza(data);
                         final zona = _scoreZonaPref(data);
+                        final promedio = ((data['list_promedio'] as num?) ??
+                                (data['promedioEstrellas'] as num?) ??
+                                0)
+                            .toDouble();
+                        final nEval = ((data['list_n_eval'] as num?) ??
+                                (data['cantidadEvaluadores'] as num?) ??
+                                (data['scoring'] is Map
+                                    ? (data['scoring']['n_eval_trabajo'] as num?)
+                                    : null) ??
+                                0)
+                            .toInt();
+                        final badgeRaw = (data['list_badge'] ?? data['badge_prestador'] ?? '')
+                            .toString()
+                            .trim();
+                        final badgeLabel = ScoringService.labelBadge(
+                          badgeRaw.isEmpty ? null : badgeRaw,
+                        );
+                        final badgeColors = ScoringService.coloresBadge(
+                          badgeRaw.isEmpty ? null : badgeRaw,
+                        );
                         return Card(
                           margin: const EdgeInsets.only(bottom: 10),
+                          elevation: 1.5,
+                          shadowColor: Colors.black.withOpacity(0.06),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
-                            ),
-                            leading: CircleAvatar(
-                              backgroundColor: _clientePrimary.withOpacity(0.12),
-                              child: Text(
-                                nombre.isNotEmpty ? nombre[0].toUpperCase() : 'P',
-                                style: const TextStyle(
-                                  color: _clientePrimary,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ),
-                            title: Text(
-                              nombre,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 15,
-                              ),
-                            ),
-                            subtitle: Text(
-                              oficio +
-                                  (zona > 0 ? ' · Zona match' : '') +
-                                  (score > 0 ? ' · Confianza' : ''),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            trailing: const Icon(Icons.chevron_right_rounded),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
                             onTap: () => _abrirTarjeta(doc),
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 24,
+                                    backgroundColor: _clientePrimary.withOpacity(0.12),
+                                    child: Text(
+                                      nombre.isNotEmpty ? nombre[0].toUpperCase() : 'P',
+                                      style: const TextStyle(
+                                        color: _clientePrimary,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          nombre,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 15,
+                                            color: Color(0xFF0F172A),
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          oficio + (zona > 0 ? ' · Cerca tuyo' : ''),
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Color(0xFF64748B),
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.star_rounded,
+                                              size: 16,
+                                              color: promedio > 0
+                                                  ? const Color(0xFFF59E0B)
+                                                  : const Color(0xFFCBD5E1),
+                                            ),
+                                            const SizedBox(width: 3),
+                                            Text(
+                                              promedio > 0
+                                                  ? promedio.toStringAsFixed(1)
+                                                  : '—',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w800,
+                                                color: promedio > 0
+                                                    ? const Color(0xFF0F172A)
+                                                    : const Color(0xFF94A3B8),
+                                              ),
+                                            ),
+                                            Text(
+                                              ' ($nEval)',
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                                color: Color(0xFF94A3B8),
+                                              ),
+                                            ),
+                                            if (badgeLabel.isNotEmpty) ...[
+                                              const SizedBox(width: 8),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 8,
+                                                  vertical: 2,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: Color(badgeColors.background),
+                                                  borderRadius: BorderRadius.circular(20),
+                                                ),
+                                                child: Text(
+                                                  badgeLabel,
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: Color(badgeColors.foreground),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const Icon(
+                                    Icons.chevron_right_rounded,
+                                    color: Color(0xFFCBD5E1),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         );
                       },
