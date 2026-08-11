@@ -9,6 +9,7 @@ import 'theme/app_colors.dart';
 import 'user_session.dart';
 import 'contacto_service.dart';
 
+/// Tarjeta UX v2 — mismo diseño para cliente y prestador (hero trust).
 class TarjetaDigitalWidget extends StatefulWidget {
   const TarjetaDigitalWidget({super.key, this.usuarioRef});
   final DocumentReference? usuarioRef;
@@ -107,7 +108,8 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
   }
 
   Future<void> _compartirPorWhatsApp(String nombre, String idDocumento) async {
-    final link = 'https://lifewalletpuelo.web.app/#/tarjetaDigital?id=$idDocumento';
+    final origin = Uri.base.origin;
+    final link = '$origin/#/tarjetaDigital?id=$idDocumento';
     final url = Uri.parse(
       'https://wa.me/?text=${Uri.encodeComponent('¡Hola! Te comparto mi tarjeta de servicios en Puelo:\n\n$link')}',
     );
@@ -119,9 +121,8 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
   }
 
   void _copiarEnlace(String idDocumento) {
-    Clipboard.setData(
-      ClipboardData(text: 'https://lifewalletpuelo.web.app/#/tarjetaDigital?id=$idDocumento'),
-    );
+    final link = '${Uri.base.origin}/#/tarjetaDigital?id=$idDocumento';
+    Clipboard.setData(ClipboardData(text: link));
     _alerta('¡Enlace copiado al portapapeles!');
   }
 
@@ -470,7 +471,8 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                   ),
                 ),
               ),
-              SliverToBoxAdapter(
+              // BLOQUE CONFIANZA — idéntico para cliente y prestador
+              ofiverToBoxAdapter(
                 child: Transform.translate(
                   offset: const Offset(0, -16),
                   child: Padding(
@@ -523,14 +525,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                                             ),
                                           )
                                         else
-                                          Text(
-                                            'Sin nivel',
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w700,
-                                              color: Colors.grey.shade500,
-                                            ),
-                                          ),
+                                          Text('Sin nivel', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.grey.shade500)),
                                         const SizedBox(height: 4),
                                         Text('Nivel', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
                                       ],
@@ -561,11 +556,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                                               ),
                                               Text(
                                                 scoreIdentidad > 0 ? '$scoreClamped' : '—',
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w900,
-                                                  color: Color(0xFF0F172A),
-                                                ),
+                                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
                                               ),
                                             ],
                                           ),
@@ -591,11 +582,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                                             const SizedBox(width: 4),
                                             Text(
                                               cantEval > 0 ? promedio.toStringAsFixed(1) : '—',
-                                              style: const TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w900,
-                                                color: Color(0xFF0F172A),
-                                              ),
+                                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
                                             ),
                                           ],
                                         ),
@@ -611,10 +598,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                               ],
                             ),
                             const SizedBox(height: 12),
-                            Text(
-                              microcopy,
-                              style: TextStyle(fontSize: 12, color: Colors.grey.shade600, height: 1.35),
-                            ),
+                            Text(microcopy, style: TextStyle(fontSize: 12, color: Colors.grey.shade600, height: 1.35)),
                           ],
                         ),
                       ),
@@ -711,7 +695,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                     ),
                   ),
                 ),
-              SliverToBoxAdapter(
+              ofiverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
                   child: FutureBuilder<List<_FotoItem>>(
@@ -724,10 +708,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                         children: [
                           Row(
                             children: [
-                              const Text(
-                                'Trabajos realizados',
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: textColor),
-                              ),
+                              const Text('Trabajos realizados', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: textColor)),
                               const Spacer(),
                               if (!loading && items.isNotEmpty)
                                 Container(
