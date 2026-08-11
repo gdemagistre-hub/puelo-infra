@@ -6,6 +6,7 @@ import 'menuEvaluaciones.dart';
 import 'menuPerfilOpciones.dart';
 import 'tarjetaDigital.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'catalogo_oficios.dart';
 
 class HomePageWidget extends StatefulWidget {
   final bool? initialModoPrestador;
@@ -27,6 +28,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   bool _modoPrestador = false;
   bool _puedeSerAmbos = false;
 
+  final TextEditingController _searchCtrl = TextEditingController();
+  final FocusNode _searchFocus = FocusNode();
+  List<OficioEspecialidad> _sugerencias = [];
+
   Color get primaryColor => _modoPrestador ? _prestadorPrimary : _clientePrimary;
   Color get primaryDark => _modoPrestador ? _prestadorDark : _clienteDark;
 
@@ -45,6 +50,13 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   void initState() {
     super.initState();
     _detectarRol();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    _searchFocus.dispose();
+    super.dispose();
   }
 
   void _detectarRol() {
@@ -77,6 +89,30 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       context,
       MaterialPageRoute(builder: (_) => BuscadorPrestadoresWidget(initialQuery: oficio)),
     );
+  }
+
+  void _onSearchChanged(String value) {
+    final list = CatalogoOficios.sugerencias(value, limit: 8);
+    setState(() => _sugerencias = list);
+  }
+
+  void _submitBusqueda([String? raw]) {
+    final q = (raw ?? _searchCtrl.text).trim();
+    _searchFocus.unfocus();
+    setState(() => _sugerencias = []);
+    if (q.isEmpty) {
+      _abrirBuscador();
+      return;
+    }
+    _abrirBuscador(oficio: q);
+  }
+
+  void _elegirSugerencia(OficioEspecialidad e) {
+    _searchCtrl.text = e.label;
+    _searchCtrl.selection = TextSelection.fromPosition(
+      TextPosition(offset: _searchCtrl.text.length),
+    );
+    _submitBusqueda(e.id);
   }
 
   void _compartirTarjeta() {
@@ -236,46 +272,100 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   Widget _buildClienteHome() {
     return CustomScrollView(
       slivers: [
-        SliverToBoxAdapter(
+        Sli verToBoxAdapter(
           child: _buildBrandHeader(subtitle: '¿Qué servicio necesitás hoy?'),
         ),
-        // Campo de búsqueda libre — debajo del header, arriba de los 8 oficios
+        // Campo de búsqueda tipeable + typeahead de oficios
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child: Material(
-              color: Colors.white,
-              elevation: 2,
-              shadowColor: Colors.black.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(16),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: () => _abrirBuscador(), // sin filtro de oficio
-                child: Container(
-                  height: 52,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.search_rounded, color: _clientePrimary, size: 24),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          '¿Qué servicio necesitás?',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.grey.shade500,
-                          ),
-                        ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Material(
+                  color: Colors.white,
+                  elevation: 2,
+                  shadowColor: Colors.black.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    height: 52,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: TextField(
+                      controller: _searchCtrl,
+                      focusNode: _searchFocus,
+                      textInputAction: TextInputAction.search,
+                      onChanged: _onSearchChanged,
+                      onSubmitted: _submitBusqueda,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0F172A),
                       ),
-                    ],
+                      decoration: InputDecoration(
+                        hintText: '¿Qué servicio necesitás?',
+                        hintStyle: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey.shade500,
+                        ),
+                        prefixIcon: Icon(Icons.search_rounded, color: _clientePrimary, size: 24),
+                        suffixIcon: _searchCtrl.text.isEmpty
+                            ? null
+                            : IconButton(
+                                icon: const Icon(Icons.close_rounded, size: 20),
+                                color: const Color(0xFF94A3B8),
+                                onPressed: () {
+                                  _searchCtrl.clear();
+                                  setState(() => _sugerencias = []);
+                                },
+                              ),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                if (_sugerencias.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Material(
+                    color: Colors.white,
+                    elevation: 3,
+                    shadowColor: Colors.black.withOpacity(0.10),
+                    borderRadius: BorderRadius.circular(14),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _sugerencias.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                      itemBuilder: (context, i) {
+                        final e = _sugerencias[i];
+                        return ListTile(
+                          dense: true,
+                          leading: Icon(CatalogoOficios.iconFor(e.id), color: _clientePrimary, size: 22),
+                          title: Text(
+                            e.label,
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF0F172A)),
+                          ),
+                          subtitle: e.sinonimos.isEmpty
+                              ? null
+                              : Text(
+                                  e.sinonimos.take(3).join(' · '),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                                ),
+                          trailing: const Icon(Icons.north_west_rounded, size: 16, color: Color(0xFF94A3B8)),
+                          onTap: () => _elegirSugerencia(e),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         ),
@@ -285,14 +375,14 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             child: Text('Oficios', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
           ),
         ),
-        SliverToBoxAdapter(
+        Sli verToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
             child: GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: _categorias.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              gridDelegate: const Sli verGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 4,
                 mainAxisSpacing: 14,
                 crossAxisSpacing: 8,
@@ -387,7 +477,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
         ),
-        const SliverToBoxAdapter(child: SizedBox(height: 32)),
+        const Sli verToBoxAdapter(child: SizedBox(height: 32)),
       ],
     );
   }
@@ -395,8 +485,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   Widget _buildPrestadorHome() {
     return CustomScrollView(
       slivers: [
-        SliverToBoxAdapter(child: _buildBrandHeader(subtitle: 'Tu perfil profesional en Puelo')),
-        SliverToBoxAdapter(
+        Sli verToBoxAdapter(child: _buildBrandHeader(subtitle: 'Tu perfil profesional en Puelo')),
+        Sli verToBoxAdapter(
           child: Transform.translate(
             offset: const Offset(0, -18),
             child: Padding(
@@ -442,8 +532,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
         ),
-        const SliverToBoxAdapter(child: SizedBox(height: 28)),
-        SliverToBoxAdapter(
+        const Sli verToBoxAdapter(child: SizedBox(height: 28)),
+        Sli verToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Material(
@@ -482,7 +572,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
         ),
-        const SliverToBoxAdapter(child: SizedBox(height: 40)),
+        const Sli verToBoxAdapter(child: SizedBox(height: 40)),
       ],
     );
   }

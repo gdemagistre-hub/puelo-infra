@@ -98,76 +98,66 @@ class CatalogoOficios {
         ['podar', 'arboles', 'ramas']),
     OficioEspecialidad('paisajismo', 'Paisajismo', 'jardin_exterior',
         ['paisajista', 'diseño jardin']),
+    OficioEspecialidad('cercos', 'Cercos y alambrados', 'jardin_exterior',
+        ['cerco', 'alambrado', 'reja jardin']),
     OficioEspecialidad('riego', 'Riego automático', 'jardin_exterior',
         ['riego', 'aspersores']),
-    OficioEspecialidad('cercos', 'Cercos y alambrados', 'jardin_exterior',
-        ['alambrado', 'cerco', 'perimetral']),
     OficioEspecialidad('piletas_mantenimiento', 'Piletas (mantenimiento)', 'jardin_exterior',
-        ['pileta', 'piscina', 'cloro', 'mantenimiento pileta']),
+        ['pileta', 'piscina', 'cloro']),
 
     // —— Limpieza ——
     OficioEspecialidad('limpieza', 'Limpieza', 'limpieza',
-        ['limpiar', 'empleada', 'limpieza hogar']),
+        ['limpiar', 'mucama', 'empleada']),
+    OficioEspecialidad('limpieza_oficinas', 'Limpieza de oficinas', 'limpieza',
+        ['oficina', 'comercial']),
     OficioEspecialidad('limpieza_postobra', 'Limpieza post-obra', 'limpieza',
-        ['post obra', 'final de obra']),
-    OficioEspecialidad('limpieza_alfombras', 'Alfombras y tapizados', 'limpieza',
-        ['alfombra', 'sillones lavado', 'tapizados']),
-    OficioEspecialidad('fumigacion', 'Fumigación / plagas', 'limpieza',
-        ['plagas', 'desinsectacion', 'desratizacion', 'cucarachas']),
-    OficioEspecialidad('vidrios', 'Limpieza de vidrios', 'limpieza',
-        ['vidrios', 'cristales']),
+        ['post obra', 'fin de obra']),
+    OficioEspecialidad('fumigacion', 'Fumigación', 'limpieza',
+        ['fumigar', 'plagas', 'desinfectar']),
 
     // —— Clima ——
     OficioEspecialidad('aire_acondicionado', 'Aire acondicionado', 'clima',
         ['aire', 'aa', 'split', 'climatizacion']),
     OficioEspecialidad('calefaccion', 'Calefacción', 'clima',
-        ['caldera', 'radiador', 'estufa', 'calefaccion']),
+        ['caldera', 'radiadores', 'losa radiante']),
     OficioEspecialidad('ventilacion', 'Ventilación', 'clima',
-        ['extractor', 'campana']),
+        ['extractor', 'ventilador']),
 
     // —— Seguridad y tech ——
-    OficioEspecialidad('cctv', 'Cámaras / CCTV', 'seguridad_tech',
-        ['camaras', 'seguridad', 'videovigilancia']),
+    OficioEspecialidad('camaras_seguridad', 'Cámaras de seguridad', 'seguridad_tech',
+        ['camaras', 'cctv', 'vigilancia']),
     OficioEspecialidad('alarmas', 'Alarmas', 'seguridad_tech',
         ['alarma', 'monitoreo']),
-    OficioEspecialidad('cerrajeria', 'Cerrajería', 'seguridad_tech',
-        ['cerrajero', 'cerradura', 'llaves', 'apertura']),
-    OficioEspecialidad('redes_wifi', 'Redes / Wi‑Fi', 'seguridad_tech',
-        ['wifi', 'red', 'router', 'cableado']),
-    OficioEspecialidad('soporte_pc', 'Soporte PC', 'seguridad_tech',
-        ['computadora', 'notebook', 'tecnico pc', 'formateo']),
-    OficioEspecialidad('domotica', 'Domótica básica', 'seguridad_tech',
-        ['automatizacion', 'smart home']),
+    OficioEspecialidad('redes_wifi', 'Redes y WiFi', 'seguridad_tech',
+        ['wifi', 'router', 'red', 'internet']),
+    OficioEspecialidad('automatizacion', 'Automatización / domótica', 'seguridad_tech',
+        ['domotica', 'smart home']),
 
     // —— Mudanzas ——
     OficioEspecialidad('mudanzas', 'Mudanzas', 'mudanzas',
-        ['mudanza', 'mudar']),
+        ['mudanza', 'flete', 'traslado']),
     OficioEspecialidad('fletes', 'Fletes', 'mudanzas',
-        ['flete', 'transporte', 'envio']),
-    OficioEspecialidad('retiro_escombros', 'Retiro de escombros', 'mudanzas',
-        ['escombros', 'escombro', 'descartes']),
+        ['flete', 'camion', 'transporte']),
+    OficioEspecialidad('embalaje', 'Embalaje', 'mudanzas',
+        ['embalar', 'cajas']),
 
     // —— Mascotas ——
     OficioEspecialidad('paseador_perros', 'Paseador de perros', 'mascotas',
-        ['paseador', 'perro', 'mascota']),
+        ['pasear', 'perro', 'mascota']),
     OficioEspecialidad('peluqueria_canina', 'Peluquería canina', 'mascotas',
-        ['grooming', 'baño perro']),
-    OficioEspecialidad('pet_sitting', 'Cuidado de mascotas', 'mascotas',
-        ['petsitter', 'cuidado perros', 'guarderia']),
+        ['peluqueria', 'grooming']),
+    OficioEspecialidad('adiestramiento', 'Adiestramiento', 'mascotas',
+        ['entrenar', 'obediencia']),
 
     // —— Hogar varios ——
-    OficioEspecialidad('persianas', 'Persianas y cortinas', 'hogar_varios',
-        ['persiana', 'cortina', 'roller']),
-    OficioEspecialidad('toldos', 'Toldos', 'hogar_varios',
-        ['toldo', 'lonas']),
-    OficioEspecialidad('portones_automaticos', 'Portones automáticos', 'hogar_varios',
-        ['porton', 'motor porton', 'automatizacion porton']),
-    OficioEspecialidad('electrodomesticos', 'Service electrodomésticos', 'hogar_varios',
-        ['heladera', 'lavarropas', 'cocina', 'horno']),
-    OficioEspecialidad('costura', 'Costura y arreglos', 'hogar_varios',
-        ['modista', 'arreglo ropa', 'costurera']),
-    OficioEspecialidad('organizacion_hogar', 'Organización del hogar', 'hogar_varios',
-        ['organizer', 'orden']),
+    OficioEspecialidad('cerrajeria', 'Cerrajería', 'hogar_varios',
+        ['cerrajero', 'llaves', 'cerradura']),
+    OficioEspecialidad('electrodomesticos', 'Reparación de electrodomésticos', 'hogar_varios',
+        ['heladera', 'lavarropas', 'electro']),
+    OficioEspecialidad('cortinas', 'Cortinas y persianas', 'hogar_varios',
+        ['cortina', 'persiana', 'rollers']),
+    OficioEspecialidad('tapiceria_auto', 'Tapicería automotor', 'hogar_varios',
+        ['auto', 'asientos']),
   ];
 
   static final Map<String, OficioEspecialidad> _byId = {
@@ -215,7 +205,6 @@ class CatalogoOficios {
     for (final p in profesiones) {
       final cat = categoriaDeEspecialidad(p);
       if (cat != null) out.add(cat);
-      // si ya es categoría id
       if (_catById.containsKey(p.toLowerCase().trim())) {
         out.add(p.toLowerCase().trim());
       }
@@ -238,7 +227,6 @@ class CatalogoOficios {
         categoriaId.isNotEmpty &&
         categoriaId != 'Todos') {
       final cat = categoriaId.toLowerCase().trim();
-      // match category id or any specialty in that category
       bool okCat = prof.contains(cat);
       if (!okCat) {
         for (final p in prof) {
@@ -247,7 +235,6 @@ class CatalogoOficios {
             okCat = true;
             break;
           }
-          // legacy: albanileria under construccion, etc. handled by data
         }
       }
       if (!okCat) return false;
@@ -271,7 +258,6 @@ class CatalogoOficios {
       final cat = _catById[esp.categoriaId];
       if (cat != null && cat.label.toLowerCase().contains(q)) return true;
     }
-    // texto es nombre de categoría
     for (final c in categorias) {
       if (c.label.toLowerCase().contains(q) || c.id == q) {
         for (final p in prof) {
@@ -280,6 +266,31 @@ class CatalogoOficios {
       }
     }
     return false;
+  }
+
+  /// Typeahead: especialidades (y categorías) que coinciden con [query].
+  /// Orden: startsWith label/id > startsWith sinónimo > contains.
+  static List<OficioEspecialidad> sugerencias(String query, {int limit = 8}) {
+    final q = query.toLowerCase().trim();
+    if (q.isEmpty) return const [];
+    final scored = <MapEntry<OficioEspecialidad, int>>[];
+    for (final e in especialidades) {
+      final label = e.label.toLowerCase();
+      final id = e.id.toLowerCase();
+      int score = 0;
+      if (label.startsWith(q) || id.startsWith(q)) {
+        score = 100;
+      } else if (e.sinonimos.any((s) => s.toLowerCase().startsWith(q))) {
+        score = 85;
+      } else if (label.contains(q) || id.contains(q)) {
+        score = 70;
+      } else if (e.sinonimos.any((s) => s.toLowerCase().contains(q))) {
+        score = 50;
+      }
+      if (score > 0) scored.add(MapEntry(e, score));
+    }
+    scored.sort((a, b) => b.value.compareTo(a.value));
+    return scored.take(limit).map((e) => e.key).toList();
   }
 
   /// Chips de buscador: Todos + categorías.
@@ -293,7 +304,6 @@ class CatalogoOficios {
         return c.id;
       }
     }
-    // legacy chip names
     const legacy = {
       'Electricista': 'electricidad',
       'Plomero': 'plomeria_gas',
