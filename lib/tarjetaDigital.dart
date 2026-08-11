@@ -354,11 +354,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                               const Expanded(
                                 child: Text(
                                   'Tarjeta digital',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 16,
-                                  ),
+                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16),
                                 ),
                               ),
                             ],
@@ -385,14 +381,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                           ),
                           alignment: Alignment.center,
                           child: (urlFoto == null || urlFoto.isEmpty)
-                              ? Text(
-                                  initials,
-                                  style: const TextStyle(
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.w900,
-                                    color: primaryColor,
-                                  ),
-                                )
+                              ? Text(initials, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: primaryColor))
                               : null,
                         ),
                         const SizedBox(height: 14),
@@ -401,13 +390,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                           child: Text(
                             nombreMostrar.isEmpty ? 'Prestador' : nombreMostrar,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 24,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.4,
-                              height: 1.15,
-                            ),
+                            style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: -0.4, height: 1.15),
                           ),
                         ),
                         if (profesiones.isNotEmpty) ...[
@@ -426,14 +409,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                                     borderRadius: BorderRadius.circular(20),
                                     border: Border.all(color: Colors.white.withOpacity(0.35)),
                                   ),
-                                  child: Text(
-                                    _labelProf(p),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
+                                  child: Text(_labelProf(p), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
                                 );
                               }).toList(),
                             ),
@@ -454,11 +430,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                                     textAlign: TextAlign.center,
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.9),
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
-                                    ),
+                                    style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 13, fontWeight: FontWeight.w500),
                                   ),
                                 ),
                               ],
@@ -471,8 +443,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                   ),
                 ),
               ),
-              // BLOQUE CONFIANZA — idéntico para cliente y prestador
-              ofiverToBoxAdapter(
+              SliverToBoxAdapter(
                 child: Transform.translate(
                   offset: const Offset(0, -16),
                   child: Padding(
@@ -492,14 +463,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'Así lo ven otros clientes',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
+                            Text('Así lo ven otros clientes', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade600)),
                             const SizedBox(height: 14),
                             Row(
                               children: [
@@ -515,14 +479,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                                               borderRadius: BorderRadius.circular(20),
                                               border: Border.all(color: Color(badgeColors.foreground).withOpacity(0.35)),
                                             ),
-                                            child: Text(
-                                              badgeLabel,
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w800,
-                                                color: Color(badgeColors.foreground),
-                                              ),
-                                            ),
+                                            child: Text(badgeLabel, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(badgeColors.foreground))),
                                           )
                                         else
                                           Text('Sin nivel', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.grey.shade500)),
@@ -554,18 +511,12 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                                                   strokeCap: StrokeCap.round,
                                                 ),
                                               ),
-                                              Text(
-                                                scoreIdentidad > 0 ? '$scoreClamped' : '—',
-                                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
-                                              ),
+                                              Text(scoreIdentidad > 0 ? '$scoreClamped' : '—', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
                                             ],
                                           ),
                                         ),
                                         const SizedBox(height: 4),
-                                        Text(
-                                          scoreIdentidad > 0 ? '$scoreClamped/100' : 'Confianza',
-                                          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                                        ),
+                                        Text(scoreIdentidad > 0 ? '$scoreClamped/100' : 'Confianza', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
                                       ],
                                     ),
                                   ),
@@ -580,17 +531,11 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                                           children: [
                                             Icon(Icons.star_rounded, color: Colors.amber.shade700, size: 18),
                                             const SizedBox(width: 4),
-                                            Text(
-                                              cantEval > 0 ? promedio.toStringAsFixed(1) : '—',
-                                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
-                                            ),
+                                            Text(cantEval > 0 ? promedio.toStringAsFixed(1) : '—', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
                                           ],
                                         ),
                                         const SizedBox(height: 4),
-                                        Text(
-                                          cantEval > 0 ? '($cantEval eval)' : 'Sin eval.',
-                                          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                                        ),
+                                        Text(cantEval > 0 ? '($cantEval eval)' : 'Sin eval.', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
                                       ],
                                     ),
                                   ),
@@ -616,13 +561,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                         child: SizedBox(
                           height: 52,
                           child: ElevatedButton.icon(
-                            onPressed: hasTel
-                                ? () => _contactarWhatsApp(
-                                      telefono,
-                                      nombreMostrar.isEmpty ? nombre : nombreMostrar,
-                                      prestadorUid: docId,
-                                    )
-                                : null,
+                            onPressed: hasTel ? () => _contactarWhatsApp(telefono, nombreMostrar.isEmpty ? nombre : nombreMostrar, prestadorUid: docId) : null,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF25D366),
                               foregroundColor: Colors.white,
@@ -641,13 +580,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                         child: SizedBox(
                           height: 52,
                           child: OutlinedButton.icon(
-                            onPressed: hasTel
-                                ? () => _realizarLlamada(
-                                      telefono,
-                                      prestadorUid: docId,
-                                      prestadorNombre: nombreMostrar.isEmpty ? null : nombreMostrar,
-                                    )
-                                : null,
+                            onPressed: hasTel ? () => _realizarLlamada(telefono, prestadorUid: docId, prestadorNombre: nombreMostrar.isEmpty ? null : nombreMostrar) : null,
                             style: OutlinedButton.styleFrom(
                               foregroundColor: primaryColor,
                               side: BorderSide(color: primaryColor.withOpacity(0.55), width: 1.5),
@@ -663,7 +596,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                 ),
               ),
               if (esPropietario)
-                SliverToBoxAdapter(
+                ofiverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
                     child: Material(
@@ -673,29 +606,16 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         child: Row(
                           children: [
-                            Expanded(
-                              child: Text(
-                                'Compartí tu tarjeta con clientes',
-                                style: TextStyle(color: primaryDark, fontWeight: FontWeight.w700, fontSize: 13),
-                              ),
-                            ),
-                            IconButton(
-                              onPressed: () => _compartirPorWhatsApp(nombreMostrar, docId),
-                              icon: const FaIcon(FontAwesomeIcons.whatsapp, color: AppColors.whatsapp, size: 20),
-                              tooltip: 'WhatsApp',
-                            ),
-                            IconButton(
-                              onPressed: () => _copiarEnlace(docId),
-                              icon: Icon(Icons.link_rounded, color: primaryColor, size: 22),
-                              tooltip: 'Copiar enlace',
-                            ),
+                            Expanded(child: Text('Compartí tu tarjeta con clientes', style: TextStyle(color: primaryDark, fontWeight: FontWeight.w700, fontSize: 13))),
+                            IconButton(onPressed: () => _compartirPorWhatsApp(nombreMostrar, docId), icon: const FaIcon(FontAwesomeIcons.whatsapp, color: AppColors.whatsapp, size: 20), tooltip: 'WhatsApp'),
+                            IconButton(onPressed: () => _copiarEnlace(docId), icon: Icon(Icons.link_rounded, color: primaryColor, size: 22), tooltip: 'Copiar enlace'),
                           ],
                         ),
                       ),
                     ),
                   ),
                 ),
-              ofiverToBoxAdapter(
+              SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
                   child: FutureBuilder<List<_FotoItem>>(
@@ -714,36 +634,24 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(color: accentColor, borderRadius: BorderRadius.circular(6)),
-                                  child: Text(
-                                    '${items.length} FOTO${items.length == 1 ? '' : 'S'}',
-                                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: primaryColor),
-                                  ),
+                                  child: Text('${items.length} FOTO${items.length == 1 ? '' : 'S'}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: primaryColor)),
                                 ),
                             ],
                           ),
                           const SizedBox(height: 12),
                           if (loading)
-                            const Padding(
-                              padding: EdgeInsets.all(24),
-                              child: Center(child: CircularProgressIndicator(color: primaryColor, strokeWidth: 2)),
-                            )
+                            const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator(color: primaryColor, strokeWidth: 2)))
                           else if (items.isEmpty)
                             Container(
                               width: double.infinity,
                               padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
-                              ),
+                              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE2E8F0))),
                               child: Column(
                                 children: [
                                   Icon(Icons.photo_library_outlined, size: 32, color: Colors.grey.shade400),
                                   const SizedBox(height: 10),
                                   Text(
-                                    esPropietario
-                                        ? 'Subí fotos de trabajos hechos para que el cliente vea tu experiencia.'
-                                        : 'Aún no publicó fotos de trabajos.',
+                                    esPropietario ? 'Subí fotos de trabajos hechos para que el cliente vea tu experiencia.' : 'Aún no publicó fotos de trabajos.',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(color: Colors.grey.shade600, fontSize: 13, height: 1.35),
                                   ),
@@ -767,24 +675,13 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                             GridView.builder(
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
-                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
-                                crossAxisSpacing: 10,
-                                mainAxisSpacing: 10,
-                              ),
+                              gridDelegate: const ofiverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 10, mainAxisSpacing: 10),
                               itemCount: items.length,
                               itemBuilder: (context, i) {
                                 final item = items[i];
                                 return ClipRRect(
                                   borderRadius: BorderRadius.circular(14),
-                                  child: Image.network(
-                                    item.url,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Container(
-                                      color: Colors.grey.shade200,
-                                      child: const Icon(Icons.broken_image_outlined, color: Colors.grey),
-                                    ),
-                                  ),
+                                  child: Image.network(item.url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: Colors.grey.shade200, child: const Icon(Icons.broken_image_outlined, color: Colors.grey))),
                                 );
                               },
                             ),
@@ -805,11 +702,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
+      decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
       child: child,
     );
   }
@@ -817,15 +710,8 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
   Widget _signalChip(String label) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: accentColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: primaryColor.withOpacity(0.25)),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: primaryDark),
-      ),
+      decoration: BoxDecoration(color: accentColor, borderRadius: BorderRadius.circular(20), border: Border.all(color: primaryColor.withOpacity(0.25))),
+      child: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: primaryDark)),
     );
   }
 }
