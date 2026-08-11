@@ -185,11 +185,8 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     _cargarPrestadores(reset: true);
   }
 
-  /// Zona activa para query server: filtro UI > preferencia del cliente.
   String? get _zonaServerFilter {
-    return selectedLocalidadId ??
-        selectedPartidoId ??
-        selectedProvinciaId;
+    return selectedLocalidadId ?? selectedPartidoId ?? selectedProvinciaId;
   }
 
   Future<void> _cargarPrestadores({required bool reset}) async {
@@ -226,7 +223,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     } catch (e) {
       debugPrint('Error buscador: $e');
       try {
-        // Fallback mínimo: solo es_trabajador
         Query fallback =
             db.collection('usuarios').where('es_trabajador', isEqualTo: true);
         fallback = fallback.limit(_pageSize);
@@ -262,7 +258,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     }
   }
 
-  /// Elige la mejor query según índices disponibles (una arrayContains a la vez).
   Future<QuerySnapshot> _queryPrestadores({required bool reset}) async {
     final catId = CatalogoOficios.idDesdeLabel(_selectedRubro);
     final zonaId = _zonaServerFilter;
@@ -270,12 +265,10 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     Query query = db.collection('usuarios').where('es_trabajador', isEqualTo: true);
 
     if (zonaId != null) {
-      // Índice: es_trabajador + zona_ids
       query = query.where('zona_ids', arrayContains: zonaId);
     } else if (catId != null) {
       query = query.where('categorias_servicio', arrayContains: catId);
     } else {
-      // Índice: es_trabajador + list_visible — solo perfiles listables
       query = query.where('list_visible', isEqualTo: true);
     }
 
@@ -295,17 +288,14 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
       final da = a.data() as Map<String, dynamic>;
       final dbMap = b.data() as Map<String, dynamic>;
 
-      // 1) Zona coincidente con domicilio del cliente
       final za = _scoreZonaPref(da);
       final zb = _scoreZonaPref(dbMap);
       if (za != zb) return zb.compareTo(za);
 
-      // 2) Confianza / calificación del proveedor
       final ca = _scoreConfianza(da);
       final cb = _scoreConfianza(dbMap);
       if (ca != cb) return cb.compareTo(ca);
 
-      // 3) Desempate: promedio de estrellas
       final pa = (da['list_promedio'] as num?) ??
           (da['promedioEstrellas'] as num?) ??
           0;
@@ -322,7 +312,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
         .map((e) => e.toString())
         .toSet();
     if (zonaIds.isEmpty) {
-      // Fallback a cobertura anidada
       final cob = data['zonas_cobertura'] as Map<String, dynamic>?;
       if (cob != null) {
         for (final id in PrestadorListFields.zonaIdsFromCobertura(cob)) {
@@ -337,9 +326,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
   }
 
   /// Score compuesto de confianza para ordenar listados.
-  /// Prioriza score_identidad (0–100), luego nivel de badge, luego estrellas.
   double _scoreConfianza(Map<String, dynamic> data) {
-    // score_identidad directo o vía mapa scoring
     num? scoreId = data['list_score_identidad'] as num?;
     if (scoreId == null) {
       final sc = data['scoring'];
@@ -349,7 +336,6 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     }
     final identidad = (scoreId ?? 0).toDouble();
 
-    // Badge escalera: nuevo < registrado < bronce < bronce_plus < plata < oro < diamante
     final badge = (data['list_badge'] ?? data['badge_prestador'] ?? '')
         .toString()
         .toLowerCase()
@@ -370,33 +356,36 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
             0)
         .toDouble();
 
-    // Identidad pesa más; badge desempata perfiles con score similar; estrellas al final
     return identidad * 10 + badgeRank * 20 + estrellas;
   }
 
   String _telefonoDe(Map<String, dynamic> data) =>
       (data['telefono'] ?? data['celular'] ?? '').toString().trim();
 
-  bool _tieneWhatsApp(Map<String, dynamic> data) {
-    if (_telefonoDe(data).isEmpty) return false;
-    if (data.containsKey('tiene_whatsapp')) {
-      return data['tiene_whatsapp'] == true;
-    }
-    return true;
-  }
-
-  String _initials(Map<String, dynamic> data) {
+  String _nombreDe(Map<String, dynamic> data) {
     final n = (data['nombre'] ?? data['list_nombre'] ?? '').toString().trim();
     final a = (data['apellido'] ?? '').toString().trim();
-    if (n.isEmpty && a.isEmpty) return 'P';
-    if (a.isEmpty) return n[0].toUpperCase();
-    if (n.isEmpty) return a[0].toUpperCase();
-    return '${n[0]}${a[0]}'.toUpperCase();
+    if (n.isEmpty && a.isEmpty) return 'Prestador';
+    return ('$n $a').trim();
   }
 
-  // NOTE: remaining UI methods kept from previous working version —
-  // if this truncated file causes missing method errors, restore full UI from backup.
-  // The ranking logic above is complete and is the critical change.
+  String _oficioDe(Map<String, dynamic> data) {
+    final cats = data['categorias_servicio'] as List? ?? data['profesiones'] as List? ?? [];
+    if (cats.isEmpty) return 'Servicio';
+    return cats.take(2).map((e) => e.toString()).join(' · ');
+  }
+
+  Future<void> _abrirTarjeta(QueryDocumentSnapshot doc) async {
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TarjetaDigitalWidget(
+          usuarioRef: doc.reference,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -406,24 +395,107 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
         backgroundColor: Colors.white,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        title: const Text(
-          'Buscar prestadores',
-          style: TextStyle(
+        title: Text(
+          _selectedRubro == 'Todos' ? 'Prestadores' : _selectedRubro,
+          style: const TextStyle(
             color: _clientePrimary,
             fontWeight: FontWeight.w800,
             fontSize: 18,
           ),
         ),
+        actions: [
+          if (_tienePreferenciaZona)
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: _clientePrimary.withOpacity(0.10),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'Cerca tuyo',
+                    style: TextStyle(
+                      color: _clientePrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
-      body: const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text(
-            'Cargando buscador… Si ves este mensaje, restaurá la UI completa desde el backup.',
-            textAlign: TextAlign.center,
-          ),
-        ),
-      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(child: Text('Error: $_error'))
+              : _docs.isEmpty
+                  ? const Center(child: Text('No hay prestadores para mostrar'))
+                  : ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                      itemCount: _docs.length + (_hasMore ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        if (index >= _docs.length) {
+                          return Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Center(
+                              child: TextButton(
+                                onPressed: _loadingMore
+                                    ? null
+                                    : () => _cargarPrestadores(reset: false),
+                                child: Text(_loadingMore ? 'Cargando…' : 'Ver más'),
+                              ),
+                            ),
+                          );
+                        }
+                        final doc = _docs[index];
+                        final data = doc.data() as Map<String, dynamic>;
+                        final nombre = _nombreDe(data);
+                        final oficio = _oficioDe(data);
+                        final score = _scoreConfianza(data);
+                        final zona = _scoreZonaPref(data);
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            leading: CircleAvatar(
+                              backgroundColor: _clientePrimary.withOpacity(0.12),
+                              child: Text(
+                                nombre.isNotEmpty ? nombre[0].toUpperCase() : 'P',
+                                style: const TextStyle(
+                                  color: _clientePrimary,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              nombre,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 15,
+                              ),
+                            ),
+                            subtitle: Text(
+                              oficio +
+                                  (zona > 0 ? ' · Zona match' : '') +
+                                  (score > 0 ? ' · Confianza' : ''),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: const Icon(Icons.chevron_right_rounded),
+                            onTap: () => _abrirTarjeta(doc),
+                          ),
+                        );
+                      },
+                    ),
     );
   }
 }
