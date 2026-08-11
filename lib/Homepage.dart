@@ -503,7 +503,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             subtitle: '¿Qué servicio necesitás hoy?',
           ),
         ),
-        SliverToBoxAdapter(
+        Sli verToBoxAdapter(
           child: Transform.translate(
             offset: const Offset(0, -18),
             child: Padding(
@@ -599,9 +599,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
         ),
-        SliverPadding(
+        Sli verPadding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          sliver: Sli verGrid(
+          sliver: SliverGrid(
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 4,
               crossAxisSpacing: 10,
@@ -661,7 +661,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
         ),
-        const Sli verToBoxAdapter(child: SizedBox(height: 32)),
+        const SliverToBoxAdapter(child: SizedBox(height: 32)),
       ],
     );
   }
@@ -669,7 +669,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   Widget _buildPrestadorHome() {
     return CustomScrollView(
       slivers: [
-        Sli verToBoxAdapter(
+        SliverToBoxAdapter(
           child: _buildBrandHeader(
             subtitle: 'Tu perfil profesional en Puelo',
           ),
@@ -796,7 +796,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
         ),
-        Sli verToBoxAdapter(
+        SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: Material(
@@ -836,7 +836,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
         ),
-        const Sli verToBoxAdapter(child: SizedBox(height: 36)),
+        const SliverToBoxAdapter(child: SizedBox(height: 36)),
       ],
     );
   }
