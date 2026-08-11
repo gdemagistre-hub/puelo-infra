@@ -239,7 +239,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         SliverToBoxAdapter(
           child: _buildBrandHeader(subtitle: '¿Qué servicio necesitás hoy?'),
         ),
-        SliverToBoxAdapter(
+        Sli verToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
             child: Text('Oficios', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
@@ -254,7 +254,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               mainAxisSpacing: 12,
               childAspectRatio: 1.18,
             ),
-            delegate: Sli verChildBuilderDelegate(
+            delegate: SliverChildBuilderDelegate(
               (context, index) {
                 final cat = _categorias[index];
                 final Color accent = (cat['color'] as Color?) ?? _clientePrimary;
@@ -346,7 +346,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
         ),
-        const SliverToBoxAdapter(child: SizedBox(height: 36)),
+        const Sli verToBoxAdapter(child: SizedBox(height: 36)),
       ],
     );
   }
