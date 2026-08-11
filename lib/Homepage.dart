@@ -27,7 +27,6 @@ import 'analytics/prox_analytics.dart';
 import 'cargaTrabajoTrabajador.dart';
 
 class HomePageWidget extends StatefulWidget {
-  /// Si se indica, fuerza el modo inicial (útil al volver desde tarjeta como cliente).
   final bool? initialModoPrestador;
 
   const HomePageWidget({super.key, this.initialModoPrestador});
@@ -64,54 +63,14 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   Color get primaryDark => _modoPrestador ? _prestadorDark : _clienteDark;
 
   static const List<Map<String, dynamic>> _categorias = [
-    {
-      'id': 'electricidad',
-      'label': 'Electricista',
-      'icon': Icons.electrical_services_rounded,
-      'color': Color(0xFF734BE4),
-    },
-    {
-      'id': 'plomeria',
-      'label': 'Plomería',
-      'icon': Icons.plumbing_rounded,
-      'color': Color(0xFF4A90E2),
-    },
-    {
-      'id': 'gasista',
-      'label': 'Gasista',
-      'icon': Icons.local_fire_department_rounded,
-      'color': Color(0xFFF75A6D),
-    },
-    {
-      'id': 'carpinteria',
-      'label': 'Carpintería',
-      'icon': Icons.carpenter_rounded,
-      'color': Color(0xFF28B5CD),
-    },
-    {
-      'id': 'pintura',
-      'label': 'Pintura',
-      'icon': Icons.format_paint_rounded,
-      'color': Color(0xFFF59E0B),
-    },
-    {
-      'id': 'albanileria',
-      'label': 'Construcción',
-      'icon': Icons.construction_rounded,
-      'color': Color(0xFF3D4756),
-    },
-    {
-      'id': 'jardineria',
-      'label': 'Jardinería',
-      'icon': Icons.grass_rounded,
-      'color': Color(0xFF16A34A),
-    },
-    {
-      'id': 'limpieza',
-      'label': 'Limpieza',
-      'icon': Icons.cleaning_services_rounded,
-      'color': Color(0xFF8B5CF6),
-    },
+    {'id': 'electricidad', 'label': 'Electricista', 'icon': Icons.electrical_services_rounded, 'color': Color(0xFF734BE4)},
+    {'id': 'plomeria', 'label': 'Plomería', 'icon': Icons.plumbing_rounded, 'color': Color(0xFF4A90E2)},
+    {'id': 'gasista', 'label': 'Gasista', 'icon': Icons.local_fire_department_rounded, 'color': Color(0xFFF75A6D)},
+    {'id': 'carpinteria', 'label': 'Carpintería', 'icon': Icons.carpenter_rounded, 'color': Color(0xFF28B5CD)},
+    {'id': 'pintura', 'label': 'Pintura', 'icon': Icons.format_paint_rounded, 'color': Color(0xFFF59E0B)},
+    {'id': 'albanileria', 'label': 'Construcción', 'icon': Icons.construction_rounded, 'color': Color(0xFF3D4756)},
+    {'id': 'jardineria', 'label': 'Jardinería', 'icon': Icons.grass_rounded, 'color': Color(0xFF16A34A)},
+    {'id': 'limpieza', 'label': 'Limpieza', 'icon': Icons.cleaning_services_rounded, 'color': Color(0xFF8B5CF6)},
   ];
 
   @override
@@ -320,7 +279,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
-      // En Home el header de marca vive en el body; en otras tabs usamos AppBar simple.
       appBar: onHome
           ? null
           : AppBar(
@@ -415,9 +373,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     );
   }
 
-  // ─────────────────────────────────────────────
-  // HEADER DE MARCA (compartido cliente / prestador)
-  // ─────────────────────────────────────────────
   Widget _buildBrandHeader({required String subtitle}) {
     return Container(
       width: double.infinity,
@@ -540,19 +495,350 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     );
   }
 
-  // ─────────────────────────────────────────────
-  // HOME CLIENTE
-  // ─────────────────────────────────────────────
   Widget _buildClienteHome() {
     return CustomScrollView(
       slivers: [
-        some_placeholder_to_avoid_truncation_in_this_simulation,
+        SliverToBoxAdapter(
+          child: _buildBrandHeader(
+            subtitle: '¿Qué servicio necesitás hoy?',
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: Transform.translate(
+            offset: const Offset(0, -18),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Material(
+                color: Colors.white,
+                elevation: 6,
+                shadowColor: _clientePrimary.withOpacity(0.25),
+                borderRadius: BorderRadius.circular(18),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () => _abrirBuscador(),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 16,
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: _clientePrimary.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.search_rounded,
+                            color: _clientePrimary,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Buscar prestador',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'Electricista, plomero, gasista…',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF94A3B8),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          size: 16,
+                          color: _clientePrimary.withOpacity(0.7),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 4,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: _clientePrimary,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                const Text(
+                  'Oficios',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          sliver: Sli verGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 4,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: 0.85,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final cat = _categorias[index];
+                final Color accent = (cat['color'] as Color?) ?? _clientePrimary;
+                return Material(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  elevation: 1.5,
+                  shadowColor: accent.withOpacity(0.2),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: () => _abrirBuscador(oficio: cat['id'] as String),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: accent.withOpacity(0.15),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              cat['icon'] as IconData,
+                              color: accent,
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            cat['label'] as String,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: accent.withOpacity(0.95),
+                              height: 1.15,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+              childCount: _categorias.length,
+            ),
+          ),
+        ),
+        const Sli verToBoxAdapter(child: SizedBox(height: 32)),
       ],
     );
   }
 
   Widget _buildPrestadorHome() {
-    return const Center(child: Text('PRESTADOR RESTORED - full content pending'));
+    return CustomScrollView(
+      slivers: [
+        Sli verToBoxAdapter(
+          child: _buildBrandHeader(
+            subtitle: 'Tu perfil profesional en Puelo',
+          ),
+        ),
+        Sli verToBoxAdapter(
+          child: Transform.translate(
+            offset: const Offset(0, -18),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Material(
+                color: Colors.white,
+                elevation: 6,
+                shadowColor: _prestadorPrimary.withOpacity(0.25),
+                borderRadius: BorderRadius.circular(20),
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: _visibilidadCargando
+                      ? const SizedBox(
+                          height: 72,
+                          child: Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : Column(
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  width: 72,
+                                  height: 72,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        _prestadorPrimary.withOpacity(0.15),
+                                        _prestadorPrimary.withOpacity(0.05),
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        '${_scoreIdentidad ?? 0}',
+                                        style: TextStyle(
+                                          fontSize: 28,
+                                          fontWeight: FontWeight.w900,
+                                          color: _prestadorPrimary,
+                                          height: 1,
+                                        ),
+                                      ),
+                                      Text(
+                                        '/100',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: _prestadorPrimary.withOpacity(0.7),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _nivelConfianza != null
+                                            ? ScoringService.labelNivel(_nivelConfianza)
+                                            : 'Confianza de perfil',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFF0F172A),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: _estaVisible
+                                              ? const Color(0xFFD1FAE5)
+                                              : const Color(0xFFFFEDD5),
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: Text(
+                                          _estaVisible ? '● Visible' : '● Oculto',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w800,
+                                            color: _estaVisible
+                                                ? const Color(0xFF047857)
+                                                : const Color(0xFFC2410C),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        _estaVisible
+                                            ? _resumenOficios
+                                            : 'Completá oficios · zona · teléfono',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Color(0xFF64748B),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        Sli verToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Material(
+              borderRadius: BorderRadius.circular(20),
+              child: InkWell(
+                onTap: _compartirTarjeta,
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: LinearGradient(
+                      colors: [_prestadorPrimary, _prestadorDark],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 28),
+                      SizedBox(width: 14),
+                      Expanded(
+                        child: Text(
+                          'Tu tarjeta digital',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      Icon(Icons.ios_share_rounded, color: Colors.white70, size: 22),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const Sli verToBoxAdapter(child: SizedBox(height: 36)),
+      ],
+    );
   }
 }
 
