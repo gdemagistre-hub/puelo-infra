@@ -359,7 +359,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                 ),
               ),
               if (esPropietario)
-                ofiverToBoxAdapter(
+                SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
                     child: Material(
