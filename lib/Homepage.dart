@@ -236,68 +236,19 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   Widget _buildClienteHome() {
     return CustomScrollView(
       slivers: [
-        Sli verToBoxAdapter(
+        SliverToBoxAdapter(
           child: _buildBrandHeader(subtitle: '¿Qué servicio necesitás hoy?'),
         ),
-        Sli verToBoxAdapter(
-          child: Transform.translate(
-            offset: const Offset(0, -18),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Material(
-                color: Colors.white,
-                elevation: 6,
-                shadowColor: _clientePrimary.withOpacity(0.25),
-                borderRadius: BorderRadius.circular(18),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(18),
-                  onTap: () => _abrirBuscador(),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(color: _clientePrimary.withOpacity(0.12), borderRadius: BorderRadius.circular(12)),
-                          child: const Icon(Icons.search_rounded, color: _clientePrimary, size: 24),
-                        ),
-                        const SizedBox(width: 14),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Buscar prestador', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
-                              SizedBox(height: 2),
-                              Text('Electricista, plomero, gasista…', style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
-                            ],
-                          ),
-                        ),
-                        Icon(Icons.arrow_forward_ios_rounded, size: 16, color: _clientePrimary.withOpacity(0.7)),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-        Sli verToBoxAdapter(
+        SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-            child: Row(
-              children: [
-                Container(width: 4, height: 18, decoration: BoxDecoration(color: _clientePrimary, borderRadius: BorderRadius.circular(2))),
-                const SizedBox(width: 10),
-                const Text('Oficios', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
-              ],
-            ),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+            child: Text('Oficios', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
           ),
         ),
-        Sli verPadding(
+        SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          sliver: Sli verGrid(
-            gridDelegate: const Sli verGridDelegateWithFixedCrossAxisCount(
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
@@ -349,10 +300,10 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   Widget _buildPrestadorHome() {
     return CustomScrollView(
       slivers: [
-        Sli verToBoxAdapter(
+        SliverToBoxAdapter(
           child: _buildBrandHeader(subtitle: 'Tu perfil profesional en Puelo'),
         ),
-        Sli verToBoxAdapter(
+        SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Material(
@@ -395,7 +346,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
         ),
-        const Sli verToBoxAdapter(child: SizedBox(height: 36)),
+        const SliverToBoxAdapter(child: SizedBox(height: 36)),
       ],
     );
   }
