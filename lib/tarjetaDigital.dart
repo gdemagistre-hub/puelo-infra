@@ -278,6 +278,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                   ),
                 ),
               ),
+              // BLOQUE CONFIANZA
               SliverToBoxAdapter(
                 child: Transform.translate(
                   offset: const Offset(0, -16),
@@ -337,7 +338,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                   ),
                 ),
               ),
-              ofiverToBoxAdapter(
+              SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
                   child: Row(children: [
@@ -358,7 +359,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                 ),
               ),
               if (esPropietario)
-                SliverToBoxAdapter(
+                ofiverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
                     child: Material(
