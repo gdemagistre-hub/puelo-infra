@@ -5,7 +5,7 @@ import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
 
-/// Cifrado por usuario: PIN de 6 dígitos → clave AES-GCM 256.
+/// Cifrado por usuario: PIN de 6 digitos → clave AES-GCM 256.
 /// Los datos en Firestore Finanzas son ilegibles sin el PIN.
 class VaultCrypto {
   VaultCrypto._();
@@ -83,5 +83,6 @@ class VaultCrypto {
     }
   }
 
-  static bool isValidPin(String pin) => RegExp(r'^\\d{6}$').hasMatch(pin);
+  static bool isValidPin(String pin) =>
+      RegExp(r'^[0-9]{6}$').hasMatch(pin);
 }
