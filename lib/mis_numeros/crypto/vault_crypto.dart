@@ -5,8 +5,9 @@ import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
 
-/// Cifrado por usuario: PIN de 6 digitos → clave AES-GCM 256.
-/// Los datos en Firestore Finanzas son ilegibles sin el PIN.
+/// Cifrado de Mis números.
+/// v1: clave = PIN derivado.
+/// v2: clave de datos (DEK) aleatoria; PIN solo envuelve la DEK.
 class VaultCrypto {
   VaultCrypto._();
 
@@ -26,6 +27,14 @@ class VaultCrypto {
     return Uint8List.fromList(List.generate(length, (_) => rnd.nextInt(256)));
   }
 
+  static Future<SecretKey> newDek() async {
+    return SecretKey(newSalt(32));
+  }
+
+  static Future<List<int>> keyBytes(SecretKey key) => key.extractBytes();
+
+  static SecretKey keyFromBytes(List<int> bytes) => SecretKey(bytes);
+
   static Future<SecretKey> deriveKey(String pin, List<int> salt) {
     return _pbkdf2.deriveKey(
       secretKey: SecretKey(utf8.encode(pin)),
@@ -33,7 +42,6 @@ class VaultCrypto {
     );
   }
 
-  /// Empaqueta: version(1) + nonce + mac + cipher → base64
   static Future<String> encryptString(String plain, SecretKey key) async {
     final clear = utf8.encode(plain);
     final box = await _aes.encrypt(clear, secretKey: key);
@@ -41,7 +49,7 @@ class VaultCrypto {
     final mac = box.mac.bytes;
     final cipher = box.cipherText;
     final out = BytesBuilder();
-    out.addByte(1); // version
+    out.addByte(1);
     out.addByte(nonce.length);
     out.add(nonce);
     out.addByte(mac.length);
@@ -68,6 +76,16 @@ class VaultCrypto {
       secretKey: key,
     );
     return utf8.decode(clear);
+  }
+
+  /// Envuelve bytes de DEK con la clave del PIN → base64.
+  static Future<String> wrapDek(List<int> dekBytes, SecretKey pinKey) {
+    return encryptString(base64Encode(dekBytes), pinKey);
+  }
+
+  static Future<List<int>> unwrapDek(String packed, SecretKey pinKey) async {
+    final b64 = await decryptString(packed, pinKey);
+    return base64Decode(b64);
   }
 
   static Future<String> makePinCheck(SecretKey key) =>
