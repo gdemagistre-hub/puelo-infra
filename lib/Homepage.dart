@@ -19,6 +19,7 @@ import 'solicitar_validacion.dart';
 import 'especialidadesLaboralesflotante.dart';
 import 'ZonaDeTrabajoflotante.dart';
 import 'cargaTrabajoTrabajador.dart';
+import 'mis_numeros/mis_numeros_shell.dart';
 
 class HomePageWidget extends StatefulWidget {
   final bool? initialModoPrestador;
@@ -217,6 +218,35 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     );
   }
 
+  String get _appBarTitle {
+    switch (_currentIndex) {
+      case 1:
+        return 'Mis números';
+      case 2:
+        return 'Evaluar';
+      case 3:
+        return 'Perfil';
+      default:
+        return '';
+    }
+  }
+
+  Widget get _tabBody {
+    switch (_currentIndex) {
+      case 1:
+        return MisNumerosShell(onBackToHome: () => setState(() => _currentIndex = 0));
+      case 2:
+        return const MenuEvaluacionesWidget(embedded: true);
+      case 3:
+        return MenuPerfilOpcionesWidget(
+          modoPrestador: _modoPrestador,
+          onClose: () => setState(() => _currentIndex = 0),
+        );
+      default:
+        return _modoPrestador ? _buildPrestadorHome() : _buildClienteHome();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final onHome = _currentIndex == 0;
@@ -227,13 +257,12 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           : AppBar(
               backgroundColor: Colors.white,
               elevation: 0,
-              title: Text(_currentIndex == 1 ? 'Evaluar' : 'Perfil', style: TextStyle(color: primaryColor, fontWeight: FontWeight.w800)),
+              title: Text(
+                _appBarTitle,
+                style: TextStyle(color: primaryColor, fontWeight: FontWeight.w800),
+              ),
             ),
-      body: _currentIndex == 1
-          ? const MenuEvaluacionesWidget(embedded: true)
-          : _currentIndex == 2
-              ? MenuPerfilOpcionesWidget(modoPrestador: _modoPrestador, onClose: () => setState(() => _currentIndex = 0))
-              : (_modoPrestador ? _buildPrestadorHome() : _buildClienteHome()),
+      body: _tabBody,
       bottomNavigationBar: _buildBottomNav(),
     );
   }
@@ -244,11 +273,12 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
           child: Row(children: [
             _navItem(0, Icons.home_rounded, 'Home'),
-            _navItem(1, Icons.star_outline_rounded, 'Evaluar'),
-            _navItem(2, Icons.person_rounded, 'Perfil'),
+            _navItem(1, Icons.account_balance_wallet_rounded, 'Mis números'),
+            _navItem(2, Icons.star_outline_rounded, 'Evaluar'),
+            _navItem(3, Icons.person_rounded, 'Perfil'),
           ]),
         ),
       ),
@@ -270,7 +300,17 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             children: [
               Icon(icon, size: selected ? 26 : 24, color: selected ? primaryColor : const Color(0xFF94A3B8)),
               const SizedBox(height: 2),
-              Text(label, style: TextStyle(fontSize: 11, fontWeight: selected ? FontWeight.w800 : FontWeight.w500, color: selected ? primaryColor : const Color(0xFF94A3B8))),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                  color: selected ? primaryColor : const Color(0xFF94A3B8),
+                ),
+              ),
             ],
           ),
         ),
