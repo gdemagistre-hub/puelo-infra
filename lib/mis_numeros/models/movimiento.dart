@@ -1,4 +1,4 @@
-enum TipoMovimiento { cobro, gasto }
+enum TipoMovimiento { cobro, gasto, retiro }
 
 enum CategoriaGasto {
   materiales,
@@ -46,9 +46,11 @@ class Movimiento {
   final CategoriaGasto? categoria;
 
   bool get esCobro => tipo == TipoMovimiento.cobro;
+  bool get esGasto => tipo == TipoMovimiento.gasto;
+  bool get esRetiro => tipo == TipoMovimiento.retiro;
 
   bool get esApartadoMeta =>
-      !esCobro && categoria == CategoriaGasto.ahorro;
+      esGasto && categoria == CategoriaGasto.ahorro;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -68,9 +70,15 @@ class Movimiento {
             orElse: () => CategoriaGasto.otros,
           );
     }
+    final tipoName = json['tipo'] as String? ?? 'gasto';
+    final tipo = TipoMovimiento.values.cast<TipoMovimiento?>().firstWhere(
+          (t) => t?.name == tipoName,
+          orElse: () => TipoMovimiento.gasto,
+        ) ??
+        TipoMovimiento.gasto;
     return Movimiento(
       id: json['id'] as String,
-      tipo: TipoMovimiento.values.byName(json['tipo'] as String),
+      tipo: tipo,
       monto: (json['monto'] as num).toDouble(),
       fecha: DateTime.parse(json['fecha'] as String),
       nota: json['nota'] as String?,
