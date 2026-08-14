@@ -71,7 +71,9 @@ class MovimientosStore extends ChangeNotifier {
       }
 
       if (cloud.isNotEmpty) {
-        _items..clear()..addAll(cloud);
+        _items
+          ..clear()
+          ..addAll(cloud);
         _items.sort((a, b) => b.fecha.compareTo(a.fecha));
         await _persistLocal();
         _cloudOk = true;
@@ -107,12 +109,14 @@ class MovimientosStore extends ChangeNotifier {
     return vault.sealMap(clear, sensitiveKeys: _sensitive);
   }
 
-  Future<Movimiento?> _fromCloud(Map<String, dynamic> data, String docId) async {
+  Future<Movimiento?> _fromCloud(
+      Map<String, dynamic> data, String docId) async {
     try {
       final vault = VaultSession.instance;
       Map<String, dynamic> open = data;
       if (data['enc'] == true && vault.isUnlocked) {
-        open = await vault.openMap(data, sensitiveKeys: _sensitive, numericKeys: _numeric);
+        open = await vault.openMap(data,
+            sensitiveKeys: _sensitive, numericKeys: _numeric);
       }
       open['id'] = open['id'] ?? docId;
       if (open['monto'] is String) {
@@ -130,13 +134,18 @@ class MovimientosStore extends ChangeNotifier {
   Future<void> _ensureUserDoc(String uid) async {
     try {
       final ref = FinanzasBridge.finanzasDb.collection('usuarios').doc(uid);
-      await ref.set({'uid': uid, 'updatedAt': FieldValue.serverTimestamp(), 'app': 'puelo-prox'}, SetOptions(merge: true));
+      await ref.set({
+        'uid': uid,
+        'updatedAt': FieldValue.serverTimestamp(),
+        'app': 'puelo-prox'
+      }, SetOptions(merge: true));
     } catch (e) {
       debugPrint('ensureUserDoc: $e');
     }
   }
 
-  Future<void> ensureUserProfile({String? email, String? displayName}) async {
+  Future<void> ensureUserProfile(
+      {String? email, String? displayName}) async {
     final uid = _uid;
     if (uid == null) return;
     try {
@@ -160,7 +169,8 @@ class MovimientosStore extends ChangeNotifier {
         final list = jsonDecode(raw) as List<dynamic>;
         for (final e in list) {
           try {
-            _items.add(Movimiento.fromJson(Map<String, dynamic>.from(e as Map)));
+            _items.add(
+                Movimiento.fromJson(Map<String, dynamic>.from(e as Map)));
           } catch (_) {}
         }
       }
@@ -173,7 +183,8 @@ class MovimientosStore extends ChangeNotifier {
   Future<void> _persistLocal() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_key, jsonEncode(_items.map((e) => e.toJson()).toList()));
+      await prefs.setString(
+          _key, jsonEncode(_items.map((e) => e.toJson()).toList()));
     } catch (e) {
       debugPrint('persistLocal: $e');
     }
@@ -187,7 +198,8 @@ class MovimientosStore extends ChangeNotifier {
       final batch = FinanzasBridge.finanzasDb.batch();
       for (final m in chunk) {
         final sealed = await _toCloud(m);
-        batch.set(col.doc(m.id), {...sealed, 'updatedAt': FieldValue.serverTimestamp()});
+        batch.set(
+            col.doc(m.id), {...sealed, 'updatedAt': FieldValue.serverTimestamp()});
       }
       await batch.commit();
     }
@@ -197,14 +209,18 @@ class MovimientosStore extends ChangeNotifier {
     final col = _col;
     if (col == null) throw StateError('Sin usuario autenticado');
     final sealed = await _toCloud(m);
-    await col.doc(m.id).set({...sealed, 'updatedAt': FieldValue.serverTimestamp()});
+    await col
+        .doc(m.id)
+        .set({...sealed, 'updatedAt': FieldValue.serverTimestamp()});
   }
 
   Future<void> _enqueuePending(Movimiento m) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_pendingKey);
-      final list = raw == null ? <Map<String, dynamic>>[] : (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
+      final list = raw == null
+          ? <Map<String, dynamic>>[]
+          : (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
       list.removeWhere((e) => e['id'] == m.id);
       list.add(m.toJson());
       await prefs.setString(_pendingKey, jsonEncode(list));
@@ -220,7 +236,9 @@ class MovimientosStore extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_pendingKey);
       if (raw == null || raw.isEmpty) return;
-      final list = (jsonDecode(raw) as List).map((e) => Movimiento.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+      final list = (jsonDecode(raw) as List)
+          .map((e) => Movimiento.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
       final remaining = <Movimiento>[];
       for (final m in list) {
         try {
@@ -233,7 +251,8 @@ class MovimientosStore extends ChangeNotifier {
       if (remaining.isEmpty) {
         await prefs.remove(_pendingKey);
       } else {
-        await prefs.setString(_pendingKey, jsonEncode(remaining.map((e) => e.toJson()).toList()));
+        await prefs.setString(
+            _pendingKey, jsonEncode(remaining.map((e) => e.toJson()).toList()));
       }
       _items.sort((a, b) => b.fecha.compareTo(a.fecha));
       await _persistLocal();
@@ -284,38 +303,71 @@ class MovimientosStore extends ChangeNotifier {
 
   String _friendlyError(Object e) {
     final s = e.toString();
-    if (s.contains('permission-denied')) return 'Firestore rechazo el guardado (reglas).';
-    if (s.contains('unavailable') || s.contains('network')) return 'Sin conexion. Guardado local.';
-    if (s.contains('not-found') || s.contains('NOT_FOUND')) return 'Firestore no esta creado.';
+    if (s.contains('permission-denied')) {
+      return 'Firestore rechazo el guardado (reglas).';
+    }
+    if (s.contains('unavailable') || s.contains('network')) {
+      return 'Sin conexion. Guardado local.';
+    }
+    if (s.contains('not-found') || s.contains('NOT_FOUND')) {
+      return 'Firestore no esta creado.';
+    }
     return 'Error nube: $s';
   }
 
   List<Movimiento> delDia([DateTime? dia]) {
     final d = dia ?? DateTime.now();
-    return _items.where((m) => m.fecha.year == d.year && m.fecha.month == d.month && m.fecha.day == d.day).toList();
+    return _items
+        .where((m) =>
+            m.fecha.year == d.year &&
+            m.fecha.month == d.month &&
+            m.fecha.day == d.day)
+        .toList();
   }
 
   List<Movimiento> deLaSemana([DateTime? ref]) {
     final now = ref ?? DateTime.now();
-    final start = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
+    final start = DateTime(now.year, now.month, now.day)
+        .subtract(Duration(days: now.weekday - 1));
     return _items.where((m) => !m.fecha.isBefore(start)).toList();
   }
 
   List<Movimiento> delMes([DateTime? ref]) {
     final d = ref ?? DateTime.now();
-    return _items.where((m) => m.fecha.year == d.year && m.fecha.month == d.month).toList();
+    return _items
+        .where((m) => m.fecha.year == d.year && m.fecha.month == d.month)
+        .toList();
   }
 
   List<Movimiento> porPeriodo(PeriodoVista periodo) {
     switch (periodo) {
-      case PeriodoVista.hoy: return delDia();
-      case PeriodoVista.semana: return deLaSemana();
-      case PeriodoVista.mes: return delMes();
+      case PeriodoVista.hoy:
+        return delDia();
+      case PeriodoVista.semana:
+        return deLaSemana();
+      case PeriodoVista.mes:
+        return delMes();
     }
   }
 
-  double totalCobros(List<Movimiento> list) => list.where((m) => m.esCobro).fold<double>(0, (s, m) => s + m.monto);
-  double totalGastos(List<Movimiento> list) => list.where((m) => !m.esCobro).fold<double>(0, (s, m) => s + m.monto);
-  double saldo(List<Movimiento> list) => totalCobros(list) - totalGastos(list);
+  /// Solo cobros del oficio.
+  double totalCobros(List<Movimiento> list) =>
+      list.where((m) => m.esCobro).fold<double>(0, (s, m) => s + m.monto);
+
+  /// Solo gastos del trabajo (materiales, transporte, etc.). No incluye retiros.
+  double totalGastos(List<Movimiento> list) =>
+      list.where((m) => m.esGasto).fold<double>(0, (s, m) => s + m.monto);
+
+  /// Plata que te pasaste a casa / bolsillo personal.
+  double totalRetiros(List<Movimiento> list) =>
+      list.where((m) => m.esRetiro).fold<double>(0, (s, m) => s + m.monto);
+
+  /// Plata que quedó en el negocio = Cobros − Gastos trabajo − Retiros a casa.
+  double saldoNegocio(List<Movimiento> list) =>
+      totalCobros(list) - totalGastos(list) - totalRetiros(list);
+
+  /// Compat: mismo cálculo que saldoNegocio (incluye retiros como salida).
+  double saldo(List<Movimiento> list) => saldoNegocio(list);
+
   double get saldoTotal => saldo(_items);
 }
