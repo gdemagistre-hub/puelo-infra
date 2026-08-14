@@ -20,6 +20,9 @@ class MensajesService {
 
   String? get authUid => FirebaseAuth.instance.currentUser?.uid;
 
+  /// Preferir Auth real; fallback a sesión (dropdown).
+  String? get effectiveUid => authUid;
+
   Stream<QuerySnapshot<Map<String, dynamic>>> watchConversaciones(String uid) {
     return _db
         .collection('conversaciones')
@@ -38,6 +41,36 @@ class MensajesService {
         .snapshots();
   }
 
+  /// UID de la otra parte en el hilo (robusto ante tipos / convId).
+  static String? otherParticipantUid({
+    required String myUid,
+    required String convId,
+    Map<String, dynamic>? data,
+  }) {
+    if (myUid.isEmpty) return null;
+
+    final raw = data?['participantes'];
+    if (raw is List) {
+      for (final p in raw) {
+        final s = p?.toString() ?? '';
+        if (s.isNotEmpty && s != myUid) return s;
+      }
+    }
+
+    // convId = uidA__uidB (orden lex)
+    final parts = convId.split('__');
+    if (parts.length == 2) {
+      if (parts[0] == myUid && parts[1].isNotEmpty) return parts[1];
+      if (parts[1] == myUid && parts[0].isNotEmpty) return parts[0];
+    }
+
+    for (final key in ['prestador_uid', 'cliente_uid', 'pending_recibo_actor_uid']) {
+      final v = data?[key]?.toString() ?? '';
+      if (v.isNotEmpty && v != myUid) return v;
+    }
+    return null;
+  }
+
   Future<Map<String, dynamic>?> loadUsuarioLite(String uid) async {
     try {
       final snap = await _db.collection('usuarios').doc(uid).get();
@@ -49,12 +82,24 @@ class MensajesService {
   }
 
   String displayNameFromUser(Map<String, dynamic>? d, String fallbackUid) {
-    if (d == null) return fallbackUid.length > 8 ? fallbackUid.substring(0, 8) : fallbackUid;
-    final n = '${d['nombre'] ?? ''} ${d['apellido'] ?? ''}'.trim();
-    if (n.isNotEmpty) return n;
-    final e = (d['email'] as String?)?.trim();
-    if (e != null && e.isNotEmpty) return e;
-    return fallbackUid.length > 8 ? fallbackUid.substring(0, 8) : fallbackUid;
+    if (d != null) {
+      final comercial = (d['nombre_comercial'] ?? '').toString().trim();
+      if (comercial.isNotEmpty) return comercial;
+      final n = '${d['nombre'] ?? ''} ${d['apellido'] ?? ''}'.trim();
+      if (n.isNotEmpty) return n;
+      final e = (d['email'] as String?)?.trim();
+      if (e != null && e.isNotEmpty) {
+        final at = e.indexOf('@');
+        return at > 0 ? e.substring(0, at) : e;
+      }
+    }
+    if (fallbackUid.length > 10) return '${fallbackUid.substring(0, 8)}…';
+    return fallbackUid;
+  }
+
+  Future<String> resolveDisplayName(String uid) async {
+    final d = await loadUsuarioLite(uid);
+    return displayNameFromUser(d, uid);
   }
 
   Future<Map<String, dynamic>> emitirRecibo({
@@ -113,7 +158,6 @@ class MensajesService {
   static String formatMonto(dynamic m) {
     final n = m is num ? m.toDouble() : double.tryParse('$m') ?? 0;
     final s = n.toStringAsFixed(n.truncateToDouble() == n ? 0 : 2);
-    // miles simples
     final parts = s.split('.');
     final intPart = parts[0].replaceAllMapped(
       RegExp(r'(\d)(?=(\d{3})+(?!\d))'),

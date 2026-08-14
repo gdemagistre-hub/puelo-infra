@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
+import '../mis_numeros/ui/thousands_formatter.dart';
 import 'mensajes_service.dart';
 
 class EmitirReciboSheet extends StatefulWidget {
-  /// Si ya estás en un hilo, pasá la contraparte.
+  /// Si ya estás en un hilo / tarjeta, pasá la contraparte.
   final String? contraparteUidFijo;
   final String? contraparteNombre;
 
@@ -25,6 +25,7 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
   String _concepto = 'sena';
   bool _loading = false;
   String? _error;
+  String? _nombreResuelto;
 
   static const _conceptos = [
     ('sena', 'Seña'),
@@ -34,12 +35,26 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
     ('otro', 'Otro'),
   ];
 
+  bool get _fijo =>
+      widget.contraparteUidFijo != null &&
+      widget.contraparteUidFijo!.trim().isNotEmpty;
+
   @override
   void initState() {
     super.initState();
-    if (widget.contraparteUidFijo != null) {
-      _uidCtrl.text = widget.contraparteUidFijo!;
+    if (_fijo) {
+      _uidCtrl.text = widget.contraparteUidFijo!.trim();
+      _nombreResuelto = widget.contraparteNombre?.trim();
+      if (_nombreResuelto == null || _nombreResuelto!.isEmpty) {
+        _resolverNombre(_uidCtrl.text);
+      }
     }
+  }
+
+  Future<void> _resolverNombre(String uid) async {
+    final n = await MensajesService.instance.resolveDisplayName(uid);
+    if (!mounted) return;
+    setState(() => _nombreResuelto = n);
   }
 
   @override
@@ -57,10 +72,12 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
     });
     try {
       final uid = _uidCtrl.text.trim();
-      final montoRaw =
-          _montoCtrl.text.trim().replaceAll('.', '').replaceAll(',', '.');
-      final monto = double.tryParse(montoRaw);
-      if (uid.isEmpty) throw StateError('Indicá el UID de la otra persona');
+      final monto = ThousandsFormatter.parse(_montoCtrl.text);
+      if (uid.isEmpty) {
+        throw StateError(
+          'Elegí a quién emitir: abrí su tarjeta digital y tocá Emitir recibo.',
+        );
+      }
       if (monto == null || monto <= 0) throw StateError('Monto inválido');
 
       final res = await MensajesService.instance.emitirRecibo(
@@ -68,20 +85,25 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
         monto: monto,
         concepto: _concepto,
         nota: _notaCtrl.text,
+        origen: _fijo ? 'tarjeta' : 'mensajes',
       );
       if (!mounted) return;
       Navigator.pop(context, res);
+      final hash = (res['content_hash'] as String?) ?? '';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Recibo emitido · sellado ${((res['content_hash'] as String?) ?? '').length >= 8 ? (res['content_hash'] as String).substring(0, 8) : ''}…',
+            'Recibo emitido · sellado ${hash.length >= 8 ? hash.substring(0, 8) : hash}…',
           ),
           behavior: SnackBarBehavior.floating,
         ),
       );
     } catch (e) {
       setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = e.toString()
+            .replaceFirst('Exception: ', '')
+            .replaceFirst('StateError: ', '')
+            .replaceFirst('FirebaseFunctionsException: ', '');
         _loading = false;
       });
     }
@@ -90,7 +112,9 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewInsets.bottom;
-    final fijo = widget.contraparteUidFijo != null;
+    final paraLabel = (_nombreResuelto != null && _nombreResuelto!.isNotEmpty)
+        ? _nombreResuelto!
+        : (_fijo ? 'Cargando…' : null);
 
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottom),
@@ -118,41 +142,91 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
             const Text(
               'Quedará registrado una sola vez, con firma del contenido. '
               'No se podrá editar ni borrar.',
-              style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.4),
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF64748B),
+                height: 1.4,
+              ),
             ),
             const SizedBox(height: 16),
-            if (fijo && widget.contraparteNombre != null)
-              Text(
-                'Para: ${widget.contraparteNombre}',
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              )
-            else ...[
-              TextField(
-                controller: _uidCtrl,
-                enabled: !fijo,
-                decoration: const InputDecoration(
-                  labelText: 'UID de la otra persona',
-                  hintText: 'uid de Firebase Auth / usuarios',
-                  border: OutlineInputBorder(),
+            if (_fijo) ...[
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE6F7FA),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF28B5CD).withOpacity(0.35)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.person_outline, color: Color(0xFF1A8FA3)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Para',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            paraLabel ?? widget.contraparteUidFijo!,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
+            ] else ...[
+              TextField(
+                controller: _uidCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'UID de la otra persona',
+                  hintText: 'Mejor: abrí su tarjeta → Emitir recibo',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (v) {
+                  if (v.trim().length > 10) _resolverNombre(v.trim());
+                },
+              ),
+              if (_nombreResuelto != null && _nombreResuelto!.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Para: $_nombreResuelto',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1A8FA3),
+                  ),
+                ),
+              ],
               const SizedBox(height: 8),
               const Text(
-                'Por ahora se usa el UID (luego se elige desde la tarjeta o contactos).',
-                style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                'Recomendado: desde la tarjeta digital de la otra persona, '
+                'tocá “Emitir recibo” (ahí no hace falta el UID).',
+                style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8), height: 1.35),
               ),
             ],
             const SizedBox(height: 14),
             TextField(
               controller: _montoCtrl,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
               inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                ThousandsFormatter(allowDecimal: true),
               ],
               decoration: const InputDecoration(
                 labelText: 'Monto (ARS)',
                 prefixText: '\$ ',
+                hintText: '15.000',
                 border: OutlineInputBorder(),
               ),
             ),

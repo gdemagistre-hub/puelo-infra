@@ -29,21 +29,20 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
   void initState() {
     super.initState();
     final my = UserSession().uid ?? '';
-    final partes =
-        (widget.conversacionData['participantes'] as List?)?.cast<String>() ??
-            [];
-    _otherUid = partes.firstWhere((p) => p != my, orElse: () => '');
+    _otherUid = MensajesService.otherParticipantUid(
+      myUid: my,
+      convId: widget.conversacionId,
+      data: widget.conversacionData,
+    );
     _loadName();
   }
 
   Future<void> _loadName() async {
     final o = _otherUid;
     if (o == null || o.isEmpty) return;
-    final d = await MensajesService.instance.loadUsuarioLite(o);
+    final name = await MensajesService.instance.resolveDisplayName(o);
     if (!mounted) return;
-    setState(() {
-      _otherName = MensajesService.instance.displayNameFromUser(d, o);
-    });
+    setState(() => _otherName = name);
   }
 
   Future<void> _responder({
@@ -173,7 +172,6 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
             return const Center(child: Text('Sin eventos aún'));
           }
 
-          // Mapa de respuestas por recibo_event_id
           final respuestas = <String, Map<String, dynamic>>{};
           for (final e in events) {
             final d = e.data();
@@ -193,8 +191,7 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
               final tipo = d['tipo'] as String? ?? '';
               if (tipo == 'recibo_emitido') {
                 final resp = respuestas[doc.id];
-                final isPending =
-                    pendingId == doc.id && resp == null;
+                final isPending = pendingId == doc.id && resp == null;
                 final soyEmisor = d['actor_uid'] == myUid;
                 final puedoResponder = isPending && !soyEmisor && !_busy;
 
@@ -209,10 +206,6 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
                   ),
                   onRechazar: () => _confirmReject(doc.id),
                 );
-              }
-              if (tipo == 'recibo_aceptado' || tipo == 'recibo_rechazado') {
-                // Ya se muestra dentro de la card del recibo
-                return const SizedBox.shrink();
               }
               return const SizedBox.shrink();
             },

@@ -50,6 +50,7 @@ class MensajesListScreen extends StatelessWidget {
             final doc = docs[i];
             final data = doc.data();
             return _HiloTile(
+              key: ValueKey(doc.id),
               convId: doc.id,
               data: data,
               myUid: uid,
@@ -143,8 +144,8 @@ class _EmptyState extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         const Text(
-          'Acá quedan registrados los recibos de seña, anticipo o pago '
-          'entre vos y la otra parte. Cada uno se sella y no se puede editar.',
+          'Abrí la tarjeta digital de la otra persona y tocá “Emitir recibo”. '
+          'Cada recibo queda sellado y no se puede editar.',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 14,
@@ -161,7 +162,7 @@ class _EmptyState extends StatelessWidget {
           ),
           icon: const Icon(Icons.add),
           label: const Text(
-            'Emitir primer recibo',
+            'Emitir recibo',
             style: TextStyle(fontWeight: FontWeight.w800),
           ),
         ),
@@ -196,6 +197,7 @@ class _HiloTile extends StatefulWidget {
   final VoidCallback onTap;
 
   const _HiloTile({
+    super.key,
     required this.convId,
     required this.data,
     required this.myUid,
@@ -208,6 +210,7 @@ class _HiloTile extends StatefulWidget {
 
 class _HiloTileState extends State<_HiloTile> {
   String? _otherName;
+  String? _otherUid;
 
   @override
   void initState() {
@@ -215,18 +218,28 @@ class _HiloTileState extends State<_HiloTile> {
     _loadName();
   }
 
+  @override
+  void didUpdateWidget(covariant _HiloTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.convId != widget.convId || oldWidget.myUid != widget.myUid) {
+      _loadName();
+    }
+  }
+
   Future<void> _loadName() async {
-    final partes = (widget.data['participantes'] as List?)?.cast<String>() ?? [];
-    final other = partes.firstWhere(
-      (p) => p != widget.myUid,
-      orElse: () => '',
+    final other = MensajesService.otherParticipantUid(
+      myUid: widget.myUid,
+      convId: widget.convId,
+      data: widget.data,
     );
-    if (other.isEmpty) return;
-    final d = await MensajesService.instance.loadUsuarioLite(other);
+    _otherUid = other;
+    if (other == null || other.isEmpty) {
+      if (mounted) setState(() => _otherName = 'Conversación');
+      return;
+    }
+    final name = await MensajesService.instance.resolveDisplayName(other);
     if (!mounted) return;
-    setState(() {
-      _otherName = MensajesService.instance.displayNameFromUser(d, other);
-    });
+    setState(() => _otherName = name);
   }
 
   @override
@@ -234,6 +247,7 @@ class _HiloTileState extends State<_HiloTile> {
     final summary = (widget.data['last_summary'] as String?) ?? 'Conversación';
     final pending = widget.data['pending_recibo_event_id'] != null;
     final name = _otherName ?? '…';
+    final initial = name.isNotEmpty && name != '…' ? name[0].toUpperCase() : '?';
 
     return Material(
       color: Colors.white,
@@ -249,7 +263,7 @@ class _HiloTileState extends State<_HiloTile> {
               CircleAvatar(
                 backgroundColor: MensajesListScreen._primary.withOpacity(0.15),
                 child: Text(
-                  name.isNotEmpty ? name[0].toUpperCase() : '?',
+                  initial,
                   style: const TextStyle(
                     color: MensajesListScreen._primary,
                     fontWeight: FontWeight.w800,
