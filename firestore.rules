@@ -1,18 +1,13 @@
 rules_version = '2';
 // Sprint 0 (2026-08-06): cierre de superficie privilegiada.
-// Menú "Modo prueba (equipo)" se mantiene: lectura de usuarios + writes de
-// campos de perfil NO privilegiados (sin Auth) siguen habilitados TEMP.
-// NO abrir al público sin: Auth obligatorio en writes + custom claims admin.
+// 2026-08-14: Mis números en DB única (lifewalletpuelo) — subcolecciones vault/movimientos/metas/vencimientos.
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ---------- helpers ----------
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // Admin: preferir custom claim. Campo es_admin solo si hay Auth (no se puede
-    // auto-asignar: writes de es_admin están bloqueados abajo).
     function isAdmin() {
       return isSignedIn() && (
         request.auth.token.admin == true ||
@@ -24,13 +19,11 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // FlutterFlow (si aún se usa ese email de servicio)
     function isFlutterFlow() {
       return isSignedIn()
         && request.auth.token.email.matches('firebase@flutterflow.io');
     }
 
-    // Campos que el cliente NUNCA puede crear/modificar (solo Admin SDK / claim admin)
     function privilegedKeys() {
       return [
         'es_admin',
@@ -64,14 +57,11 @@ service cloud.firestore {
       return request.resource.data.keys().size() <= 24;
     }
 
-    // ---------- FlutterFlow (opcional, acotado) ----------
     match /{document=**} {
       allow read, write: if isFlutterFlow();
     }
 
-    // ---------- analytics ----------
     match /analytics_events/{id} {
-      // Create: permite buffer cliente (también sesión dev sin Auth) con keys sanitizadas
       allow create: if analyticsKeysOk() && analyticsSizeOk()
         && request.resource.data.type is string
         && request.resource.data.session_id is string;
@@ -79,15 +69,12 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    // ---------- contactos (leads WhatsApp / llamada) ----------
-    // TEMP: create abierto para impersonación (dropdown). Cerrar con Auth al go-live.
     match /contactos/{id} {
       allow create: if true;
       allow read: if isAdmin();
       allow update, delete: if false;
     }
 
-    // ---------- stats / batch: solo Admin SDK (Functions / GH Actions) ----------
     match /stats/{doc} {
       allow read: if isAdmin();
       allow write: if false;
@@ -97,7 +84,6 @@ service cloud.firestore {
       }
     }
 
-    // ---------- catálogos (solo lectura pública) ----------
     match /cat_paises/{doc} {
       allow read: if true;
       allow write: if isAdmin();
@@ -115,9 +101,6 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // ---------- usuarios ----------
-    // read: true → buscador + dropdown "Modo prueba"
-    // write: TEMP sin Auth para campos de perfil; privilegios bloqueados
     match /usuarios/{userId} {
       allow read: if true;
 
@@ -133,20 +116,30 @@ service cloud.firestore {
         ) || (
           updateTouchesNoPrivileged()
           && (
-            // Sesión real: dueño del doc
             isOwner(userId)
-            // TEMP Sprint0: dropdown sin Auth puede editar perfil no privilegiado
             || !isSignedIn()
           )
         );
 
       allow delete: if isAdmin();
+
+      // Mis números (DB única lifewalletpuelo) — solo dueño con Auth real
+      match /movimientos/{docId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /metas/{docId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /vencimientos/{docId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /vault/{docId} {
+        allow read, write: if isOwner(userId);
+      }
     }
 
-    // ---------- trabajos ----------
     match /trabajos/{id} {
       allow read: if true;
-      // TEMP: create/update abiertos (portfolio / carga con impersonación)
       allow create: if true;
       allow update: if true;
       allow delete: if isAdmin() || (isSignedIn()
@@ -163,7 +156,6 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    // ---------- calificaciones (create cliente; update scoring solo Admin SDK) ----------
     match /calificaciones/{id} {
       allow read: if true;
       allow create: if true;
@@ -171,7 +163,6 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // ---------- validaciones / tokens: solo Cloud Functions (Admin SDK) ----------
     match /validaciones/{id} {
       allow read, write: if false;
     }
@@ -182,7 +173,6 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // ---------- default DENY ----------
     match /{document=**} {
       allow read, write: if false;
     }
