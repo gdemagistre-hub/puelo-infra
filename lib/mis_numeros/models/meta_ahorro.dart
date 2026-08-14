@@ -5,6 +5,7 @@ class MetaAhorro {
     required this.objetivo,
     required this.ahorrado,
     required this.creada,
+    this.esFondoEmergencia = false,
   });
 
   final String id;
@@ -12,6 +13,9 @@ class MetaAhorro {
   final double objetivo;
   final double ahorrado;
   final DateTime creada;
+
+  /// Colchón para imprevistos (días sin laburo, roturas). Visual y tratamiento distintos.
+  final bool esFondoEmergencia;
 
   double get progreso {
     if (objetivo <= 0) return 0;
@@ -27,6 +31,7 @@ class MetaAhorro {
     String? titulo,
     double? objetivo,
     double? ahorrado,
+    bool? esFondoEmergencia,
   }) {
     return MetaAhorro(
       id: id,
@@ -34,6 +39,7 @@ class MetaAhorro {
       objetivo: objetivo ?? this.objetivo,
       ahorrado: ahorrado ?? this.ahorrado,
       creada: creada,
+      esFondoEmergencia: esFondoEmergencia ?? this.esFondoEmergencia,
     );
   }
 
@@ -43,6 +49,7 @@ class MetaAhorro {
         'objetivo': objetivo,
         'ahorrado': ahorrado,
         'creada': creada.toIso8601String(),
+        'esFondoEmergencia': esFondoEmergencia,
       };
 
   factory MetaAhorro.fromJson(Map<String, dynamic> json) {
@@ -52,6 +59,7 @@ class MetaAhorro {
       objetivo: (json['objetivo'] as num).toDouble(),
       ahorrado: (json['ahorrado'] as num).toDouble(),
       creada: DateTime.parse(json['creada'] as String),
+      esFondoEmergencia: json['esFondoEmergencia'] == true,
     );
   }
 }
