@@ -6,15 +6,16 @@ import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../finanzas_bridge.dart';
 import 'vault_crypto.dart';
 
-/// Sesión de cifrado en memoria.
-/// v2: DEK aleatoria + PIN envuelve DEK + recuperación vía CF (Google).
-/// v1 legacy: la clave era el PIN derivado (sin recuperación).
+/// Sesión de cifrado — DB única lifewalletpuelo.
+/// v2: DEK + PIN + recuperación vía CF (Google).
 class VaultSession extends ChangeNotifier {
   VaultSession._();
   static final VaultSession instance = VaultSession._();
+
+  /// Región de las CF de PROX (puelo-infra).
+  static const String functionsRegion = 'us-east1';
 
   SecretKey? _key;
   String? _uid;
@@ -28,12 +29,10 @@ class VaultSession extends ChangeNotifier {
   SecretKey? get key => _key;
   String? get uid => _uid;
 
+  FirebaseFirestore get _db => FirebaseFirestore.instance;
+
   DocumentReference<Map<String, dynamic>> _metaRef(String uid) =>
-      FinanzasBridge.finanzasDb
-          .collection('usuarios')
-          .doc(uid)
-          .collection('vault')
-          .doc('meta');
+      _db.collection('usuarios').doc(uid).collection('vault').doc('meta');
 
   Future<void> bindUser(String? uid) async {
     if (uid == null) {
@@ -74,7 +73,6 @@ class VaultSession extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Crea bóveda v2 (recuperable con Google).
   Future<void> setupPin(String pin) async {
     final uid = _uid;
     if (uid == null) throw StateError('Sin usuario');
@@ -103,7 +101,6 @@ class VaultSession extends ChangeNotifier {
     };
     await _metaRef(uid).set(meta, SetOptions(merge: true));
 
-    // Registro de recuperación en el servidor (no bloquea si falla en dev).
     try {
       await _registerRecovery(base64Encode(dekBytes));
       hasRecovery = true;
@@ -127,10 +124,7 @@ class VaultSession extends ChangeNotifier {
   }
 
   Future<void> _registerRecovery(String dekBase64) async {
-    final functions = FirebaseFunctions.instanceFor(
-      app: FinanzasBridge.finanzasApp,
-      region: 'us-central1',
-    );
+    final functions = FirebaseFunctions.instanceFor(region: functionsRegion);
     await functions.httpsCallable('registerVaultRecovery').call({
       'dekBase64': dekBase64,
     });
@@ -192,7 +186,6 @@ class VaultSession extends ChangeNotifier {
         return false;
       }
     } else {
-      // Legacy v1: la clave era el PIN derivado.
       _key = pinKey;
       vaultVersion = 1;
     }
@@ -203,7 +196,6 @@ class VaultSession extends ChangeNotifier {
     return true;
   }
 
-  /// Olvidé el PIN (solo v2 con recovery). Requiere sesión Finanzas.
   Future<void> resetPinWithRecovery(String newPin) async {
     final uid = _uid;
     if (uid == null) throw StateError('Sin usuario');
@@ -211,10 +203,7 @@ class VaultSession extends ChangeNotifier {
       throw ArgumentError('El PIN debe ser 6 dígitos');
     }
 
-    final functions = FirebaseFunctions.instanceFor(
-      app: FinanzasBridge.finanzasApp,
-      region: 'us-central1',
-    );
+    final functions = FirebaseFunctions.instanceFor(region: functionsRegion);
     final result = await functions.httpsCallable('recoverVaultDek').call();
     final data = Map<String, dynamic>.from(result.data as Map);
     final dekBase64 = data['dekBase64'] as String?;

@@ -6,12 +6,9 @@ import '../theme/app_colors.dart';
 import '../user_session.dart';
 import 'crypto/vault_session.dart';
 import 'data/movimientos_store.dart';
-import 'finanzas_bridge.dart';
 import 'ui/mis_numeros_content.dart';
 
-/// Shell Mis números embebido en Homepage.
-/// Flujo: Auth real → bridge Finanzas → PIN → movimientos cifrados.
-/// PIN recuperable: Google + PIN nuevo (bóveda v2).
+/// Shell Mis números — DB única lifewalletpuelo (sin proyecto Finanzas).
 class MisNumerosShell extends StatefulWidget {
   final VoidCallback? onBackToHome;
   const MisNumerosShell({super.key, this.onBackToHome});
@@ -22,7 +19,6 @@ class MisNumerosShell extends StatefulWidget {
 enum _Phase {
   loading,
   needsRealAuth,
-  bridgeError,
   pinSetup,
   pinUnlock,
   pinReset,
@@ -31,7 +27,6 @@ enum _Phase {
 
 class _MisNumerosShellState extends State<MisNumerosShell> {
   _Phase _phase = _Phase.loading;
-  String? _error;
   final _store = MovimientosStore();
   bool _storeLoaded = false;
 
@@ -60,44 +55,30 @@ class _MisNumerosShellState extends State<MisNumerosShell> {
   }
 
   Future<void> _bootstrap() async {
-    setState(() {
-      _phase = _Phase.loading;
-      _error = null;
-    });
+    setState(() => _phase = _Phase.loading);
     final session = UserSession();
-    if (!session.isLoggedIn ||
-        session.isDevImpersonation ||
-        FirebaseAuth.instance.currentUser == null) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (!session.isLoggedIn || session.isDevImpersonation || user == null) {
       setState(() => _phase = _Phase.needsRealAuth);
       return;
     }
-    try {
-      await FinanzasBridge.ensureInit();
-      final finUser = await FinanzasBridge.linkSession();
-      await VaultSession.instance.bindUser(finUser.uid);
-      if (!VaultSession.instance.hasVault) {
-        setState(() => _phase = _Phase.pinSetup);
-        return;
-      }
-      if (!VaultSession.instance.isUnlocked) {
-        setState(() => _phase = _Phase.pinUnlock);
-        return;
-      }
-      await _enterReady();
-    } catch (e) {
-      setState(() {
-        _phase = _Phase.bridgeError;
-        _error = e.toString();
-      });
+    await VaultSession.instance.bindUser(user.uid);
+    if (!VaultSession.instance.hasVault) {
+      setState(() => _phase = _Phase.pinSetup);
+      return;
     }
+    if (!VaultSession.instance.isUnlocked) {
+      setState(() => _phase = _Phase.pinUnlock);
+      return;
+    }
+    await _enterReady();
   }
 
   Future<void> _enterReady() async {
-    final uid = VaultSession.instance.uid ??
-        FinanzasBridge.finanzasAuth.currentUser?.uid;
+    final user = FirebaseAuth.instance.currentUser;
+    final uid = VaultSession.instance.uid ?? user?.uid;
     if (!_storeLoaded) {
       await _store.loadForUser(uid);
-      final user = FinanzasBridge.finanzasAuth.currentUser;
       if (user != null) {
         await _store.ensureUserProfile(
           email: user.email,
@@ -131,17 +112,6 @@ class _MisNumerosShellState extends State<MisNumerosShell> {
               'Mis números necesita sesión con Google (no el dropdown de prueba).',
           primaryLabel: 'Volver al inicio',
           onPrimary: widget.onBackToHome,
-        );
-      case _Phase.bridgeError:
-        return _InfoCard(
-          icon: Icons.cloud_off_rounded,
-          title: 'No se pudo vincular Finanzas',
-          body:
-              'Login PROX OK, pero falló el bridge.\n\n${_error ?? ''}',
-          primaryLabel: 'Reintentar',
-          onPrimary: _bootstrap,
-          secondaryLabel: 'Volver al inicio',
-          onSecondary: widget.onBackToHome,
         );
       case _Phase.pinSetup:
         return _PinSetupEmbedded(
@@ -552,7 +522,7 @@ class _PinResetEmbeddedState extends State<_PinResetEmbedded> {
     } catch (e) {
       setState(() {
         _error =
-            'No se pudo recuperar. Si tu bóveda es anterior, puede no tener respaldo. Detalle: $e';
+            'No se pudo recuperar. Detalle: $e';
       });
     } finally {
       if (mounted) setState(() => _busy = false);
