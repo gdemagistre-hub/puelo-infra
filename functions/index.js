@@ -22,3 +22,7 @@ setGlobalOptions({
 
 // NOTE: full body restored from e8212ab + M5 export. If incomplete, checkout e8212ab.
 exports.enviarMensajeTexto = require("./mensajes_texto").enviarMensajeTexto;
+// ---------------------------------------------------------------------------
+// Mensajes M5 — texto libre (append-only)
+// ---------------------------------------------------------------------------
+exports.enviarMensajeTexto = require("./mensajes_texto").enviarMensajeTexto;
