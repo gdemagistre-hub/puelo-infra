@@ -24,57 +24,63 @@ class MensajesListScreen extends StatelessWidget {
       );
     }
 
-    final body = StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: MensajesService.instance.watchConversaciones(uid),
-      builder: (context, snap) {
-        if (snap.hasError) {
-          return _ErrorBox(
-            message:
-                'No se pudieron cargar los hilos.\n${snap.error}',
-          );
-        }
-        if (!snap.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final docs = snap.data!.docs;
-        if (docs.isEmpty) {
-          return _EmptyState(
-            onEmitir: () => _openEmitir(context),
-          );
-        }
-        return ListView.separated(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
-          itemCount: docs.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 8),
-          itemBuilder: (context, i) {
-            final doc = docs[i];
-            final data = doc.data();
-            return _HiloTile(
-              key: ValueKey(doc.id),
-              convId: doc.id,
-              data: data,
-              myUid: uid,
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => MensajesDetalleScreen(
-                      conversacionId: doc.id,
-                      conversacionData: data,
-                    ),
-                  ),
-                );
-              },
-            );
-          },
-        );
-      },
-    );
-
     return ColoredBox(
       color: const Color(0xFFF1F5F9),
       child: Stack(
         children: [
-          body,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const _LeyendaHeader(),
+              Expanded(
+                child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: MensajesService.instance.watchConversaciones(uid),
+                  builder: (context, snap) {
+                    if (snap.hasError) {
+                      return _ErrorBox(
+                        message:
+                            'No se pudieron cargar los hilos.\n${snap.error}',
+                      );
+                    }
+                    if (!snap.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final docs = snap.data!.docs;
+                    if (docs.isEmpty) {
+                      return _EmptyState(
+                        onEmitir: () => _openEmitir(context),
+                      );
+                    }
+                    return ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
+                      itemCount: docs.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (context, i) {
+                        final doc = docs[i];
+                        final data = doc.data();
+                        return _HiloTile(
+                          key: ValueKey(doc.id),
+                          convId: doc.id,
+                          data: data,
+                          myUid: uid,
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => MensajesDetalleScreen(
+                                  conversacionId: doc.id,
+                                  conversacionData: data,
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
           Positioned(
             right: 16,
             bottom: 16,
@@ -108,6 +114,43 @@ class MensajesListScreen extends StatelessWidget {
   }
 }
 
+/// Leyenda fija bajo el título de la pestaña.
+class _LeyendaHeader extends StatelessWidget {
+  const _LeyendaHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.info_outline_rounded,
+            size: 18,
+            color: MensajesListScreen._primary.withOpacity(0.85),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'Los recibos se emiten desde la tarjeta digital de la otra persona. '
+              'Acá los ves y respondés.',
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.35,
+                color: MensajesListScreen._muted,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _EmptyState extends StatelessWidget {
   final VoidCallback onEmitir;
   const _EmptyState({required this.onEmitir});
@@ -115,7 +158,7 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(28, 48, 28, 32),
+      padding: const EdgeInsets.fromLTRB(28, 36, 28, 32),
       children: [
         Center(
           child: Container(
@@ -134,7 +177,7 @@ class _EmptyState extends StatelessWidget {
         ),
         const SizedBox(height: 24),
         const Text(
-          'Recibos y acuerdos',
+          'Todavía no hay recibos',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 20,
@@ -144,7 +187,7 @@ class _EmptyState extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         const Text(
-          'Abrí la tarjeta digital de la otra persona y tocá “Emitir recibo”. '
+          'Buscá a la persona, abrí su tarjeta digital y tocá “Emitir recibo”. '
           'Cada recibo queda sellado y no se puede editar.',
           textAlign: TextAlign.center,
           style: TextStyle(
@@ -164,6 +207,16 @@ class _EmptyState extends StatelessWidget {
           label: const Text(
             'Emitir recibo',
             style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
+        const SizedBox(height: 10),
+        const Text(
+          'También podés usar el botón de abajo si ya conocés el código de la otra persona.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 12,
+            height: 1.4,
+            color: Color(0xFF94A3B8),
           ),
         ),
       ],
