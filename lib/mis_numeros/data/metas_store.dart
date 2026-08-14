@@ -19,6 +19,18 @@ class MetasStore extends ChangeNotifier {
   List<MetaAhorro> get items => List.unmodifiable(_items);
   bool get syncedToCloud => _cloudOk;
 
+  /// Primer fondo de emergencia (si existe).
+  MetaAhorro? get fondoEmergencia {
+    for (final m in _items) {
+      if (m.esFondoEmergencia) return m;
+    }
+    return null;
+  }
+
+  /// Metas aspiracionales (vacaciones, herramientas, etc.).
+  List<MetaAhorro> get metasAspiracionales =>
+      _items.where((m) => !m.esFondoEmergencia).toList();
+
   String get _key => '$_prefix${_uid ?? 'anon'}';
 
   CollectionReference<Map<String, dynamic>>? get _col {
@@ -40,7 +52,8 @@ class MetasStore extends ChangeNotifier {
     return vault.sealMap(clear, sensitiveKeys: _sensitive);
   }
 
-  Future<MetaAhorro?> _fromCloud(Map<String, dynamic> data, String docId) async {
+  Future<MetaAhorro?> _fromCloud(
+      Map<String, dynamic> data, String docId) async {
     try {
       var open = data;
       final vault = VaultSession.instance;
@@ -136,6 +149,10 @@ class MetasStore extends ChangeNotifier {
   }
 
   Future<bool> add(MetaAhorro meta) async {
+    // Un solo fondo de emergencia.
+    if (meta.esFondoEmergencia && fondoEmergencia != null) {
+      return false;
+    }
     _items.insert(0, meta);
     notifyListeners();
     await _persistLocal();
@@ -195,5 +212,32 @@ class MetasStore extends ChangeNotifier {
     if (i < 0 || monto <= 0) return false;
     final updated = _items[i].copyWith(ahorrado: _items[i].ahorrado + monto);
     return update(updated);
+  }
+
+  /// Sacar plata del fondo/meta (uso del colchón o deshacer aparte).
+  Future<bool> restarAhorro(String id, double monto) async {
+    final i = _items.indexWhere((e) => e.id == id);
+    if (i < 0 || monto <= 0) return false;
+    final actual = _items[i].ahorrado;
+    if (monto > actual + 0.001) return false;
+    final nuevo = (actual - monto).clamp(0, double.infinity);
+    final updated = _items[i].copyWith(ahorrado: nuevo.toDouble());
+    return update(updated);
+  }
+
+  /// Crea el Fondo días flojos si aún no existe.
+  Future<MetaAhorro?> asegurarFondoEmergencia({double objetivo = 50000}) async {
+    final existing = fondoEmergencia;
+    if (existing != null) return existing;
+    final meta = MetaAhorro(
+      id: 'fondo_emergencia_${DateTime.now().millisecondsSinceEpoch}',
+      titulo: 'Fondo días flojos',
+      objetivo: objetivo,
+      ahorrado: 0,
+      creada: DateTime.now(),
+      esFondoEmergencia: true,
+    );
+    final ok = await add(meta);
+    return ok ? meta : null;
   }
 }
