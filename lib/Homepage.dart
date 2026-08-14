@@ -543,7 +543,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: _categorias.length,
-            gridDelegate: const SoliverGridDelegateWithFixedCrossAxisCount(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 4,
               mainAxisSpacing: 14,
               crossAxisSpacing: 8,
