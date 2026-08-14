@@ -1,6 +1,7 @@
 rules_version = '2';
 // Sprint 0 (2026-08-06): cierre de superficie privilegiada.
-// 2026-08-14: Mis números en DB única (lifewalletpuelo) — subcolecciones vault/movimientos/metas/vencimientos.
+// 2026-08-14: Mis números DB única.
+// 2026-08-14: Mensajes M1 conversaciones/eventos append-only (write CF only).
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -123,7 +124,6 @@ service cloud.firestore {
 
       allow delete: if isAdmin();
 
-      // Mis números (DB única lifewalletpuelo) — solo dueño con Auth real
       match /movimientos/{docId} {
         allow read, write: if isOwner(userId);
       }
@@ -171,6 +171,26 @@ service cloud.firestore {
     }
     match /validaciones_pendientes/{id} {
       allow read, write: if false;
+    }
+
+    // Mensajes M1 — recibos auditables (append-only). Write solo via CF (Admin SDK).
+    match /conversaciones/{convId} {
+      function isConvParticipant() {
+        return isSignedIn()
+          && resource.data.keys().hasAny(['participantes'])
+          && request.auth.uid in resource.data.participantes;
+      }
+      allow read: if isConvParticipant() || isAdmin();
+      allow create, update, delete: if false;
+
+      match /eventos/{eventId} {
+        function isParentParticipant() {
+          return isSignedIn()
+            && request.auth.uid in get(/databases/$(database)/documents/conversaciones/$(convId)).data.participantes;
+        }
+        allow read: if isParentParticipant() || isAdmin();
+        allow create, update, delete: if false;
+      }
     }
 
     match /{document=**} {
