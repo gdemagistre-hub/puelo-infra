@@ -30,8 +30,10 @@ class _MisNumerosContentState extends State<MisNumerosContent> {
   final _money =
       NumberFormat.currency(locale: 'es_AR', symbol: r'$', decimalDigits: 0);
   PeriodoVista _periodo = PeriodoVista.hoy;
+
   static const _cobro = Color(0xFF28B5CD);
   static const _gasto = Color(0xFFF75A6D);
+  static const _retiro = Color(0xFFF59E0B);
 
   @override
   void initState() {
@@ -48,6 +50,9 @@ class _MisNumerosContentState extends State<MisNumerosContent> {
   void _onStore() {
     if (mounted) setState(() {});
   }
+
+  String _fmt(double v) =>
+      '${_money.format(v).replaceAll(r"$", "").trim()} \$';
 
   Future<void> _abrirNuevo(TipoMovimiento tipo) async {
     await showModalBottomSheet<void>(
@@ -75,8 +80,7 @@ class _MisNumerosContentState extends State<MisNumerosContent> {
   void _abrirVencimientos() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) =>
-            VencimientosScreen(store: widget.vencimientosStore),
+        builder: (_) => VencimientosScreen(store: widget.vencimientosStore),
       ),
     );
   }
@@ -88,9 +92,10 @@ class _MisNumerosContentState extends State<MisNumerosContent> {
       return const Center(child: CircularProgressIndicator());
     }
     final lista = store.porPeriodo(_periodo);
-    final saldo = store.saldo(lista);
     final cobros = store.totalCobros(lista);
     final gastos = store.totalGastos(lista);
+    final retiros = store.totalRetiros(lista);
+    final saldoNegocio = store.saldoNegocio(lista);
 
     return ColoredBox(
       color: const Color(0xFFF1F5F9),
@@ -100,7 +105,7 @@ class _MisNumerosContentState extends State<MisNumerosContent> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
           children: [
-            // Atajos temporales: Metas / Vencimientos
+            // Atajos Metas / Vencimientos
             Row(
               children: [
                 Expanded(
@@ -135,7 +140,7 @@ class _MisNumerosContentState extends State<MisNumerosContent> {
               Expanded(
                 child: Text(
                   store.syncedToCloud
-                      ? 'Numeros cifrados en la nube'
+                      ? 'Números cifrados en la nube'
                       : (store.lastCloudError ?? 'Sin sync'),
                   style: TextStyle(
                     fontSize: 12,
@@ -172,6 +177,8 @@ class _MisNumerosContentState extends State<MisNumerosContent> {
               onSelectionChanged: (s) => setState(() => _periodo = s.first),
             ),
             const SizedBox(height: 16),
+
+            // Resumen Casa vs Negocio
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -182,79 +189,79 @@ class _MisNumerosContentState extends State<MisNumerosContent> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Plata que te quedo',
-                      style: TextStyle(
-                          color: AppColors.textMuted,
-                          fontWeight: FontWeight.w600)),
+                  const Text(
+                    'Plata que quedó en el negocio',
+                    style: TextStyle(
+                      color: AppColors.textMuted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   const SizedBox(height: 6),
                   Text(
-                    '${_money.format(saldo).replaceAll(r"$", "").trim()} \$',
-                    style: const TextStyle(
-                        fontSize: 36,
-                        fontWeight: FontWeight.w800,
-                        color: _cobro),
+                    _fmt(saldoNegocio),
+                    style: TextStyle(
+                      fontSize: 34,
+                      fontWeight: FontWeight.w800,
+                      color: saldoNegocio >= 0 ? _cobro : _gasto,
+                    ),
                   ),
                   const SizedBox(height: 16),
-                  Row(children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Cobros',
-                              style: TextStyle(color: AppColors.textMuted)),
-                          Text(
-                            '${_money.format(cobros).replaceAll(r"$", "").trim()} \$',
-                            style: const TextStyle(
-                                color: _cobro,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 18),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Gastos',
-                              style: TextStyle(color: AppColors.textMuted)),
-                          Text(
-                            '${_money.format(gastos).replaceAll(r"$", "").trim()} \$',
-                            style: const TextStyle(
-                                color: _gasto,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 18),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ]),
+                  _ResumenLinea(
+                    label: 'Cobros',
+                    value: _fmt(cobros),
+                    color: _cobro,
+                  ),
+                  const SizedBox(height: 8),
+                  _ResumenLinea(
+                    label: 'Gastos del trabajo',
+                    value: _fmt(gastos),
+                    color: _gasto,
+                  ),
+                  const SizedBox(height: 8),
+                  _ResumenLinea(
+                    label: 'Me saqué para casa',
+                    value: _fmt(retiros),
+                    color: _retiro,
+                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
+
+            // Tres acciones
             Row(children: [
               Expanded(
                 child: _BigAction(
-                  label: 'Cobre',
+                  label: 'Cobré',
                   color: _cobro,
                   icon: Icons.arrow_downward_rounded,
                   onTap: () => _abrirNuevo(TipoMovimiento.cobro),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(
                 child: _BigAction(
-                  label: 'Gaste',
+                  label: 'Gasté',
                   color: _gasto,
                   icon: Icons.arrow_upward_rounded,
                   onTap: () => _abrirNuevo(TipoMovimiento.gasto),
                 ),
               ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _BigAction(
+                  label: 'Me saqué',
+                  color: _retiro,
+                  icon: Icons.account_balance_wallet_outlined,
+                  onTap: () => _abrirNuevo(TipoMovimiento.retiro),
+                ),
+              ),
             ]),
             const SizedBox(height: 28),
-            const Text('Movimientos',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+            const Text(
+              'Movimientos',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+            ),
             const SizedBox(height: 12),
             if (lista.isEmpty)
               Container(
@@ -265,20 +272,41 @@ class _MisNumerosContentState extends State<MisNumerosContent> {
                   border: Border.all(color: AppColors.border),
                 ),
                 child: const Text(
-                  'Todavia no anotaste nada en este periodo.',
+                  'Todavía no anotaste nada en este período.\n'
+                  'Usá “Me saqué” cuando te pases plata a casa.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: AppColors.textMuted),
+                  style: TextStyle(color: AppColors.textMuted, height: 1.4),
                 ),
               )
             else
               ...lista.map((m) {
-                final esCobro = m.esCobro;
-                final titulo = esCobro
-                    ? (m.nota?.isNotEmpty == true ? m.nota! : 'Cobro')
-                    : (m.categoria?.label ?? 'Gasto');
+                final Color accent;
+                final IconData icon;
+                final String titulo;
+                final String montoStr;
+
+                if (m.esCobro) {
+                  accent = _cobro;
+                  icon = Icons.arrow_downward_rounded;
+                  titulo = (m.nota?.isNotEmpty == true) ? m.nota! : 'Cobro';
+                  montoStr = _fmt(m.monto);
+                } else if (m.esRetiro) {
+                  accent = _retiro;
+                  icon = Icons.account_balance_wallet_outlined;
+                  titulo = (m.nota?.isNotEmpty == true)
+                      ? m.nota!
+                      : 'Me saqué para casa';
+                  montoStr = _fmt(m.monto);
+                } else {
+                  accent = _gasto;
+                  icon = Icons.arrow_upward_rounded;
+                  titulo = m.categoria?.label ??
+                      ((m.nota?.isNotEmpty == true) ? m.nota! : 'Gasto');
+                  montoStr = '-${_fmt(m.monto)}';
+                }
+
                 final fecha = DateFormat('dd/MM HH:mm').format(m.fecha);
-                final montoStr =
-                    '${esCobro ? "" : "-"}${_money.format(m.monto).replaceAll(r"$", "").trim()} \$';
+
                 return Card(
                   margin: const EdgeInsets.only(bottom: 10),
                   elevation: 0,
@@ -288,16 +316,17 @@ class _MisNumerosContentState extends State<MisNumerosContent> {
                   ),
                   child: ListTile(
                     leading: CircleAvatar(
-                      backgroundColor:
-                          (esCobro ? _cobro : _gasto).withOpacity(0.15),
-                      child: Icon(
-                        esCobro ? Icons.arrow_downward : Icons.arrow_upward,
-                        color: esCobro ? _cobro : _gasto,
-                      ),
+                      backgroundColor: accent.withOpacity(0.15),
+                      child: Icon(icon, color: accent, size: 22),
                     ),
-                    title: Text(titulo,
-                        style: const TextStyle(fontWeight: FontWeight.w700)),
-                    subtitle: Text(fecha, style: const TextStyle(fontSize: 12)),
+                    title: Text(
+                      titulo,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    subtitle: Text(
+                      fecha,
+                      style: const TextStyle(fontSize: 12),
+                    ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -305,7 +334,7 @@ class _MisNumerosContentState extends State<MisNumerosContent> {
                           montoStr,
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
-                            color: esCobro ? _cobro : _gasto,
+                            color: accent,
                           ),
                         ),
                         IconButton(
@@ -324,6 +353,49 @@ class _MisNumerosContentState extends State<MisNumerosContent> {
   }
 }
 
+class _ResumenLinea extends StatelessWidget {
+  const _ResumenLinea({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.textMuted,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            color: color,
+            fontWeight: FontWeight.w700,
+            fontSize: 15,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _BigAction extends StatelessWidget {
   const _BigAction({
     required this.label,
@@ -335,25 +407,31 @@ class _BigAction extends StatelessWidget {
   final Color color;
   final IconData icon;
   final VoidCallback onTap;
+
   @override
   Widget build(BuildContext context) {
     return Material(
       color: color,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 22),
-          child: Column(children: [
-            Icon(icon, color: Colors.white, size: 28),
-            const SizedBox(height: 6),
-            Text(label,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            children: [
+              Icon(icon, color: Colors.white, size: 24),
+              const SizedBox(height: 4),
+              Text(
+                label,
                 style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 18)),
-          ]),
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
