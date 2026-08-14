@@ -21,6 +21,7 @@ import 'ZonaDeTrabajoflotante.dart';
 import 'cargaTrabajoTrabajador.dart';
 import 'mis_numeros/mis_numeros_shell.dart';
 import 'academia/ui/academia_screen.dart';
+import 'mensajes/mensajes_list.dart';
 
 class HomePageWidget extends StatefulWidget {
   final bool? initialModoPrestador;
@@ -37,12 +38,11 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   static const Color _clienteDark = Color(0xFF5B35C5);
   static const Color _prestadorPrimary = Color(0xFF28B5CD);
   static const Color _prestadorDark = Color(0xFF1A8FA3);
-  // Mis números / Finanzas — fijo, no cambia con rol cliente/prestador
   static const Color _misNumerosPrimary = Color(0xFF28B5CD);
   static const Color _misNumerosDark = Color(0xFF1F9BB0);
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  // 0 Home | 1 Evaluar | 2 Mis números | 4 Academia  (3 Mensajes = snackbar)
+  // 0 Home | 1 Evaluar | 2 Mis números | 3 Mensajes | 4 Academia
   int _currentIndex = 0;
   bool _modoPrestador = false;
   bool _puedeSerAmbos = false;
@@ -230,6 +230,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         return 'Evaluar';
       case 2:
         return 'Mis números';
+      case 3:
+        return 'Mensajes';
       case 4:
         return 'Academia';
       default:
@@ -243,6 +245,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         return const MenuEvaluacionesWidget(embedded: true);
       case 2:
         return MisNumerosShell(onBackToHome: () => setState(() => _currentIndex = 0));
+      case 3:
+        return const MensajesListScreen(embedded: true);
       case 4:
         return const AcademiaScreen(embedded: true);
       default:
@@ -309,20 +313,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                 _navItem(0, Icons.home_rounded, 'Home'),
                 _navItem(1, Icons.star_outline_rounded, 'Evaluar'),
                 _centerMisNumerosButton(),
-                _navItem(
-                  3,
-                  Icons.chat_bubble_outline_rounded,
-                  'Mensajes',
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Mensajes · Próximamente'),
-                        behavior: SnackBarBehavior.floating,
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-                  },
-                ),
+                _navItem(3, Icons.chat_bubble_outline_rounded, 'Mensajes'),
                 _navItem(4, Icons.school_outlined, 'Academia'),
               ],
             ),
@@ -332,7 +323,6 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     );
   }
 
-  /// Botón circular central — color fijo Mis números (#28B5CD), independiente del rol.
   Widget _centerMisNumerosButton() {
     final selected = _currentIndex == 2;
     return Padding(
