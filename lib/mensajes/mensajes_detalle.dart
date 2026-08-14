@@ -25,6 +25,9 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
   String? _otherName;
   String? _otherUid;
   bool _busy = false;
+  bool _sending = false;
+  final _textCtrl = TextEditingController();
+  final _scrollCtrl = ScrollController();
 
   @override
   void initState() {
@@ -38,12 +41,44 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
     _loadName();
   }
 
+  @override
+  void dispose() {
+    _textCtrl.dispose();
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadName() async {
     final o = _otherUid;
     if (o == null || o.isEmpty) return;
     final name = await MensajesService.instance.resolveDisplayName(o);
     if (!mounted) return;
     setState(() => _otherName = name);
+  }
+
+  Future<void> _enviarTexto() async {
+    final t = _textCtrl.text.trim();
+    if (t.isEmpty || _sending) return;
+    setState(() => _sending = true);
+    try {
+      await MensajesService.instance.enviarMensajeTexto(
+        conversacionId: widget.conversacionId,
+        texto: t,
+      );
+      if (!mounted) return;
+      _textCtrl.clear();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(MensajesService.humanizeError(e)),
+          backgroundColor: const Color(0xFFB91C1C),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
   }
 
   Future<void> _responder({
@@ -64,8 +99,8 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
         SnackBar(
           content: Text(
             decision == 'aceptado'
-                ? 'Recibo aceptado · queda como evidencia'
-                : 'Recibo rechazado · queda documentado',
+                ? 'Recibo aceptado \u00b7 queda como evidencia'
+                : 'Recibo rechazado \u00b7 queda documentado',
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -97,14 +132,18 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
             const Text(
               'El rechazo queda registrado y no se borra. '
               'Sirve como evidencia de que no hubo acuerdo sobre ese monto.',
-              style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.35),
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF64748B),
+                height: 1.35,
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: ctrl,
               decoration: const InputDecoration(
                 labelText: 'Motivo (opcional)',
-                hintText: 'Monto incorrecto, no recibí, etc.',
+                hintText: 'Monto incorrecto, no recib\u00ed, etc.',
               ),
             ),
           ],
@@ -148,6 +187,7 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
   @override
   Widget build(BuildContext context) {
     final myUid = UserSession().uid ?? '';
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
@@ -155,7 +195,7 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         title: Text(
-          _otherName ?? 'Recibos',
+          _otherName ?? 'Mensajes',
           style: const TextStyle(
             color: _primary,
             fontWeight: FontWeight.w800,
@@ -165,7 +205,8 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
         actions: [
           IconButton(
             tooltip: 'Emitir recibo',
-            onPressed: _otherUid == null || _otherUid!.isEmpty ? null : _openEmitir,
+            onPressed:
+                _otherUid == null || _otherUid!.isEmpty ? null : _openEmitir,
             icon: const Icon(Icons.receipt_long_rounded),
           ),
         ],
@@ -178,12 +219,12 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             child: const Row(
               children: [
-                Icon(Icons.verified_user_outlined, size: 18, color: Color(0xFF1A8FA3)),
+                Icon(Icons.verified_user_outlined,
+                    size: 18, color: Color(0xFF1A8FA3)),
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Los recibos se sellan al emitirlos. No se editan ni se borran. '
-                    'Quedan como evidencia entre las partes.',
+                    'Recibos y mensajes quedan registrados. Los recibos se sellan y no se editan ni se borran.',
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.35,
@@ -216,44 +257,6 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
                   return const Center(child: CircularProgressIndicator());
                 }
                 final events = snap.data!.docs;
-                if (events.isEmpty) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(28),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.receipt_long_outlined,
-                              size: 48, color: Color(0xFF94A3B8)),
-                          const SizedBox(height: 12),
-                          const Text(
-                            'Todavía no hay recibos en este hilo',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 16,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Emití uno cuando haya un pago, seña o anticipo.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Color(0xFF64748B)),
-                          ),
-                          const SizedBox(height: 20),
-                          FilledButton.icon(
-                            onPressed: _openEmitir,
-                            style: FilledButton.styleFrom(
-                              backgroundColor: _primary,
-                            ),
-                            icon: const Icon(Icons.add),
-                            label: const Text('Emitir recibo'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }
 
                 final respuestas = <String, Map<String, dynamic>>{};
                 for (final e in events) {
@@ -265,19 +268,72 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
                   }
                 }
 
-                final emitidos = events
-                    .where((e) => (e.data()['tipo'] as String?) == 'recibo_emitido')
-                    .toList();
+                // Timeline: recibos + textos (omitir eventos de respuesta sueltos)
+                final timeline = events.where((e) {
+                  final t = e.data()['tipo'] as String? ?? '';
+                  return t == 'recibo_emitido' || t == 'mensaje_texto';
+                }).toList();
+
+                if (timeline.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(28),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.chat_bubble_outline,
+                              size: 48, color: Color(0xFF94A3B8)),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Todav\u00eda no hay mensajes en este hilo',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Escrib\u00ed algo o emit\u00ed un recibo cuando haya un pago o se\u00f1a.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Color(0xFF64748B)),
+                          ),
+                          const SizedBox(height: 20),
+                          FilledButton.icon(
+                            onPressed: _openEmitir,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: _primary,
+                            ),
+                            icon: const Icon(Icons.receipt_long),
+                            label: const Text('Emitir recibo'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
 
                 return ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-                  itemCount: emitidos.length,
+                  controller: _scrollCtrl,
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                  itemCount: timeline.length,
                   itemBuilder: (context, i) {
-                    final doc = emitidos[i];
+                    final doc = timeline[i];
                     final d = doc.data();
+                    final tipo = d['tipo'] as String? ?? '';
+
+                    if (tipo == 'mensaje_texto') {
+                      final mine = d['actor_uid'] == myUid;
+                      return _TextoBubble(
+                        texto: (d['texto'] as String?) ?? '',
+                        iso: (d['created_at_iso'] as String?) ?? '',
+                        mine: mine,
+                      );
+                    }
+
+                    // recibo_emitido
                     final resp = respuestas[doc.id];
                     final soyEmisor = d['actor_uid'] == myUid;
-                    // Cualquier recibo sin respuesta: la contraparte puede contestar
                     final puedoResponder =
                         !soyEmisor && resp == null && !_busy;
 
@@ -299,7 +355,141 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
               },
             ),
           ),
+          // Composer
+          Material(
+            color: Colors.white,
+            elevation: 8,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(12, 10, 12, 10 + bottomInset),
+              child: SafeArea(
+                top: false,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _textCtrl,
+                        minLines: 1,
+                        maxLines: 4,
+                        maxLength: 500,
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (_) => _enviarTexto(),
+                        decoration: InputDecoration(
+                          hintText: 'Escrib\u00ed un mensaje\u2026',
+                          counterText: '',
+                          filled: true,
+                          fillColor: const Color(0xFFF1F5F9),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(22),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Material(
+                      color: _primary,
+                      shape: const CircleBorder(),
+                      child: IconButton(
+                        onPressed: _sending ? null : _enviarTexto,
+                        icon: _sending
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.send_rounded,
+                                color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class _TextoBubble extends StatelessWidget {
+  final String texto;
+  final String iso;
+  final bool mine;
+
+  const _TextoBubble({
+    required this.texto,
+    required this.iso,
+    required this.mine,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final time = iso.isNotEmpty
+        ? iso.replaceFirst('T', ' ').split('.').first
+        : '';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Align(
+        alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.78,
+          ),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: mine ? const Color(0xFF28B5CD) : Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(16),
+                topRight: const Radius.circular(16),
+                bottomLeft: Radius.circular(mine ? 16 : 4),
+                bottomRight: Radius.circular(mine ? 4 : 16),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment:
+                  mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children: [
+                Text(
+                  texto,
+                  style: TextStyle(
+                    color: mine ? Colors.white : const Color(0xFF0F172A),
+                    fontSize: 15,
+                    height: 1.35,
+                  ),
+                ),
+                if (time.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    time,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: mine
+                          ? Colors.white.withOpacity(0.75)
+                          : const Color(0xFF94A3B8),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -340,7 +530,7 @@ class _ReciboCard extends StatelessWidget {
     Color border = const Color(0xFFE2E8F0);
     String estadoLabel = soyEmisor
         ? 'Esperando a $quien'
-        : 'Pendiente de tu confirmación';
+        : 'Pendiente de tu confirmaci\u00f3n';
     Color estadoColor = const Color(0xFFB45309);
     if (decision == 'aceptado') {
       border = const Color(0xFF16A34A);
@@ -421,10 +611,10 @@ class _ReciboCard extends StatelessWidget {
                 Text(nota, style: const TextStyle(color: Color(0xFF64748B))),
               ],
               const SizedBox(height: 12),
-              // Firma / sello
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF8FAFC),
                   borderRadius: BorderRadius.circular(12),
@@ -440,7 +630,7 @@ class _ReciboCard extends StatelessWidget {
                         const SizedBox(width: 6),
                         const Expanded(
                           child: Text(
-                            'Registro sellado · no editable',
+                            'Registro sellado \u00b7 no editable',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
@@ -471,7 +661,7 @@ class _ReciboCard extends StatelessWidget {
                     if (hashShort.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
-                        'Firma $hashShort…',
+                        'Firma $hashShort\u2026',
                         style: const TextStyle(
                           fontSize: 11,
                           fontFamily: 'monospace',
@@ -506,7 +696,7 @@ class _ReciboCard extends StatelessWidget {
               if (puedoResponder) ...[
                 const SizedBox(height: 16),
                 const Text(
-                  '¿Confirmás que recibiste este monto?',
+                  '\u00bfConfirm\u00e1s que recibiste este monto?',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -524,7 +714,7 @@ class _ReciboCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
                         child: const Text(
-                          'Sí, gracias',
+                          'S\u00ed, gracias',
                           style: TextStyle(fontWeight: FontWeight.w800),
                         ),
                       ),
