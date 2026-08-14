@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 import '../user_session.dart';
 import 'crypto/vault_session.dart';
+import 'data/fiados_store.dart';
 import 'data/metas_store.dart';
 import 'data/movimientos_store.dart';
 import 'data/vencimientos_store.dart';
@@ -32,6 +33,7 @@ class _MisNumerosShellState extends State<MisNumerosShell> {
   final _store = MovimientosStore();
   final _metasStore = MetasStore();
   final _vencimientosStore = VencimientosStore();
+  final _fiadosStore = FiadosStore();
   bool _storeLoaded = false;
 
   @override
@@ -86,6 +88,7 @@ class _MisNumerosShellState extends State<MisNumerosShell> {
         _store.loadForUser(uid),
         _metasStore.loadForUser(uid),
         _vencimientosStore.loadForUser(uid),
+        _fiadosStore.loadForUser(uid),
       ]);
       if (user != null) {
         await _store.ensureUserProfile(
@@ -142,6 +145,7 @@ class _MisNumerosShellState extends State<MisNumerosShell> {
           store: _store,
           metasStore: _metasStore,
           vencimientosStore: _vencimientosStore,
+          fiadosStore: _fiadosStore,
           onLock: _lock,
         );
     }
