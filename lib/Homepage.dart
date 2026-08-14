@@ -20,7 +20,7 @@ import 'especialidadesLaboralesflotante.dart';
 import 'ZonaDeTrabajoflotante.dart';
 import 'cargaTrabajoTrabajador.dart';
 import 'mis_numeros/mis_numeros_shell.dart';
-import 'academia_placeholder.dart';
+import 'academia/ui/academia_screen.dart';
 
 class HomePageWidget extends StatefulWidget {
   final bool? initialModoPrestador;
@@ -37,6 +37,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   static const Color _clienteDark = Color(0xFF5B35C5);
   static const Color _prestadorPrimary = Color(0xFF28B5CD);
   static const Color _prestadorDark = Color(0xFF1A8FA3);
+  // Mis números / Finanzas — fijo, no cambia con rol cliente/prestador
+  static const Color _misNumerosPrimary = Color(0xFF28B5CD);
+  static const Color _misNumerosDark = Color(0xFF1F9BB0);
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   // 0 Home | 1 Evaluar | 2 Mis números | 4 Academia  (3 Mensajes = snackbar)
@@ -241,7 +244,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       case 2:
         return MisNumerosShell(onBackToHome: () => setState(() => _currentIndex = 0));
       case 4:
-        return const AcademiaPlaceholderWidget(embedded: true);
+        return const AcademiaScreen(embedded: true);
       default:
         return _modoPrestador ? _buildPrestadorHome() : _buildClienteHome();
     }
@@ -329,7 +332,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     );
   }
 
-  /// Botón circular central (estilo YPF / Mercado Pago).
+  /// Botón circular central — color fijo Mis números (#28B5CD), independiente del rol.
   Widget _centerMisNumerosButton() {
     final selected = _currentIndex == 2;
     return Padding(
@@ -346,14 +349,14 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
                   colors: selected
-                      ? [primaryColor, primaryDark]
-                      : [primaryColor, primaryColor.withOpacity(0.85)],
+                      ? [_misNumerosPrimary, _misNumerosDark]
+                      : [_misNumerosPrimary, _misNumerosPrimary.withOpacity(0.88)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: primaryColor.withOpacity(0.35),
+                    color: _misNumerosPrimary.withOpacity(0.35),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
@@ -371,7 +374,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               style: TextStyle(
                 fontSize: 9,
                 fontWeight: FontWeight.w800,
-                color: selected ? primaryColor : const Color(0xFF64748B),
+                color: selected ? _misNumerosPrimary : const Color(0xFF64748B),
               ),
             ),
           ],
