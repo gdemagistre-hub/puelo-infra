@@ -5,7 +5,7 @@ import '../data/catalogo_lecciones.dart';
 import '../models/leccion.dart';
 import 'leccion_detalle_screen.dart';
 
-/// Academia embebida en el tab de PROX (sin Scaffold propio cuando [embedded]).
+/// Academia embebida en el tab de PROX.
 class AcademiaScreen extends StatelessWidget {
   final bool embedded;
   const AcademiaScreen({super.key, this.embedded = true});
@@ -20,7 +20,6 @@ class AcademiaScreen extends StatelessWidget {
     final body = ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
       children: [
-        // Atajo temporal a Equípate
         Material(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -147,8 +146,10 @@ class _LeccionCard extends StatelessWidget {
                     color: AcademiaScreen._secondary.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(
-                    Icons.menu_book_outlined,
+                  child: Icon(
+                    leccion.hasAudio
+                        ? Icons.headphones_outlined
+                        : Icons.menu_book_outlined,
                     color: AcademiaScreen._secondary,
                   ),
                 ),
@@ -185,6 +186,11 @@ class _LeccionCard extends StatelessWidget {
                               color: AcademiaScreen._muted,
                             ),
                           ),
+                          if (leccion.hasAudio) ...[
+                            const SizedBox(width: 8),
+                            const Icon(Icons.play_circle_outline,
+                                size: 16, color: AcademiaScreen._secondary),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 6),

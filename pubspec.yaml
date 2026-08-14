@@ -7,6 +7,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  audioplayers: ^6.1.0
   auto_size_text: 3.0.0
   cached_network_image: 3.4.1
   cached_network_image_platform_interface: 4.1.1
@@ -83,9 +84,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
-    # Geo vive en Firestore (cat_*); no embeber JSON grandes en el cliente.
-    # - assets/provincia.json
-    # - assets/departamentos.json
-    # - assets/localidades.json
-    # Seed de prueba: se mantiene a pedido (sacar antes de prod masiva).
     - assets/usuarios_dummy_500.json
