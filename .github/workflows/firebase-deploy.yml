@@ -21,21 +21,21 @@ jobs:
           flutter pub get
           flutter build web --release --dart-define=PUELLO_ENV=prod
 
-      # Copia MP3 públicos desde Hosting de Finanzas (sin git clone / sin auth).
-      # Así PROX también sirve /content/academia/audio/ cuando apaguemos finanzas.
-      - name: Fetch Academia audio (HTTP)
+      # Copia content/academia (MP3 + lo que haya) desde el propio repo.
+      # Self-contained: no depende de puelo-finanzas ni de curl externo.
+      - name: Copy Academia content
         run: |
           set -e
-          mkdir -p build/web/content/academia/audio
-          BASE="https://puelo-finanzas.web.app/content/academia"
-          for id in ahorro_inflacion separar_plata presupuesto_obra herramientas gastos_escondidos cobrar_bien cuidado_con_prestamos; do
-            echo "Fetching $id.mp3"
-            curl -fsSL "$BASE/audio/$id.mp3" -o "build/web/content/academia/audio/$id.mp3" \
-              || echo "WARN: skip $id"
-          done
-          curl -fsSL "$BASE/catalogo.json" -o build/web/content/academia/catalogo.json || true
-          echo "=== audio files ==="
-          ls -la build/web/content/academia/audio/ || true
+          mkdir -p build/web/content
+          if [ -d content/academia ]; then
+            cp -a content/academia build/web/content/
+            echo "=== content/academia copiado ==="
+            ls -la build/web/content/academia/ || true
+            echo "=== audio files ==="
+            ls -la build/web/content/academia/audio/ || true
+          else
+            echo "WARN: content/academia no encontrado en el repo"
+          fi
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0

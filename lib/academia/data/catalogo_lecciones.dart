@@ -1,9 +1,9 @@
 import '../models/leccion.dart';
 
-/// Audios publicados en Hosting de Finanzas (siguen online).
-/// Cuando apaguemos ese proyecto, el CI ya copia los MP3 a lifewalletpuelo.
+/// Audios servidos same-origin desde Hosting PROX.
+/// Los MP3 viven en content/academia/audio/ del repo; el CI los copia a build/web.
 const _audioBase =
-    'https://puelo-finanzas.web.app/content/academia/audio';
+    'https://lifewalletpuelo.web.app/content/academia/audio';
 
 /// Cápsulas de educación financiera (migradas desde puelo-finanzas).
 const catalogoLecciones = <Leccion>[
