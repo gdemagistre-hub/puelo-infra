@@ -5,10 +5,12 @@ import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 import '../user_session.dart';
 import 'crypto/vault_session.dart';
+import 'data/metas_store.dart';
 import 'data/movimientos_store.dart';
+import 'data/vencimientos_store.dart';
 import 'ui/mis_numeros_content.dart';
 
-/// Shell Mis números — DB única lifewalletpuelo (sin proyecto Finanzas).
+/// Shell Mis números — DB única lifewalletpuelo.
 class MisNumerosShell extends StatefulWidget {
   final VoidCallback? onBackToHome;
   const MisNumerosShell({super.key, this.onBackToHome});
@@ -28,6 +30,8 @@ enum _Phase {
 class _MisNumerosShellState extends State<MisNumerosShell> {
   _Phase _phase = _Phase.loading;
   final _store = MovimientosStore();
+  final _metasStore = MetasStore();
+  final _vencimientosStore = VencimientosStore();
   bool _storeLoaded = false;
 
   @override
@@ -78,7 +82,11 @@ class _MisNumerosShellState extends State<MisNumerosShell> {
     final user = FirebaseAuth.instance.currentUser;
     final uid = VaultSession.instance.uid ?? user?.uid;
     if (!_storeLoaded) {
-      await _store.loadForUser(uid);
+      await Future.wait([
+        _store.loadForUser(uid),
+        _metasStore.loadForUser(uid),
+        _vencimientosStore.loadForUser(uid),
+      ]);
       if (user != null) {
         await _store.ensureUserProfile(
           email: user.email,
@@ -130,7 +138,12 @@ class _MisNumerosShellState extends State<MisNumerosShell> {
           onBack: () => setState(() => _phase = _Phase.pinUnlock),
         );
       case _Phase.ready:
-        return MisNumerosContent(store: _store, onLock: _lock);
+        return MisNumerosContent(
+          store: _store,
+          metasStore: _metasStore,
+          vencimientosStore: _vencimientosStore,
+          onLock: _lock,
+        );
     }
   }
 }
@@ -209,7 +222,8 @@ class _InfoCard extends StatelessWidget {
                   ),
                 if (secondaryLabel != null && onSecondary != null) ...[
                   const SizedBox(height: 12),
-                  TextButton(onPressed: onSecondary, child: Text(secondaryLabel!)),
+                  TextButton(
+                      onPressed: onSecondary, child: Text(secondaryLabel!)),
                 ],
               ]),
             ),
@@ -521,8 +535,7 @@ class _PinResetEmbeddedState extends State<_PinResetEmbedded> {
       widget.onDone();
     } catch (e) {
       setState(() {
-        _error =
-            'No se pudo recuperar. Detalle: $e';
+        _error = 'No se pudo recuperar. Detalle: $e';
       });
     } finally {
       if (mounted) setState(() => _busy = false);
