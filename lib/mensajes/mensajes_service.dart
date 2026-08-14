@@ -142,12 +142,31 @@ class MensajesService {
     }
   }
 
-  /// Mensajes legibles para el usuario.
+  Future<Map<String, dynamic>> enviarMensajeTexto({
+    required String conversacionId,
+    required String texto,
+  }) async {
+    if (!hasFirebaseAuth) {
+      throw StateError('Necesitás entrar con Google para enviar mensajes');
+    }
+    final t = texto.trim();
+    if (t.isEmpty) throw StateError('Escribí un mensaje');
+    try {
+      final result = await _fn.httpsCallable('enviarMensajeTexto').call({
+        'conversacion_id': conversacionId,
+        'texto': t,
+      });
+      return Map<String, dynamic>.from(result.data as Map);
+    } catch (e) {
+      throw StateError(humanizeError(e));
+    }
+  }
+
   static String humanizeError(Object? e) {
     final s = '$e';
     final lower = s.toLowerCase();
     if (lower.contains('unauthenticated') || lower.contains('not-authenticated')) {
-      return 'Entrá con Google para usar recibos.';
+      return 'Entrá con Google para usar mensajes.';
     }
     if (lower.contains('permission-denied') || lower.contains('permission_denied')) {
       return 'No tenés permiso para esta acción.';
@@ -156,7 +175,7 @@ class MensajesService {
       return 'Ese recibo ya fue respondido.';
     }
     if (lower.contains('not-found')) {
-      return 'No encontramos ese recibo.';
+      return 'No encontramos ese registro.';
     }
     if (lower.contains('invalid-argument')) {
       return 'Datos incompletos o inválidos.';
@@ -167,7 +186,6 @@ class MensajesService {
     if (lower.contains('deadline') || lower.contains('timeout') || lower.contains('unavailable')) {
       return 'Sin conexión o el servidor no respondió. Probá de nuevo.';
     }
-    // FirebaseFunctionsException: [code] message
     final m = RegExp(r'(?:FirebaseFunctionsException:?\s*)?(?:\[[^\]]*\]\s*)?(.+)')
         .firstMatch(s);
     final msg = (m?.group(1) ?? s).trim();
