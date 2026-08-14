@@ -1,20 +1,14 @@
-# Mis números — PIN y recuperación
+# Mis números — DB única (lifewalletpuelo)
+
+Desde 2026-08-14 **no** usa el proyecto puelo-finanzas ni el bridge `exchangeWalletToken`.
+
+- Auth: Firebase Auth de PROX (Google)
+- Firestore: `usuarios/{uid}/movimientos|vault|metas|vencimientos` en **lifewalletpuelo**
+- CF recovery: `registerVaultRecovery` / `recoverVaultDek` en región **us-east1**
 
 Mensaje de producto:
 
 > Tu PIN bloquea Mis números en el celular.
 > Si lo olvidás, entrás de nuevo con Google y elegís uno nuevo.
 
-## Modelo v2
-- DEK aleatoria cifra montos/notas
-- PIN envuelve la DEK (`dek_wrapped_pin`)
-- CF `registerVaultRecovery` / `recoverVaultDek` permiten reset de PIN sin perder historial
-
-## Legacy v1
-- Clave = PIN derivado
-- Sin `dek_wrapped_recovery` → "Olvidé el PIN" puede fallar; hay que recrear bóveda
-
-## Deploy CF (puelo-finanzas)
-```
-firebase deploy --only functions:registerVaultRecovery,functions:recoverVaultDek,functions:exchangeWalletToken
-```
+Los datos que hubieran estado solo en puelo-finanzas **no se migran**.
