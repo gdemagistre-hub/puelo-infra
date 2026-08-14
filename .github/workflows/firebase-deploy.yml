@@ -21,22 +21,17 @@ jobs:
           flutter pub get
           flutter build web --release --dart-define=PUELLO_ENV=prod
 
-      - name: Copy Academia content (audios + catalogo) from puelo-finanzas
+      - name: Copy Academia content (audios) from puelo-finanzas
         run: |
           set -e
           mkdir -p build/web/content/academia
-          # Sparse checkout solo de content/academia (MP3 + txt + json)
-          git clone --depth 1 --filter=blob:none --sparse \
-            https://github.com/gdemagistre-hub/puelo-finanzas.git /tmp/puelo-finanzas
-          cd /tmp/puelo-finanzas
-          git sparse-checkout set content/academia
+          git clone --depth 1 https://github.com/gdemagistre-hub/puelo-finanzas.git /tmp/puelo-finanzas
           cp -a /tmp/puelo-finanzas/content/academia/. build/web/content/academia/
-          # También dejar copia en el workspace si hay content local
           if [ -d content/academia ]; then
             cp -a content/academia/. build/web/content/academia/
           fi
-          ls -la build/web/content/academia/ || true
-          ls -la build/web/content/academia/audio/ || true
+          echo "=== content/academia ==="
+          find build/web/content/academia -type f | head -40
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
