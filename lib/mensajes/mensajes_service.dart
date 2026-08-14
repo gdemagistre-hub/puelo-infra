@@ -3,7 +3,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
-/// Cliente de Mensajes M1/M2 — CF us-east1 + lectura Firestore.
+/// Cliente de Mensajes — CF us-east1 + lectura Firestore.
 class MensajesService {
   MensajesService._();
   static final MensajesService instance = MensajesService._();
@@ -15,13 +15,9 @@ class MensajesService {
   FirebaseFunctions get _fn =>
       FirebaseFunctions.instanceFor(region: functionsRegion);
 
-  /// Auth real requerida por las CF (no dropdown dev).
   bool get hasFirebaseAuth => FirebaseAuth.instance.currentUser != null;
 
   String? get authUid => FirebaseAuth.instance.currentUser?.uid;
-
-  /// Preferir Auth real; fallback a sesión (dropdown).
-  String? get effectiveUid => authUid;
 
   Stream<QuerySnapshot<Map<String, dynamic>>> watchConversaciones(String uid) {
     return _db
@@ -41,7 +37,6 @@ class MensajesService {
         .snapshots();
   }
 
-  /// UID de la otra parte en el hilo (robusto ante tipos / convId).
   static String? otherParticipantUid({
     required String myUid,
     required String convId,
@@ -57,7 +52,6 @@ class MensajesService {
       }
     }
 
-    // convId = uidA__uidB (orden lex)
     final parts = convId.split('__');
     if (parts.length == 2) {
       if (parts[0] == myUid && parts[1].isNotEmpty) return parts[1];
@@ -112,14 +106,18 @@ class MensajesService {
     if (!hasFirebaseAuth) {
       throw StateError('Necesitás entrar con Google para emitir recibos');
     }
-    final result = await _fn.httpsCallable('emitirRecibo').call({
-      'contraparte_uid': contraparteUid,
-      'monto': monto,
-      'concepto': concepto,
-      if (nota != null && nota.trim().isNotEmpty) 'nota': nota.trim(),
-      'origen': origen,
-    });
-    return Map<String, dynamic>.from(result.data as Map);
+    try {
+      final result = await _fn.httpsCallable('emitirRecibo').call({
+        'contraparte_uid': contraparteUid,
+        'monto': monto,
+        'concepto': concepto,
+        if (nota != null && nota.trim().isNotEmpty) 'nota': nota.trim(),
+        'origen': origen,
+      });
+      return Map<String, dynamic>.from(result.data as Map);
+    } catch (e) {
+      throw StateError(humanizeError(e));
+    }
   }
 
   Future<Map<String, dynamic>> responderRecibo({
@@ -131,13 +129,52 @@ class MensajesService {
     if (!hasFirebaseAuth) {
       throw StateError('Necesitás entrar con Google para responder');
     }
-    final result = await _fn.httpsCallable('responderRecibo').call({
-      'conversacion_id': conversacionId,
-      'recibo_event_id': reciboEventId,
-      'decision': decision,
-      if (motivo != null && motivo.trim().isNotEmpty) 'motivo': motivo.trim(),
-    });
-    return Map<String, dynamic>.from(result.data as Map);
+    try {
+      final result = await _fn.httpsCallable('responderRecibo').call({
+        'conversacion_id': conversacionId,
+        'recibo_event_id': reciboEventId,
+        'decision': decision,
+        if (motivo != null && motivo.trim().isNotEmpty) 'motivo': motivo.trim(),
+      });
+      return Map<String, dynamic>.from(result.data as Map);
+    } catch (e) {
+      throw StateError(humanizeError(e));
+    }
+  }
+
+  /// Mensajes legibles para el usuario.
+  static String humanizeError(Object? e) {
+    final s = '$e';
+    final lower = s.toLowerCase();
+    if (lower.contains('unauthenticated') || lower.contains('not-authenticated')) {
+      return 'Entrá con Google para usar recibos.';
+    }
+    if (lower.contains('permission-denied') || lower.contains('permission_denied')) {
+      return 'No tenés permiso para esta acción.';
+    }
+    if (lower.contains('already-exists') || lower.contains('ya respondido')) {
+      return 'Ese recibo ya fue respondido.';
+    }
+    if (lower.contains('not-found')) {
+      return 'No encontramos ese recibo.';
+    }
+    if (lower.contains('invalid-argument')) {
+      return 'Datos incompletos o inválidos.';
+    }
+    if (lower.contains('failed-precondition')) {
+      return 'No se puede completar ahora. Revisá e intentá de nuevo.';
+    }
+    if (lower.contains('deadline') || lower.contains('timeout') || lower.contains('unavailable')) {
+      return 'Sin conexión o el servidor no respondió. Probá de nuevo.';
+    }
+    // FirebaseFunctionsException: [code] message
+    final m = RegExp(r'(?:FirebaseFunctionsException:?\s*)?(?:\[[^\]]*\]\s*)?(.+)')
+        .firstMatch(s);
+    final msg = (m?.group(1) ?? s).trim();
+    if (msg.length > 160) return '${msg.substring(0, 157)}…';
+    return msg
+        .replaceFirst('Exception: ', '')
+        .replaceFirst('StateError: ', '');
   }
 
   static String labelConcepto(String? c) {

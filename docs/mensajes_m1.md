@@ -1,8 +1,18 @@
-# Mensajes M1 — Recibos auditables
+# Mensajes — Recibos auditables
 
 ## Objetivo
 
 Canal de **recibos de pago/anticipo** entre cliente y prestador, con doble control y registro append-only firmado (HMAC).
+
+## Estado por etapas
+
+| Etapa | Contenido | Estado |
+|-------|-----------|--------|
+| M1 | CF `emitirRecibo` / `responderRecibo` + rules | Hecho |
+| M2 | UI lista + detalle + sheet | Hecho |
+| M3 | Entry desde tarjeta digital | Hecho |
+| M4 | Firma visible, copy inmutabilidad, errores, empty states | Hecho |
+| M5 | Texto libre / chat (opcional) | Pendiente |
 
 ## Colecciones
 
@@ -26,17 +36,21 @@ Conceptos: `sena` | `anticipo` | `saldo` | `pago_total` | `otro`
 `content_hash` = HMAC-SHA256 del payload canónico (secret `RECIBO_HMAC_SECRET` o fallback).
 Los eventos de emisión **no se actualizan** al responder.
 
+Copy UX: “Registro sellado · no editable” + firma corta copiable.
+
 ## Rules
 
 Clientes: read si `request.auth.uid in participantes`. Write: denegado.
 
-## Deploy
+## UI entry points
+
+1. Tab **Mensajes** (lista de hilos)
+2. **Tarjeta digital** de otra persona → botón Emitir recibo
+3. Detalle de hilo → icono / empty CTA
+
+## Deploy backend
 
 ```bash
 firebase use lifewalletpuelo
 firebase deploy --only functions:emitirRecibo,functions:responderRecibo,firestore:rules
 ```
-
-## Fuera de M1
-
-UI, entry points desde tarjeta, texto libre, push.
