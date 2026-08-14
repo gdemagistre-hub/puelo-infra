@@ -1,0 +1,311 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+
+import '../user_session.dart';
+import 'emitir_recibo_sheet.dart';
+import 'mensajes_detalle.dart';
+import 'mensajes_service.dart';
+
+/// Tab Mensajes embebido: lista de hilos (recibos).
+class MensajesListScreen extends StatelessWidget {
+  final bool embedded;
+  const MensajesListScreen({super.key, this.embedded = true});
+
+  static const Color _primary = Color(0xFF28B5CD);
+  static const Color _text = Color(0xFF0F172A);
+  static const Color _muted = Color(0xFF64748B);
+
+  @override
+  Widget build(BuildContext context) {
+    final uid = UserSession().uid;
+    if (uid == null || uid.isEmpty) {
+      return const Center(
+        child: Text('Iniciá sesión para ver mensajes'),
+      );
+    }
+
+    final body = StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: MensajesService.instance.watchConversaciones(uid),
+      builder: (context, snap) {
+        if (snap.hasError) {
+          return _ErrorBox(
+            message:
+                'No se pudieron cargar los hilos.\n${snap.error}',
+          );
+        }
+        if (!snap.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final docs = snap.data!.docs;
+        if (docs.isEmpty) {
+          return _EmptyState(
+            onEmitir: () => _openEmitir(context),
+          );
+        }
+        return ListView.separated(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
+          itemCount: docs.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 8),
+          itemBuilder: (context, i) {
+            final doc = docs[i];
+            final data = doc.data();
+            return _HiloTile(
+              convId: doc.id,
+              data: data,
+              myUid: uid,
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => MensajesDetalleScreen(
+                      conversacionId: doc.id,
+                      conversacionData: data,
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+
+    return ColoredBox(
+      color: const Color(0xFFF1F5F9),
+      child: Stack(
+        children: [
+          body,
+          Positioned(
+            right: 16,
+            bottom: 16,
+            child: FloatingActionButton.extended(
+              onPressed: () => _openEmitir(context),
+              backgroundColor: _primary,
+              icon: const Icon(Icons.receipt_long_rounded, color: Colors.white),
+              label: const Text(
+                'Emitir recibo',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openEmitir(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => const EmitirReciboSheet(),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  final VoidCallback onEmitir;
+  const _EmptyState({required this.onEmitir});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(28, 48, 28, 32),
+      children: [
+        Center(
+          child: Container(
+            width: 88,
+            height: 88,
+            decoration: BoxDecoration(
+              color: MensajesListScreen._primary.withOpacity(0.12),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.receipt_long_rounded,
+              size: 44,
+              color: MensajesListScreen._primary,
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        const Text(
+          'Recibos y acuerdos',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            color: MensajesListScreen._text,
+          ),
+        ),
+        const SizedBox(height: 10),
+        const Text(
+          'Acá quedan registrados los recibos de seña, anticipo o pago '
+          'entre vos y la otra parte. Cada uno se sella y no se puede editar.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 14,
+            height: 1.45,
+            color: MensajesListScreen._muted,
+          ),
+        ),
+        const SizedBox(height: 28),
+        FilledButton.icon(
+          onPressed: onEmitir,
+          style: FilledButton.styleFrom(
+            backgroundColor: MensajesListScreen._primary,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+          ),
+          icon: const Icon(Icons.add),
+          label: const Text(
+            'Emitir primer recibo',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ErrorBox extends StatelessWidget {
+  final String message;
+  const _ErrorBox({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          message,
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Color(0xFFB91C1C)),
+        ),
+      ),
+    );
+  }
+}
+
+class _HiloTile extends StatefulWidget {
+  final String convId;
+  final Map<String, dynamic> data;
+  final String myUid;
+  final VoidCallback onTap;
+
+  const _HiloTile({
+    required this.convId,
+    required this.data,
+    required this.myUid,
+    required this.onTap,
+  });
+
+  @override
+  State<_HiloTile> createState() => _HiloTileState();
+}
+
+class _HiloTileState extends State<_HiloTile> {
+  String? _otherName;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadName();
+  }
+
+  Future<void> _loadName() async {
+    final partes = (widget.data['participantes'] as List?)?.cast<String>() ?? [];
+    final other = partes.firstWhere(
+      (p) => p != widget.myUid,
+      orElse: () => '',
+    );
+    if (other.isEmpty) return;
+    final d = await MensajesService.instance.loadUsuarioLite(other);
+    if (!mounted) return;
+    setState(() {
+      _otherName = MensajesService.instance.displayNameFromUser(d, other);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final summary = (widget.data['last_summary'] as String?) ?? 'Conversación';
+    final pending = widget.data['pending_recibo_event_id'] != null;
+    final name = _otherName ?? '…';
+
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      elevation: 1,
+      child: InkWell(
+        onTap: widget.onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: MensajesListScreen._primary.withOpacity(0.15),
+                child: Text(
+                  name.isNotEmpty ? name[0].toUpperCase() : '?',
+                  style: const TextStyle(
+                    color: MensajesListScreen._primary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                        color: MensajesListScreen._text,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      summary,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: MensajesListScreen._muted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (pending)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF59E0B).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'Pendiente',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFFB45309),
+                    ),
+                  ),
+                )
+              else
+                const Icon(Icons.chevron_right_rounded,
+                    color: Color(0xFF94A3B8)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
