@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../theme/app_colors.dart';
+import '../data/fiados_store.dart';
 import '../data/metas_store.dart';
 import '../data/movimientos_store.dart';
 import '../data/vencimientos_store.dart';
 import '../models/movimiento.dart';
+import 'fiados_screen.dart';
 import 'metas_screen.dart';
 import 'nuevo_movimiento_sheet.dart';
 import 'vencimientos_screen.dart';
@@ -16,11 +18,13 @@ class MisNumerosContent extends StatefulWidget {
     required this.store,
     required this.metasStore,
     required this.vencimientosStore,
+    required this.fiadosStore,
     this.onLock,
   });
   final MovimientosStore store;
   final MetasStore metasStore;
   final VencimientosStore vencimientosStore;
+  final FiadosStore fiadosStore;
   final VoidCallback? onLock;
   @override
   State<MisNumerosContent> createState() => _MisNumerosContentState();
@@ -34,16 +38,19 @@ class _MisNumerosContentState extends State<MisNumerosContent> {
   static const _cobro = Color(0xFF28B5CD);
   static const _gasto = Color(0xFFF75A6D);
   static const _retiro = Color(0xFFF59E0B);
+  static const _fiado = Color(0xFF7C3AED);
 
   @override
   void initState() {
     super.initState();
     widget.store.addListener(_onStore);
+    widget.fiadosStore.addListener(_onStore);
   }
 
   @override
   void dispose() {
     widget.store.removeListener(_onStore);
+    widget.fiadosStore.removeListener(_onStore);
     super.dispose();
   }
 
@@ -85,6 +92,17 @@ class _MisNumerosContentState extends State<MisNumerosContent> {
     );
   }
 
+  void _abrirFiados() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FiadosScreen(
+          store: widget.fiadosStore,
+          movimientosStore: widget.store,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final store = widget.store;
@@ -96,6 +114,10 @@ class _MisNumerosContentState extends State<MisNumerosContent> {
     final gastos = store.totalGastos(lista);
     final retiros = store.totalRetiros(lista);
     final saldoNegocio = store.saldoNegocio(lista);
+
+    final fiados = widget.fiadosStore;
+    final totalFiados = fiados.totalPendiente;
+    final nFiados = fiados.cantidadPendiente;
 
     return ColoredBox(
       color: const Color(0xFFF1F5F9),
@@ -257,6 +279,87 @@ class _MisNumerosContentState extends State<MisNumerosContent> {
                 ),
               ),
             ]),
+            const SizedBox(height: 16),
+
+            // Me deben
+            Material(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              child: InkWell(
+                onTap: _abrirFiados,
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: nFiados > 0
+                          ? _fiado.withOpacity(0.35)
+                          : AppColors.border,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: _fiado.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.handshake_outlined,
+                          color: _fiado,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Me deben',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 15,
+                              ),
+                            ),
+                            Text(
+                              nFiados == 0
+                                  ? 'Libreta de fiados · anotar plata prestada'
+                                  : '$nFiados pendiente${nFiados == 1 ? '' : 's'}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (nFiados > 0)
+                        Text(
+                          _fmt(totalFiados),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                            color: _fiado,
+                          ),
+                        ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: Colors.grey.shade400,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
             const SizedBox(height: 28),
             const Text(
               'Movimientos',
