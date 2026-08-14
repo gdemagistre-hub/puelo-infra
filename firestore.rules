@@ -2,6 +2,7 @@ rules_version = '2';
 // Sprint 0 (2026-08-06): cierre de superficie privilegiada.
 // 2026-08-14: Mis números DB única.
 // 2026-08-14: Mensajes M1 conversaciones/eventos append-only (write CF only).
+// 2026-08-14: fiados (Me deben) subcolección owner-only.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -131,6 +132,9 @@ service cloud.firestore {
         allow read, write: if isOwner(userId);
       }
       match /vencimientos/{docId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /fiados/{docId} {
         allow read, write: if isOwner(userId);
       }
       match /vault/{docId} {
