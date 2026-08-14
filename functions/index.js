@@ -1,20 +1,12 @@
 /**
- * Cloud Functions — Puelo scoring + validación de domicilio (admin bypass rules).
- * Sprint 0 (2026-08-06):
- * - BATCH_SECRET fail-closed (env / secret)
- * - aplicarValidacionPendiente con Auth Bearer preferente
- * - mintDevSession para "Modo prueba" con DEV_LOGIN_SECRET
- * - CORS acotado
- *
- * Config opcional (Firebase secrets o env):
- *   firebase functions:secrets:set BATCH_SECRET
- *   firebase functions:secrets:set DEV_LOGIN_SECRET
- *   firebase functions:config o params: ALLOW_DEV_VALIDACION=1|0
+ * Cloud Functions — Puelo (lifewalletpuelo)
+ * Scoring, validación domicilio, vault recovery (Mis números).
  */
-const { onRequest } = require("firebase-functions/v2/https");
+const { onRequest, onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const admin = require("firebase-admin");
+const crypto = require("crypto");
 const { runScoringBatch } = require("./scoringCore");
 
 if (!admin.apps.length) {
@@ -31,6 +23,8 @@ setGlobalOptions({
 const ALLOWED_ORIGINS = [
   "https://lifewalletpuelo.web.app",
   "https://lifewalletpuelo.firebaseapp.com",
+  "https://walletpuelo.web.app",
+  "https://walletpuelo.firebaseapp.com",
   "http://localhost:5000",
   "http://localhost:8080",
   "http://127.0.0.1:5000",
@@ -122,10 +116,6 @@ exports.scoringBatchDaily = onSchedule(
   }
 );
 
-/**
- * Menú "Modo prueba": custom token para el uid elegido.
- * Header X-Dev-Login-Secret == DEV_LOGIN_SECRET.
- */
 exports.mintDevSession = onRequest(
   {
     invoker: "public",
@@ -177,10 +167,6 @@ exports.mintDevSession = onRequest(
   }
 );
 
-/**
- * Guarda respuesta de "Ayudar a validar" (admin SDK).
- * Público: el validador externo puede no tener sesión.
- */
 exports.submitValidacionPendiente = onRequest(
   { invoker: "public", cors: ALLOWED_ORIGINS, memory: "256MiB", timeoutSeconds: 60 },
   async (req, res) => {
@@ -227,11 +213,6 @@ exports.submitValidacionPendiente = onRequest(
   }
 );
 
-/**
- * Aplica validación pendiente.
- * Preferente: Authorization Bearer → uid del token.
- * TEMP: ALLOW_DEV_VALIDACION=1 (default) acepta body.validadorId (dropdown local).
- */
 exports.aplicarValidacionPendiente = onRequest(
   {
     invoker: "public",
@@ -399,6 +380,119 @@ exports.aplicarValidacionPendiente = onRequest(
     } catch (e) {
       console.error("aplicarValidacionPendiente", e);
       res.status(500).json({ error: String(e.message || e) });
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Mis números — recuperación de PIN (DB única lifewalletpuelo)
+// ---------------------------------------------------------------------------
+
+function recoveryKeyFor(uid) {
+  const secret =
+    process.env.VAULT_RECOVERY_SECRET || "lifewalletpuelo-vault-recovery-v1";
+  return crypto.createHash("sha256").update(`${secret}:${uid}`).digest();
+}
+
+function wrapDek(dekBuf, uid) {
+  const key = recoveryKeyFor(uid);
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  const enc = Buffer.concat([cipher.update(dekBuf), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return Buffer.concat([Buffer.from([1]), iv, tag, enc]).toString("base64");
+}
+
+function unwrapDek(packedB64, uid) {
+  const raw = Buffer.from(packedB64, "base64");
+  if (raw.length < 1 + 12 + 16 || raw[0] !== 1) {
+    throw new Error("Formato recovery inválido");
+  }
+  const iv = raw.subarray(1, 13);
+  const tag = raw.subarray(13, 29);
+  const enc = raw.subarray(29);
+  const key = recoveryKeyFor(uid);
+  const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+  decipher.setAuthTag(tag);
+  return Buffer.concat([decipher.update(enc), decipher.final()]);
+}
+
+function requireAuthUid(request) {
+  if (!request.auth || !request.auth.uid) {
+    throw new HttpsError("unauthenticated", "Necesitás sesión Google");
+  }
+  return request.auth.uid;
+}
+
+exports.registerVaultRecovery = onCall(
+  {
+    cors: true,
+    memory: "256MiB",
+    timeoutSeconds: 30,
+  },
+  async (request) => {
+    const uid = requireAuthUid(request);
+    const dekBase64 = request.data && request.data.dekBase64;
+    if (!dekBase64 || typeof dekBase64 !== "string") {
+      throw new HttpsError("invalid-argument", "dekBase64 requerido");
+    }
+    let dekBuf;
+    try {
+      dekBuf = Buffer.from(dekBase64, "base64");
+    } catch (e) {
+      throw new HttpsError("invalid-argument", "dekBase64 inválido");
+    }
+    if (dekBuf.length < 16 || dekBuf.length > 64) {
+      throw new HttpsError("invalid-argument", "DEK de tamaño inválido");
+    }
+    const wrapped = wrapDek(dekBuf, uid);
+    await db
+      .collection("usuarios")
+      .doc(uid)
+      .collection("vault")
+      .doc("meta")
+      .set(
+        {
+          dek_wrapped_recovery: wrapped,
+          recovery_v: 1,
+          recoveryUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    return { ok: true };
+  }
+);
+
+exports.recoverVaultDek = onCall(
+  {
+    cors: true,
+    memory: "256MiB",
+    timeoutSeconds: 30,
+  },
+  async (request) => {
+    const uid = requireAuthUid(request);
+    const snap = await db
+      .collection("usuarios")
+      .doc(uid)
+      .collection("vault")
+      .doc("meta")
+      .get();
+    if (!snap.exists) {
+      throw new HttpsError("not-found", "No hay bóveda");
+    }
+    const wrapped = snap.get("dek_wrapped_recovery");
+    if (!wrapped || typeof wrapped !== "string") {
+      throw new HttpsError(
+        "failed-precondition",
+        "Esta bóveda no tiene recuperación. Podés empezar de cero."
+      );
+    }
+    try {
+      const dekBuf = unwrapDek(wrapped, uid);
+      return { dekBase64: dekBuf.toString("base64") };
+    } catch (e) {
+      console.error("unwrap recovery", e);
+      throw new HttpsError("internal", "No se pudo recuperar la clave");
     }
   }
 );
