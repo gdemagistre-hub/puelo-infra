@@ -1,5 +1,14 @@
 import '../models/leccion.dart';
 
+/// Base de audios en Hosting PROX (se copia en CI desde content/academia).
+/// Fallback: raw de puelo-finanzas mientras el deploy de content termina.
+const _audioHosting =
+    'https://lifewalletpuelo.web.app/content/academia/audio';
+const _audioFallback =
+    'https://raw.githubusercontent.com/gdemagistre-hub/puelo-finanzas/main/content/academia/audio';
+
+String _audioUrl(String id) => '$_audioHosting/$id.mp3';
+
 /// Cápsulas de educación financiera (migradas desde puelo-finanzas).
 const catalogoLecciones = <Leccion>[
   Leccion(
@@ -8,6 +17,7 @@ const catalogoLecciones = <Leccion>[
     resumen: 'Juntar billetes abajo del colchón pierde valor. Opciones simples.',
     minutos: 4,
     tag: 'Ahorro',
+    audioUrl: '$_audioHosting/ahorro_inflacion.mp3',
     cuerpo: '''
 En Argentina, si dejás la plata quieta en efectivo meses, con el tiempo compra menos. Eso es la inflación.
 
@@ -39,6 +49,7 @@ Apartar no es perder: es decidir que esa plata tiene un destino, antes de que se
     resumen: 'No mezcles lo que cobrás con lo de la casa.',
     minutos: 3,
     tag: 'Básico',
+    audioUrl: '$_audioHosting/separar_plata.mp3',
     cuerpo: '''
 Cuando cobrás un trabajo, esa plata no es toda "tuya para gastar".
 
@@ -57,6 +68,7 @@ Si mezclás todo en el bolsillo, a fin de mes no sabés si ganaste o perdiste.
     resumen: 'Materiales + tiempo + un colchón.',
     minutos: 4,
     tag: 'Obra',
+    audioUrl: '$_audioHosting/presupuesto_obra.mp3',
     cuerpo: '''
 Antes de decir un precio, pensá en 3 cosas:
 
@@ -75,6 +87,7 @@ Tip: anotá en Gasté cada compra de la obra. Así ves si el trabajo te dejó pl
     resumen: 'Una meta chica cada semana.',
     minutos: 2,
     tag: 'Ahorro',
+    audioUrl: '$_audioHosting/herramientas.mp3',
     cuerpo: '''
 En vez de pensar "necesito 300 lucas de una", pensá:
 
@@ -85,7 +98,7 @@ Ejemplo:
 - Apartás 15.000 por semana a la meta
 - En 10 semanas lo tenés
 
-Usá Mis números para anotar y, más adelante, Metas para reservar esa plata.
+Usá Mis números para anotar y Metas para reservar esa plata.
 ''',
   ),
   Leccion(
@@ -94,6 +107,7 @@ Usá Mis números para anotar y, más adelante, Metas para reservar esa plata.
     resumen: 'Nafta, comida en la obra, desgaste.',
     minutos: 3,
     tag: 'Gastos',
+    audioUrl: '$_audioHosting/gastos_escondidos.mp3',
     cuerpo: '''
 Muchos oficios pierden plata en cosas chicas:
 
@@ -113,6 +127,7 @@ Usá el botón Gasté con categorías. En una semana vas a ver el patrón.
     resumen: 'No empieces sin algo por delante.',
     minutos: 2,
     tag: 'Cobros',
+    audioUrl: '$_audioHosting/cobrar_bien.mp3',
     cuerpo: '''
 Pedir seña no es de malo: es cuidarte.
 
