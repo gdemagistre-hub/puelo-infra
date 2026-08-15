@@ -24,6 +24,9 @@ class _EspecialidadesLaboralesFlotanteWidgetState
   List<String> _oficiosDisponibles = [];
   List<String> _oficiosSeleccionados = [];
 
+  /// Evaluaciones recibidas: si > 0 no se puede quedar sin oficios.
+  int _cantidadEvaluaciones = 0;
+
   bool _loading = true;
   bool _saving = false;
   String? _errorCarga;
@@ -58,7 +61,6 @@ class _EspecialidadesLaboralesFlotanteWidgetState
   }
 
   Future<void> _cargarCatalogos() async {
-    // Catálogo local v2 (categoría → especialidad). Firestore se alinea vía seed.
     _oficiosDisponibles = CatalogoOficios.maestroIds();
     try {
       final oficiosSnapshot = await db.collection('cat_oficios').get();
@@ -70,7 +72,6 @@ class _EspecialidadesLaboralesFlotanteWidgetState
               .map((e) => e.toString().trim())
               .where((s) => s.isNotEmpty)
               .toList();
-          // Unión: local + remoto (nadie queda afuera si el seed va atrás)
           final set = {..._oficiosDisponibles, ...remoto};
           _oficiosDisponibles = set.toList()..sort();
           break;
@@ -95,6 +96,11 @@ class _EspecialidadesLaboralesFlotanteWidgetState
         if (data['profesiones'] != null) {
           _oficiosSeleccionados = List<String>.from(data['profesiones']);
         }
+        final n = data['cantidadEvaluadores'] ??
+            data['list_n_eval'] ??
+            data['cantidad_evaluadores'] ??
+            0;
+        _cantidadEvaluaciones = (n is num) ? n.toInt() : int.tryParse('$n') ?? 0;
       }
     } catch (e) {
       debugPrint('Error cargando datos usuario: $e');
@@ -107,53 +113,105 @@ class _EspecialidadesLaboralesFlotanteWidgetState
     final uid = UserSession().uid;
     if (uid == null) return;
 
+    // Sin servicios: solo si todavía no lo evaluaron → pasa a cliente.
     if (_oficiosSeleccionados.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Seleccioná al menos un servicio')),
+      if (_cantidadEvaluaciones > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No podés quitar todos los servicios: ya tenés evaluaciones.',
+            ),
+            backgroundColor: Color(0xFFB45309),
+          ),
+        );
+        return;
+      }
+
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('¿Dejar de ofrecer servicios?'),
+          content: const Text(
+            'Vas a guardar el perfil sin oficios y quedar solo como cliente.\n'
+            'Podés volver a ofrecer servicios cuando quieras.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: FilledButton.styleFrom(backgroundColor: primaryColor),
+              child: const Text('Sí, quedar como cliente'),
+            ),
+          ],
+        ),
       );
-      return;
+      if (ok != true) return;
     }
 
     setState(() => _saving = true);
     try {
-      final categorias =
-          CatalogoOficios.categoriasDesdeProfesiones(_oficiosSeleccionados);
+      final vacio = _oficiosSeleccionados.isEmpty;
+      final categorias = vacio
+          ? <String>[]
+          : CatalogoOficios.categoriasDesdeProfesiones(_oficiosSeleccionados);
       final session = UserSession();
       final base = {
         ...(session.datosCompletos ?? {}),
         'nombre_comercial': _nombreComercialController.text.trim(),
         'profesiones': _oficiosSeleccionados,
         'categorias_servicio': categorias,
-        'es_trabajador': true,
+        'es_trabajador': !vacio,
+        if (vacio) 'rol': 'cliente',
+        if (vacio) 'camino_elegido': 'busco',
+        if (!vacio) 'rol': 'trabajador',
       };
       final listFields = PrestadorListFields.build(data: base);
       final listFieldsMem =
           PrestadorListFields.build(data: base, touchTimestamp: false);
-      await db.collection('usuarios').doc(uid).set({
+
+      final patch = <String, dynamic>{
         'nombre_comercial': _nombreComercialController.text.trim(),
         'profesiones': _oficiosSeleccionados,
         'categorias_servicio': categorias,
-        'es_trabajador': true,
+        'es_trabajador': !vacio,
         'updated_at': FieldValue.serverTimestamp(),
         ...listFields,
-      }, SetOptions(merge: true));
-
-      if (session.datosCompletos != null) {
-        session.datosCompletos = {
-          ...session.datosCompletos!,
-          'nombre_comercial': _nombreComercialController.text.trim(),
-          'profesiones': _oficiosSeleccionados,
-          'categorias_servicio': categorias,
-          'es_trabajador': true,
-          ...listFieldsMem,
-        };
+      };
+      if (vacio) {
+        patch['rol'] = 'cliente';
+        patch['camino_elegido'] = 'busco';
+        // Limpia texto libre de onboarding si quedó.
+        patch['oficio_libre'] = FieldValue.delete();
+      } else {
+        patch['rol'] = 'trabajador';
       }
+
+      await db.collection('usuarios').doc(uid).set(patch, SetOptions(merge: true));
+
+      session.datosCompletos = {
+        ...(session.datosCompletos ?? {}),
+        'nombre_comercial': _nombreComercialController.text.trim(),
+        'profesiones': List<String>.from(_oficiosSeleccionados),
+        'categorias_servicio': categorias,
+        'es_trabajador': !vacio,
+        'rol': vacio ? 'cliente' : 'trabajador',
+        if (vacio) 'camino_elegido': 'busco',
+        if (vacio) 'oficio_libre': null,
+        ...listFieldsMem,
+      };
       session.invalidateHomeCache();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Servicios actualizados'),
+          SnackBar(
+            content: Text(
+              vacio
+                  ? 'Perfil actualizado: quedaste como cliente'
+                  : 'Servicios actualizados',
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -211,7 +269,10 @@ class _EspecialidadesLaboralesFlotanteWidgetState
                         'Elegí categoría y después las especialidades. '
                         'El cliente te encuentra por las dos.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.3),
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF64748B),
+                            height: 1.3),
                       ),
                       const SizedBox(height: 8),
                       if (_oficiosSeleccionados.isNotEmpty)
@@ -245,7 +306,8 @@ class _EspecialidadesLaboralesFlotanteWidgetState
                                 onToggleEsp: (espId, selected) {
                                   setModalState(() {
                                     if (selected) {
-                                      if (!_oficiosSeleccionados.contains(espId)) {
+                                      if (!_oficiosSeleccionados
+                                          .contains(espId)) {
                                         _oficiosSeleccionados.add(espId);
                                       }
                                     } else {
@@ -369,9 +431,12 @@ class _EspecialidadesLaboralesFlotanteWidgetState
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  'Por categoría y especialidad — el cliente te encuentra igual',
-                  style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                Text(
+                  _cantidadEvaluaciones > 0
+                      ? 'Podés sacar o sumar oficios. Si ya te evaluaron, '
+                          'tenés que dejar al menos uno.'
+                      : 'Podés sacar todos y guardar: quedás solo como cliente.',
+                  style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
                 ),
                 const SizedBox(height: 12),
                 InkWell(
@@ -406,7 +471,7 @@ class _EspecialidadesLaboralesFlotanteWidgetState
                               const SizedBox(height: 4),
                               Text(
                                 _oficiosSeleccionados.isEmpty
-                                    ? 'Seleccionar servicios'
+                                    ? 'Ninguno (solo cliente)'
                                     : _oficiosSeleccionados
                                         .map(_labelOficio)
                                         .join(' · '),
@@ -496,7 +561,11 @@ class _EspecialidadesLaboralesFlotanteWidgetState
                           )
                         : const Icon(Icons.save_outlined),
                     label: Text(
-                      _saving ? 'Guardando...' : 'Actualizar los datos',
+                      _saving
+                          ? 'Guardando...'
+                          : (_oficiosSeleccionados.isEmpty
+                              ? 'Guardar (solo cliente)'
+                              : 'Actualizar los datos'),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryColor,
@@ -582,7 +651,8 @@ class _CategoriaTile extends StatelessWidget {
                       controlAffinity: ListTileControlAffinity.leading,
                       title: Text(
                         esp.label,
-                        style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w500, fontSize: 14),
                       ),
                       onChanged: (v) => onToggleEsp(esp.id, v == true),
                     ),
