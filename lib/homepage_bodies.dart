@@ -1,4 +1,4 @@
-part of 'Homepage.dart';
+part of puelo_homepage;
 
   Widget _buildBrandHeader({required String subtitle}) {
     return Container(
