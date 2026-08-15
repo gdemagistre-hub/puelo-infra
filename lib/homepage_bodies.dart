@@ -123,7 +123,7 @@ part of 'Homepage.dart';
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: _categorias.length,
-            gridDelegate: const SpiverGridDelegateWithFixedCrossAxisCount(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 4,
               mainAxisSpacing: 14,
               crossAxisSpacing: 8,
