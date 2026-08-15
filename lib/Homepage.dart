@@ -836,7 +836,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     return ListView(
       padding: EdgeInsets.zero,
       children: [
-        _buildBrandHeader(subtitle: 'Tu perfil profesional en Puelo'),
+        _buildBrandHeader(subtitle: 'Así te ven quienes buscan trabajo'),
         Transform.translate(
           offset: const Offset(0, -18),
           child: Padding(
