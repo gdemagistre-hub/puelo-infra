@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import 'Homepage.dart';
+import 'elige_camino.dart';
 import 'user_session.dart';
 import 'auth_service.dart';
 import 'registroCuenta.dart';
@@ -50,7 +51,6 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
 
   Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>>
       _loadUsuariosDev() async {
-    // Sin orderBy: evita excluir docs sin campo `nombre` y no exige índice extra.
     final snap = await FirebaseFirestore.instance
         .collection('usuarios')
         .limit(150)
@@ -153,7 +153,6 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
       if (!mounted) return;
       _navegarPostLogin();
     } on AuthCancelledException {
-      // Usuario cerró el popup.
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -188,12 +187,19 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
           builder: (context) => const PantallaGraciasValidacionWidget(),
         ),
       );
-    } else {
+      return;
+    }
+    if (EligeCaminoWidget.necesitaElegir()) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const HomePageWidget()),
+        MaterialPageRoute(builder: (context) => const EligeCaminoWidget()),
       );
+      return;
     }
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const HomePageWidget()),
+    );
   }
 
   Widget _buildDevLoginPanel({required bool busy}) {
