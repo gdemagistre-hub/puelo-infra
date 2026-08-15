@@ -11,6 +11,7 @@ import 'user_session.dart';
 import 'splashScreen.dart';
 import 'loginScreen.dart';
 import 'Homepage.dart';
+import 'elige_camino.dart';
 import 'registroTrabajador.dart';
 import 'buscadorPrestadores.dart';
 import 'tarjetaDigital.dart';
@@ -57,11 +58,11 @@ class MyApp extends StatelessWidget {
         SplashScreenWidget.routePath: (context) => const SplashScreenWidget(),
         LoginScreenWidget.routePath: (context) => const LoginScreenWidget(),
         HomePageWidget.routePath: (context) => const HomePageWidget(),
+        EligeCaminoWidget.routePath: (context) => const EligeCaminoWidget(),
         RegistroTrabajadorWidget.routePath: (context) =>
             const RegistroTrabajadorWidget(),
         BuscadorPrestadoresWidget.routePath: (context) =>
             const BuscadorPrestadoresWidget(),
-        // Gate client-side: solo es_admin / rol admin (complementar con rules + Auth).
         ConsolaProxWidget.routePath: (context) {
           if (!ConsolaProxWidget.puedeAcceder && !UserSession().isAdmin) {
             return const Scaffold(
