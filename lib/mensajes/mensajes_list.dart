@@ -305,11 +305,22 @@ class _HiloTileState extends State<_HiloTile> {
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
-      elevation: 1,
+      elevation: pending ? 2 : 1,
+      shadowColor: pending
+          ? const Color(0xFFF59E0B).withOpacity(0.25)
+          : Colors.black12,
       child: InkWell(
         onTap: widget.onTap,
         borderRadius: BorderRadius.circular(16),
-        child: Padding(
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: pending
+                ? const Border(
+                    left: BorderSide(color: Color(0xFFF59E0B), width: 3.5),
+                  )
+                : null,
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           child: Row(
             children: [
@@ -352,9 +363,9 @@ class _HiloTileState extends State<_HiloTile> {
               if (pending)
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF59E0B).withOpacity(0.15),
+                    color: const Color(0xFFF59E0B),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Text(
@@ -362,7 +373,8 @@ class _HiloTileState extends State<_HiloTile> {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFFB45309),
+                      color: Colors.white,
+                      letterSpacing: 0.2,
                     ),
                   ),
                 )
