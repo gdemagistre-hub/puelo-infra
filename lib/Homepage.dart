@@ -24,6 +24,8 @@ import 'academia/ui/academia_screen.dart';
 import 'mensajes/mensajes_list.dart';
 import 'services/fcm_service.dart';
 
+library puelo_homepage;
+
 part 'homepage_bodies.dart';
 
 class HomePageWidget extends StatefulWidget {
