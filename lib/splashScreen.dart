@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'Homepage.dart';
+import 'elige_camino.dart';
 import 'loginScreen.dart';
 import 'user_session.dart';
 
@@ -50,12 +51,10 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
   }
 
   Future<void> _bootstrap() async {
-    // Mínimo de animación visible.
     await Future<void>.delayed(const Duration(milliseconds: 1600));
 
     var restored = false;
     try {
-      // No bloquear el splash si Firestore/prefs tardan o fallan.
       restored = await UserSession()
           .restaurarSesion()
           .timeout(const Duration(seconds: 6), onTimeout: () => false);
@@ -68,7 +67,11 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
 
     try {
       if (restored && UserSession().isLoggedIn) {
-        Navigator.pushReplacementNamed(context, HomePageWidget.routePath);
+        if (EligeCaminoWidget.necesitaElegir()) {
+          Navigator.pushReplacementNamed(context, EligeCaminoWidget.routePath);
+        } else {
+          Navigator.pushReplacementNamed(context, HomePageWidget.routePath);
+        }
       } else {
         Navigator.pushReplacementNamed(context, LoginScreenWidget.routePath);
       }
@@ -102,7 +105,6 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
               opacity: _opacityAnimation.value,
               child: Transform.scale(
                 scale: _scaleAnimation.value,
-                // Asset real en repo: logo_prox_splash.png.png
                 child: Image.asset(
                   'assets/images/logo_prox_splash.png.png',
                   width: 200,
