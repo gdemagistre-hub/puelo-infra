@@ -6,7 +6,7 @@ import 'elige_oficio.dart';
 import 'user_session.dart';
 
 /// Primera decisión post-login: ¿busca o ofrece servicios?
-/// Pensada para personas con poca experiencia digital: 2 botones grandes, poco texto.
+/// Lenguaje simple (oficio/barrio), sin tono LinkedIn.
 class EligeCaminoWidget extends StatefulWidget {
   static const String routeName = 'EligeCamino';
   static const String routePath = '/elige-camino';
