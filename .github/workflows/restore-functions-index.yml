@@ -1,0 +1,111 @@
+name: Restore functions index
+on:
+  workflow_dispatch:
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 30
+
+      - name: Restore index.js from last good commit and append fiados VTO
+        run: |
+          set -e
+          GOOD=25f72a4d50d6cda39179b251415134e7078fc0db
+          git show "$GOOD:functions/index.js" > functions/index.js
+          cat >> functions/index.js << 'EOF'
+
+          // ---------------------------------------------------------------------------
+          // Mis números — fiados vencidos (Me deben) → FCM batch
+          // ---------------------------------------------------------------------------
+          const { runFiadosVtoBatch } = require("./fiados_vto");
+
+          exports.fiadosVtoDaily = onSchedule(
+            {
+              schedule: "0 8 * * *",
+              timeZone: "America/Argentina/Buenos_Aires",
+              memory: "512MiB",
+              timeoutSeconds: 300,
+            },
+            async () => {
+              const result = await runFiadosVtoBatch({ force: false });
+              console.log("fiadosVtoDaily", result);
+              return result;
+            }
+          );
+
+          exports.fiadosVtoEvening = onSchedule(
+            {
+              schedule: "0 18 * * *",
+              timeZone: "America/Argentina/Buenos_Aires",
+              memory: "512MiB",
+              timeoutSeconds: 300,
+            },
+            async () => {
+              const result = await runFiadosVtoBatch({ force: false });
+              console.log("fiadosVtoEvening", result);
+              return result;
+            }
+          );
+
+          exports.fiadosVtoHttp = onRequest(
+            {
+              invoker: "public",
+              secrets: ["BATCH_SECRET"],
+              memory: "512MiB",
+              timeoutSeconds: 300,
+            },
+            async (req, res) => {
+              applyCors(req, res);
+              if (req.method === "OPTIONS") {
+                res.status(204).send("");
+                return;
+              }
+              if (req.method !== "POST" && req.method !== "GET") {
+                res.status(405).send("Method not allowed");
+                return;
+              }
+              const secret = process.env.BATCH_SECRET || "";
+              const provided =
+                req.get("X-Batch-Secret") ||
+                req.query.secret ||
+                (req.body && req.body.secret) ||
+                "";
+              if (!secret) {
+                res.status(503).json({ error: "batch_secret_not_configured" });
+                return;
+              }
+              if (provided !== secret) {
+                res.status(401).json({ error: "unauthorized" });
+                return;
+              }
+              const force =
+                req.query.force === "1" || (req.body && req.body.force === true);
+              try {
+                const result = await runFiadosVtoBatch({ force });
+                res.status(200).json(result);
+              } catch (e) {
+                console.error("fiadosVtoHttp", e);
+                res.status(500).json({ error: String(e.message || e) });
+              }
+            }
+          );
+          EOF
+          # Drop broken helpers if present
+          rm -f functions/index_core.js functions/index_half_0.js functions/index_half_1.js functions/index_core_part_*.js
+          node --check functions/index.js
+          node --check functions/fiados_vto.js
+          echo "index size: $(wc -c < functions/index.js)"
+
+      - name: Commit and push
+        run: |
+          git config user.name "gdemagistre-hub"
+          git config user.email "gdemagistre@gmail.com"
+          git add -A functions/
+          git status
+          git commit -m "fix: restore functions/index.js + fiadosVtoDaily/Evening/Http" || echo "nothing to commit"
+          git push origin HEAD:main
