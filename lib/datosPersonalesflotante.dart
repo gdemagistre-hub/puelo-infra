@@ -564,7 +564,7 @@ class _DatosPersonalesFlotanteWidgetState
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    _esPrestador ? 'Tu perfil profesional' : 'Tu identidad en Puelo',
+                                    _esPrestador ? 'Tus datos para trabajar' : 'Tu identidad en Puelo',
                                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: _textColor),
                                   ),
                                   Text(

@@ -211,7 +211,7 @@ class _CalificarTrabajoWidgetState extends State<CalificarTrabajoWidget> {
                 decoration: InputDecoration(
                   hintText: '¿Cómo te fue? ¿Llegó a tiempo? ¿Quedó bien?',
                   helperText:
-                      'El comentario lo ve el profesional. Las estrellas sí son públicas.',
+                      'El comentario lo ve quien hizo el trabajo. Las estrellas sí son públicas.',
                   filled: true,
                   fillColor: Colors.white,
                   border: OutlineInputBorder(

@@ -64,7 +64,7 @@ class MenuEvaluacionesWidget extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           _PrimaryActionCard(
-            titulo: 'Calificar al profesional',
+            titulo: 'Calificar el trabajo',
             subtitulo:
                 '¿Cómo te fue con el trabajo? Tu opinión ayuda a otros a elegir con más confianza.',
             icono: Icons.star_rounded,
