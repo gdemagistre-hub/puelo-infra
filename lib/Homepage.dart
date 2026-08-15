@@ -22,6 +22,7 @@ import 'cargaTrabajoTrabajador.dart';
 import 'mis_numeros/mis_numeros_shell.dart';
 import 'academia/ui/academia_screen.dart';
 import 'mensajes/mensajes_list.dart';
+import 'services/fcm_service.dart';
 
 class HomePageWidget extends StatefulWidget {
   final bool? initialModoPrestador;
@@ -74,6 +75,8 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     _detectarRol();
     final foto = (UserSession().datosCompletos?['url_foto_perfil'] ?? UserSession().datosCompletos?['foto_perfil'] ?? '').toString().trim();
     if (foto.isNotEmpty) _urlFotoPerfil = foto;
+    // FCM: registra token si hay Auth real (Google). Dev dropdown no tiene token Auth → no-op seguro.
+    FcmService.instance.ensureStarted();
   }
 
   @override
