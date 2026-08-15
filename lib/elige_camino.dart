@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import 'Homepage.dart';
+import 'elige_oficio.dart';
 import 'user_session.dart';
 
 /// Primera decisión post-login: ¿busca o ofrece servicios?
@@ -54,7 +55,8 @@ class _EligeCaminoWidgetState extends State<EligeCaminoWidget> {
             .doc(uid)
             .set(patch, SetOptions(merge: true));
 
-        final data = Map<String, dynamic>.from(UserSession().datosCompletos ?? {});
+        final data =
+            Map<String, dynamic>.from(UserSession().datosCompletos ?? {});
         data['camino_elegido'] = camino;
         data['es_trabajador'] = quiereOfrecer;
         if (quiereOfrecer) data['rol'] = 'trabajador';
@@ -63,8 +65,8 @@ class _EligeCaminoWidgetState extends State<EligeCaminoWidget> {
       }
     } catch (e) {
       debugPrint('EligeCamino save error: $e');
-      // Igual dejamos pasar: no bloquear por red.
-      final data = Map<String, dynamic>.from(UserSession().datosCompletos ?? {});
+      final data =
+          Map<String, dynamic>.from(UserSession().datosCompletos ?? {});
       data['camino_elegido'] = camino;
       data['es_trabajador'] = quiereOfrecer;
       if (quiereOfrecer) data['rol'] = 'trabajador';
@@ -72,10 +74,19 @@ class _EligeCaminoWidgetState extends State<EligeCaminoWidget> {
     }
 
     if (!mounted) return;
+
+    if (quiereOfrecer) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const EligeOficioWidget()),
+      );
+      return;
+    }
+
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (_) => HomePageWidget(initialModoPrestador: quiereOfrecer),
+        builder: (_) => const HomePageWidget(initialModoPrestador: false),
       ),
     );
   }
