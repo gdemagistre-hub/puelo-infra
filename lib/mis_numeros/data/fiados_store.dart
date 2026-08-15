@@ -49,11 +49,23 @@ class FiadosStore extends ChangeNotifier {
   static const _sensitive = ['nombre', 'monto', 'nota'];
   static const _numeric = {'monto'};
 
+  /// Cifra sensibles y deja en claro lo que el batch de vencimientos necesita.
   Future<Map<String, dynamic>> _toCloud(Fiado f) async {
     final clear = f.toJson();
     final vault = VaultSession.instance;
-    if (!vault.isUnlocked) return clear;
-    return vault.sealMap(clear, sensitiveKeys: _sensitive);
+    Map<String, dynamic> out;
+    if (!vault.isUnlocked) {
+      out = Map<String, dynamic>.from(clear);
+    } else {
+      out = await vault.sealMap(clear, sensitiveKeys: _sensitive);
+    }
+    // Siempre en claro (el cron de FCM no tiene la DEK del usuario).
+    out['estado'] = f.estado.name;
+    out['vto_dia'] = f.vtoDia;
+    out['fechaAcordada'] = f.fechaAcordada?.toIso8601String();
+    out['notificado_vto_dia'] = f.notificadoVtoDia;
+    out['owner_uid'] = _uid; // redunda path; útil en collectionGroup
+    return out;
   }
 
   Future<Fiado?> _fromCloud(Map<String, dynamic> data, String docId) async {
