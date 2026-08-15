@@ -55,6 +55,14 @@
         { "fieldPath": "participantes", "arrayConfig": "CONTAINS" },
         { "fieldPath": "last_event_at", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "fiados",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "estado", "order": "ASCENDING" },
+        { "fieldPath": "vto_dia", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
