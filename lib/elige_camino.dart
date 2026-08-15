@@ -6,14 +6,13 @@ import 'elige_oficio.dart';
 import 'user_session.dart';
 
 /// Primera decisión post-login: ¿busca o ofrece servicios?
-/// Lenguaje simple (oficio/barrio), sin tono LinkedIn.
+/// Lenguaje simple (oficio/barrio), sin tono LinkedIn / "profesional".
 class EligeCaminoWidget extends StatefulWidget {
   static const String routeName = 'EligeCamino';
   static const String routePath = '/elige-camino';
 
   const EligeCaminoWidget({super.key});
 
-  /// true si aún no eligió camino y no es prestador ya marcado.
   static bool necesitaElegir() {
     final data = UserSession().datosCompletos;
     if (data == null) return false;
