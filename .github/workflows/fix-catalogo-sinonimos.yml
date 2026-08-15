@@ -1,0 +1,46 @@
+name: Fix catalogo oficios
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/fix-catalogo-sinonimos.yml'
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Restore catalog and add synonyms
+        run: |
+          set -e
+          # Restore last good catalog from before placeholder
+          git show e7e68560beb40853ac43ca74bb20ce051a28e640:lib/catalogo_oficios.dart > lib/catalogo_oficios.dart
+          python3 << 'PY'
+          from pathlib import Path
+          p = Path('lib/catalogo_oficios.dart')
+          c = p.read_text()
+          old = "        ['ceramicos', 'porcelanato', 'piso', 'azulejos']),"
+          new = "        ['ceramicos', 'ceramista', 'ceramica', 'porcelanato', 'piso', 'azulejos', 'azulejista']),"
+          if old not in c:
+              if 'ceramista' in c:
+                  print('already patched')
+              else:
+                  raise SystemExit('pattern not found')
+          else:
+              c = c.replace(old, new, 1)
+              p.write_text(c)
+              print('patched synonyms')
+          assert 'class CatalogoOficios' in c
+          assert len(c) > 10000
+          PY
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add lib/catalogo_oficios.dart
+          git commit -m "FIX: restore catalogo_oficios + sinonimos ceramista" || echo no changes
+          git push origin HEAD:main
