@@ -6,7 +6,7 @@ const _audioBase =
     'https://lifewalletpuelo.web.app/content/academia/audio';
 
 /// Cápsulas de educación financiera para el oficio.
-/// Orden: Módulo 1 (Mis Números) → tips de obra/ahorro.
+/// Orden: Módulo 1 (Mis Números) → Módulo 2 (tips) → Módulo 3 (Metas + Vencimientos).
 const catalogoLecciones = <Leccion>[
   // ─────────────────────────────────────────────
   // MÓDULO 1 — Control diario y semanal
@@ -291,6 +291,111 @@ Primero anotar. Después apartar. Después juntar para la herramienta.
 El préstamo es el último recurso, no el primero.
 
 Si llegás a esos 4 puntos con números claros en la app, ahí sí podés mirar opciones con más tranquilidad.
+''',
+  ),
+
+  // ─────────────────────────────────────────────
+  // MÓDULO 3 — Metas y vencimientos
+  // ─────────────────────────────────────────────
+  Leccion(
+    id: 'colchon_antes_sueno',
+    titulo: 'Primero el colchón, después el sueño',
+    resumen: 'El fondo de emergencia antes de la meta linda.',
+    minutos: 4,
+    tag: 'Metas',
+    audioUrl: '$_audioBase/colchon_antes_sueno.mp3',
+    cuerpo: '''
+Cuando arrancás a juntar plata, la tentación es ir de una a la meta linda: la herramienta nueva, las vacaciones, el local. El problema es que si no tenés un colchón, el primer bache te obliga a romper esa meta o a pedir plata cara.
+
+En Metas hay dos tipos de cosas:
+
+• Colchón (fondo de emergencia): plata para aguantar una semana o dos sin laburo, una rotura o un imprevisto. No es para gastar «porque sí».
+
+• Metas aspiracionales: lo que querés construir o comprar (taladro, moto, curso, etc.).
+
+La regla simple: primero armá un colchón chico. Después, con lo que sobra de cada semana, alimentá la meta del sueño.
+
+Si usás «Usar» del colchón, es porque hubo un golpe real. Después, la prioridad vuelve a ser reponerlo.
+
+Hacelo ahora
+Entrá a Mis números → Metas. Si no tenés colchón, crealo con un monto chico pero realista. El resto de las metas pueden esperar un poco.
+''',
+  ),
+  Leccion(
+    id: 'meta_que_se_pueda_tocar',
+    titulo: 'Una meta que se pueda tocar',
+    resumen: 'Nombre, monto y ritmo. Sin eso no es meta.',
+    minutos: 3,
+    tag: 'Metas',
+    audioUrl: '$_audioBase/meta_que_se_pueda_tocar.mp3',
+    cuerpo: '''
+«Quiero progresar» no es una meta. «Quiero un amoladora de 180 lucas en 12 semanas» sí lo es.
+
+Para que una meta funcione en el oficio:
+
+1. Nombre concreto (herramienta, repuesto, curso, arranque de stock).
+
+2. Monto (lo que realmente cuesta hoy, no «más o menos»).
+
+3. Ritmo (cuánto podés apartar por semana sin ahogar la casa).
+
+Cada vez que cobrás y te queda un resto, en vez de dejarlo en el bolsillo, lo pasás a la meta. Así la plata tiene destino antes de que se evapore en gastos chicos.
+
+Si la meta es una herramienta que te permite cobrar más o trabajar más rápido, conviene priorizarla: no es gusto, es inversión en el laburo.
+
+Hacelo ahora
+Creá una meta con nombre, monto y una fecha aproximada. La próxima vez que uses «Me saqué» o veas sobrante, pensá cuánto de eso puede ir a esa meta.
+''',
+  ),
+  Leccion(
+    id: 'vencimientos_que_no_se_ven',
+    titulo: 'Los vencimientos que no se ven',
+    resumen: 'Alquiler, monotributo, cuotas: que no te agarren desprevenido.',
+    minutos: 3,
+    tag: 'Vencimientos',
+    audioUrl: '$_audioBase/vencimientos_que_no_se_ven.mp3',
+    cuerpo: '''
+Alquiler, expensas, monotributo, tarjeta, la cuota de la herramienta, el seguro del auto de trabajo. Si no están anotados, aparecen de golpe y se comen el mes bueno.
+
+Vencimientos en la app sirve para una sola cosa: que no te agarren desprevenido.
+
+Anotá:
+• qué es,
+• cuánto es,
+• cuándo vence.
+
+Cuando llega la fecha, ya sabés que esa plata no era «sobrante»: estaba comprometida. Así evitás gastar de más a principio de mes y después andar a las apuradas.
+
+No hace falta cargar todo el universo el primer día. Empezá por los 3 o 4 que más te duelen cuando se te pasan.
+
+Hacelo ahora
+Entrá a Vencimientos y cargá al menos el próximo pago grande que tengas. El resto lo vas sumando de a uno.
+''',
+  ),
+  Leccion(
+    id: 'cuando_el_mes_aprieta',
+    titulo: 'Cuando el mes aprieta',
+    resumen: 'Qué tocar primero sin romper el negocio ni la casa.',
+    minutos: 4,
+    tag: 'Metas',
+    audioUrl: '$_audioBase/cuando_el_mes_aprieta.mp3',
+    cuerpo: '''
+Hay meses flojos. La pregunta no es «¿por qué me va mal?», sino «¿qué toco primero sin romper el negocio ni la casa?».
+
+Orden práctico:
+
+1. No dejes de anotar Cobré / Gasté / Me saqué. Sin números, cualquier ajuste es a ciegas.
+
+2. Revisá vencimientos de las próximas dos semanas: qué es ineludible y qué se puede negociar o postergar con tiempo.
+
+3. El colchón es el freno de mano, no el combustible. Si lo usás, anotalo y después priorizá reponerlo.
+
+4. Las metas aspiracionales se pausan, no se abandonan: bajás el aporte semanal a cero un tiempo, sin borrar la meta.
+
+Pedir un préstamo en un mes flojo, sin mirar Semana/Mes y sin colchón, suele empeorar el problema. Primero orden; después, si hace falta, crédito con números claros (como vimos en el módulo de préstamos).
+
+Hacelo ahora
+Mirá Hoy / Semana / Mes y la lista de vencimientos de las próximas dos semanas. Con eso solo ya sabés si el mes está justo o si hay margen.
 ''',
   ),
 ];
