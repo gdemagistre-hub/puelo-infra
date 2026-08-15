@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_session.dart';
 import 'catalogo_oficios.dart';
 import 'prestador_list_fields.dart';
+import 'Homepage.dart';
 
 class EspecialidadesLaboralesFlotanteWidget extends StatefulWidget {
   const EspecialidadesLaboralesFlotanteWidget({super.key});
@@ -215,7 +216,17 @@ class _EspecialidadesLaboralesFlotanteWidgetState
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context);
+        if (vacio) {
+          // Transición limpia: Home cliente fresco (sin modo prestador residual).
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (_) => const HomePageWidget(initialModoPrestador: false),
+            ),
+            (route) => false,
+          );
+        } else {
+          Navigator.pop(context);
+        }
       }
     } catch (e) {
       if (mounted) {
