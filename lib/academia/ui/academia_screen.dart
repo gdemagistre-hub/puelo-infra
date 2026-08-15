@@ -130,7 +130,8 @@ class _LeccionCard extends StatelessWidget {
       child: Material(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        elevation: 1,
+        elevation: 1.5,
+        shadowColor: Colors.black12,
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(16),
@@ -162,19 +163,19 @@ class _LeccionCard extends StatelessWidget {
                         children: [
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
+                              horizontal: 9,
+                              vertical: 3,
                             ),
                             decoration: BoxDecoration(
-                              color: AcademiaScreen._primary.withOpacity(0.12),
+                              color: AcademiaScreen._secondary.withOpacity(0.12),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
                               leccion.tag,
                               style: const TextStyle(
                                 fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: AcademiaScreen._primary,
+                                fontWeight: FontWeight.w800,
+                                color: AcademiaScreen._secondary,
                               ),
                             ),
                           ),
