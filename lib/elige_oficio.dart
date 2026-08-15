@@ -101,7 +101,6 @@ class _EligeOficioWidgetState extends State<EligeOficioWidget> {
         if (labelLibre != null && labelLibre.isNotEmpty) {
           patch['oficio_libre'] = labelLibre;
         } else {
-          // Si eligió del catálogo, limpiamos un libre previo.
           patch['oficio_libre'] = FieldValue.delete();
         }
 
@@ -368,9 +367,7 @@ class _EligeOficioWidgetState extends State<EligeOficioWidget> {
               ),
               const SizedBox(height: 12),
               Expanded(
-                child: buscando
-                    ? _buildSugerencias()
-                    : _buildAtajos(),
+                child: buscando ? _buildSugerencias() : _buildAtajos(),
               ),
               if (_saving)
                 const Padding(
@@ -428,10 +425,11 @@ class _EligeOficioWidgetState extends State<EligeOficioWidget> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Probá con otras palabras o tocá un atajo abajo.\n'
+                'Probá con otras palabras o tocá un atajo.\n'
                 'Si no aparece, usá “No está en la lista”.',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8), height: 1.35),
+                style: TextStyle(
+                    fontSize: 13, color: Color(0xFF94A3B8), height: 1.35),
               ),
               const SizedBox(height: 16),
               TextButton(
@@ -469,7 +467,8 @@ class _EligeOficioWidgetState extends State<EligeOficioWidget> {
             onTap: _saving ? null : () => _guardarYSeguir(esp.id),
             borderRadius: BorderRadius.circular(14),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
