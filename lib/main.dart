@@ -12,6 +12,7 @@ import 'splashScreen.dart';
 import 'loginScreen.dart';
 import 'Homepage.dart';
 import 'elige_camino.dart';
+import 'elige_oficio.dart';
 import 'registroTrabajador.dart';
 import 'buscadorPrestadores.dart';
 import 'tarjetaDigital.dart';
@@ -59,6 +60,7 @@ class MyApp extends StatelessWidget {
         LoginScreenWidget.routePath: (context) => const LoginScreenWidget(),
         HomePageWidget.routePath: (context) => const HomePageWidget(),
         EligeCaminoWidget.routePath: (context) => const EligeCaminoWidget(),
+        EligeOficioWidget.routePath: (context) => const EligeOficioWidget(),
         RegistroTrabajadorWidget.routePath: (context) =>
             const RegistroTrabajadorWidget(),
         BuscadorPrestadoresWidget.routePath: (context) =>
