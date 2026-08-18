@@ -3,6 +3,7 @@ rules_version = '2';
 // 2026-08-14: Mis números DB única.
 // 2026-08-14: Mensajes M1 conversaciones/eventos append-only (write CF only).
 // 2026-08-14: fiados (Me deben) subcolección owner-only.
+// 2026-08-18: Phase 1 scoring_features (Vertex export, admin only).
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -195,6 +196,12 @@ service cloud.firestore {
         allow read: if isParentParticipant() || isAdmin();
         allow create, update, delete: if false;
       }
+    }
+
+    // Phase 1: feature vectors for Vertex (admin / batch only)
+    match /scoring_features/{uid} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
     }
 
     match /{document=**} {
