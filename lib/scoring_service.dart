@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// Scoring Puelo v1.1-phase0 — scorecard por capas (sin ML).
+import 'scoring_features.dart';
+
+/// Scoring Puelo v1.2-phase1 — scorecard por capas + export features Vertex.
 ///
 /// Capas:
 ///   A) score_identidad      — confianza de perfil (visible)
@@ -24,7 +26,7 @@ class ScoringService {
   static final _db = FirebaseFirestore.instance;
 
   /// Versión del modelo documentada (changelog en commits).
-  static const String modelVersion = 'v1.1-phase0';
+  static const String modelVersion = 'v1.2-phase1';
 
   /// Techo raw de identidad para normalizar a 0–100.
   static const int techoIdentidad = 55; // +5 por capacitaciones
@@ -1301,6 +1303,60 @@ class ScoringService {
               'list_score_servicio': servicio.score,
               'list_score_comportamiento': comportamiento.score,
               'list_badge': badge,
+              // Phase 1: flat features on user (export / Vertex offline)
+              'features_v1': ScoringFeatures.build(
+                userData: data,
+                layerScores: {
+                  'identidad': identidad.score,
+                  'servicio': servicio.score,
+                  'cliente': cliente.score,
+                  'comportamiento': comportamiento.score,
+                  'creditoPreview': creditoPreview,
+                },
+                counts: {
+                  'fotosPortfolio': fp,
+                  'fotosClientes': fc,
+                  'nEvalTrabajo': servicio.nEventos,
+                  'nEvalCliente': cliente.nEventos,
+                  'nEvalConFoto': servicio.nConFoto,
+                  'nValidaciones6m': idsVal.length,
+                  'validadoresConCalif': validadoresConCalif,
+                  'ratingPromedio': servicio.ratingPromedio ?? 0,
+                },
+                badge: badge,
+              ),
+            },
+            SetOptions(merge: true),
+          );
+
+          // Colección dedicada para export Vertex (admin batch)
+          batch.set(
+            _db.collection('scoring_features').doc(uid),
+            {
+              ...ScoringFeatures.exportDoc(
+                uid: uid,
+                userData: data,
+                layerScores: {
+                  'identidad': identidad.score,
+                  'servicio': servicio.score,
+                  'cliente': cliente.score,
+                  'comportamiento': comportamiento.score,
+                  'creditoPreview': creditoPreview,
+                },
+                counts: {
+                  'fotosPortfolio': fp,
+                  'fotosClientes': fc,
+                  'nEvalTrabajo': servicio.nEventos,
+                  'nEvalCliente': cliente.nEventos,
+                  'nEvalConFoto': servicio.nConFoto,
+                  'nValidaciones6m': idsVal.length,
+                  'validadoresConCalif': validadoresConCalif,
+                  'ratingPromedio': servicio.ratingPromedio ?? 0,
+                },
+                badge: badge,
+                runId: runId,
+              ),
+              'exported_at': FieldValue.serverTimestamp(),
             },
             SetOptions(merge: true),
           );
