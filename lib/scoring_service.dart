@@ -1718,7 +1718,6 @@ class ScoringService {
     }
     return null;
   }
-}
 
   // ---------------------------------------------------------------------------
   // STATS NEGOCIO (denormalizado desde Mis Números — solo conteos)
@@ -1762,6 +1761,9 @@ class ScoringService {
       print('ScoringService.actualizarStatsNegocio: $e');
     }
   }
+
+
+}
 
 
 class ScoreResult {
