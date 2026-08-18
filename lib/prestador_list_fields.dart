@@ -52,9 +52,11 @@ class PrestadorListFields {
     final scoring = data['scoring'];
     int? scoreServicio;
     int? scoreIdentidad;
+    int? scoreComportamiento;
     if (scoring is Map) {
       scoreServicio = (scoring['score_servicio'] as num?)?.toInt();
       scoreIdentidad = (scoring['score_identidad'] as num?)?.toInt();
+      scoreComportamiento = (scoring['score_comportamiento'] as num?)?.toInt();
     }
 
     final cobertura = data['zonas_cobertura'] as Map<String, dynamic>?;
@@ -75,6 +77,7 @@ class PrestadorListFields {
       'list_n_eval': data['cantidadEvaluadores'],
       'list_score_servicio': scoreServicio,
       'list_score_identidad': scoreIdentidad,
+      'list_score_comportamiento': scoreComportamiento,
       'list_visible': visible,
       'es_trabajador': data['es_trabajador'] == true || profesiones.isNotEmpty,
     };
