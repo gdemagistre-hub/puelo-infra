@@ -1,0 +1,21 @@
+name: Restore Homepage tips
+on:
+  workflow_dispatch:
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 40
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Restore Homepage from good commit and patch tips
+        run: |
+          git checkout bd5d04aeea9c83675003777cb6e872bae649c52d -- lib/Homepage.dart
+          python3 scripts/patch_homepage_tips.py
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add lib/Homepage.dart scripts/patch_homepage_tips.py
+          git status
+          git commit -m "feat(home): tips Confianza grisados en sesion al volver" || echo "no changes"
+          git push
