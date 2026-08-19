@@ -115,7 +115,25 @@ class UserSession {
 
         Map<String, dynamic> data;
         if (doc.exists && doc.data() != null) {
-          data = doc.data()!;
+          data = Map<String, dynamic>.from(doc.data()!);
+          // Si el doc no tiene foto, usar la de Google Auth (no pisar selfie).
+          final fp = (data['url_foto_perfil'] ?? data['foto_perfil'] ?? '')
+              .toString()
+              .trim();
+          if (fp.isEmpty && (user.photoURL ?? '').trim().isNotEmpty) {
+            data['url_foto_perfil'] = user.photoURL!.trim();
+            data['foto_perfil_origen'] = data['foto_perfil_origen'] ?? 'google';
+            try {
+              await FirebaseFirestore.instance
+                  .collection('usuarios')
+                  .doc(user.uid)
+                  .set({
+                'url_foto_perfil': user.photoURL!.trim(),
+                'foto_perfil_origen': 'google',
+                'updated_at': FieldValue.serverTimestamp(),
+              }, SetOptions(merge: true));
+            } catch (_) {}
+          }
         } else {
           // Perfil mínimo si Auth existe pero falta el doc (race / borrado).
           final display = (user.displayName ?? '').trim();

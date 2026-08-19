@@ -6,6 +6,7 @@ import 'menuEvaluaciones.dart';
 import 'menuPerfilOpciones.dart';
 import 'tarjetaDigital.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -76,7 +77,15 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   void initState() {
     super.initState();
     _detectarRol();
-    final foto = (UserSession().datosCompletos?['url_foto_perfil'] ?? UserSession().datosCompletos?['foto_perfil'] ?? '').toString().trim();
+    var foto = (UserSession().datosCompletos?['url_foto_perfil'] ??
+            UserSession().datosCompletos?['foto_perfil'] ??
+            '')
+        .toString()
+        .trim();
+    if (foto.isEmpty) {
+      final authPhoto = FirebaseAuth.instance.currentUser?.photoURL?.trim() ?? '';
+      if (authPhoto.isNotEmpty) foto = authPhoto;
+    }
     if (foto.isNotEmpty) _urlFotoPerfil = foto;
     // FCM: registra token si hay Auth real (Google). Dev dropdown no tiene token Auth → no-op seguro.
     FcmService.instance.ensureStarted();
@@ -220,13 +229,46 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     return Container(
       width: 44,
       height: 44,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Colors.white,
         shape: BoxShape.circle,
-        image: hasFoto ? DecorationImage(image: NetworkImage(_urlFotoPerfil!), fit: BoxFit.cover) : null,
       ),
+      clipBehavior: Clip.antiAlias,
       alignment: Alignment.center,
-      child: hasFoto ? null : Text(_getInitials(), style: TextStyle(color: primaryColor, fontWeight: FontWeight.w800, fontSize: 15)),
+      child: hasFoto
+          ? Image.network(
+              _urlFotoPerfil!,
+              width: 44,
+              height: 44,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Text(
+                _getInitials(),
+                style: TextStyle(
+                  color: primaryColor,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                ),
+              ),
+              loadingBuilder: (context, child, progress) {
+                if (progress == null) return child;
+                return Text(
+                  _getInitials(),
+                  style: TextStyle(
+                    color: primaryColor,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                  ),
+                );
+              },
+            )
+          : Text(
+              _getInitials(),
+              style: TextStyle(
+                color: primaryColor,
+                fontWeight: FontWeight.w800,
+                fontSize: 15,
+              ),
+            ),
     );
   }
 
