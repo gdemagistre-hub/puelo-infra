@@ -1,19 +1,16 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:google_sign_in/google_sign_in.dart';
 
 import 'user_session.dart';
-import 'analytics/prox_analytics.dart';
 
-/// Autenticación real (Google ahora; Facebook / Apple después).
+/// Auth real (Google primero; FB/Apple placeholders).
 ///
 /// Flujo:
-/// 1) Provider → Firebase Auth
+/// 1) Sign-in con provider → Firebase Auth
 /// 2) Asegura doc `usuarios/{uid}` (crea o merge de campos auth)
-/// 3) Carga [UserSession]
-///
-/// El login por dropdown (impersonación) NO pasa por aquí.
+/// 3) Carga sesión en [UserSession]
 class AuthService {
   AuthService._();
   static final AuthService instance = AuthService._();
@@ -21,28 +18,21 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  User? get currentUser => _auth.currentUser;
-
-  /// true si hay sesión Firebase Auth (no impersonación dev).
-  bool get hasFirebaseAuth => currentUser != null;
-
-  /// Datos que expone Firebase Auth / Google (referencia).
+  /// Snapshot liviano del usuario Auth (para claims / debug).
   ///
-  /// Desde [User]:
+  /// Campos útiles:
   /// - uid, email, displayName, photoURL, emailVerified
-  /// - phoneNumber (casi siempre null con Google)
   /// - metadata.creationTime / lastSignInTime
   /// - providerData[] (providerId, uid, email, displayName, photoURL)
-  ///
-  /// No entrega: DNI, teléfono verificado, domicilio, oficios, zona.
-  static Map<String, dynamic> snapshotFromUser(User user) {
+  Map<String, dynamic>? authUserSnapshot() {
+    final user = _auth.currentUser;
+    if (user == null) return null;
     return {
       'uid': user.uid,
       'email': user.email,
       'displayName': user.displayName,
       'photoURL': user.photoURL,
       'emailVerified': user.emailVerified,
-      'phoneNumber': user.phoneNumber,
       'providers': user.providerData
           .map((p) => {
                 'providerId': p.providerId,
@@ -55,20 +45,8 @@ class AuthService {
     };
   }
 
-  /// Google Sign-In → perfil Firestore → UserSession.
   Future<void> signInWithGoogle() async {
-    // Escritorio nativo: sin flujo estable aún (usar web o modo prueba).
-    if (!kIsWeb &&
-        (defaultTargetPlatform == TargetPlatform.windows ||
-            defaultTargetPlatform == TargetPlatform.linux ||
-            defaultTargetPlatform == TargetPlatform.macOS)) {
-      throw UnsupportedError(
-        'Iniciar con Google en escritorio se habilita en una etapa siguiente. '
-        'Usá la versión web o el menú Modo prueba (equipo).',
-      );
-    }
-
-    final UserCredential cred;
+    UserCredential cred;
     if (kIsWeb) {
       final provider = GoogleAuthProvider();
       provider.addScope('email');
@@ -91,40 +69,24 @@ class AuthService {
 
     final user = cred.user;
     if (user == null) {
-      throw StateError('Google Auth no devolvió usuario');
+      throw StateError('Google sign-in sin user');
     }
 
-    debugPrint('Google user: ${snapshotFromUser(user)}');
-
-    final data = await ensureUserProfile(
-      user,
-      providerId: 'google',
-    );
+    final data = await ensureUserProfile(user, providerId: 'google');
     UserSession().iniciarSesion(
       user.uid,
       data,
       authProvider: 'google',
       isDevImpersonation: false,
     );
-
-    final esPrestador =
-        data['es_trabajador'] == true || data['rol'] == 'trabajador';
-    try {
-      ProxAnalytics.instance.startSession(
-        role: esPrestador ? 'prestador' : 'cliente',
-      );
-      ProxAnalytics.instance.action('login_google', screen: '/login');
-    } catch (_) {}
   }
 
-  /// Placeholder para el mismo patrón con Facebook.
   Future<void> signInWithFacebook() async {
     throw UnimplementedError(
       'Facebook Auth se habilita en una etapa siguiente (mismo patrón que Google).',
     );
   }
 
-  /// Placeholder para el mismo patrón con Apple.
   Future<void> signInWithApple() async {
     throw UnimplementedError(
       'Apple Auth se habilita en una etapa siguiente (mismo patrón que Google).',
@@ -133,9 +95,9 @@ class AuthService {
 
   /// Crea o actualiza `usuarios/{uid}` con datos del provider.
   ///
-  /// En cada login con Google sincronizamos nombre/apellido/foto/email del
-  /// provider (no solo si el campo estaba vacío), para no quedar con un doc
-  /// viejo a medias.
+  /// En cada login con Google sincronizamos nombre/apellido/email.
+  /// La foto de perfil solo se seed-ea si el usuario aún no tiene una
+  /// (no pisamos selfie subida a Storage).
   Future<Map<String, dynamic>> ensureUserProfile(
     User user, {
     required String providerId,
@@ -184,6 +146,7 @@ class AuthService {
         'apellido': apellido,
         'email': email,
         if (photo.isNotEmpty) 'url_foto_perfil': photo,
+        if (photo.isNotEmpty) 'foto_perfil_origen': 'google',
         'auth_provider': providerId,
         'auth_uid': user.uid,
         'es_trabajador': false,
@@ -203,11 +166,24 @@ class AuthService {
       'updated_at': FieldValue.serverTimestamp(),
     };
 
-    // Siempre refrescar identidad desde Google si viene dato.
+    // Identidad desde Google: nombre/email sí; foto NO si el usuario ya
+    // cargó selfie propia (Storage). Solo seed si aún no hay foto.
     if (nombre.isNotEmpty) patch['nombre'] = nombre;
     if (apellido.isNotEmpty) patch['apellido'] = apellido;
     if (email.isNotEmpty) patch['email'] = email;
-    if (photo.isNotEmpty) patch['url_foto_perfil'] = photo;
+    final existingPhoto = (existing['url_foto_perfil'] ??
+            existing['foto_perfil'] ??
+            '')
+        .toString()
+        .trim();
+    final esSelfiePropia = existingPhoto.contains('/usuarios/') &&
+        existingPhoto.contains('foto_perfil');
+    if (existingPhoto.isEmpty && photo.isNotEmpty) {
+      patch['url_foto_perfil'] = photo;
+      patch['foto_perfil_origen'] = 'google';
+    } else if (esSelfiePropia) {
+      // Conservar selfie; no tocar url_foto_perfil.
+    }
 
     final estado = (existing['estado'] ?? '').toString();
     if (estado == 'pendiente_validacion' || estado.isEmpty) {
@@ -240,5 +216,5 @@ class AuthService {
 /// El usuario cerró el selector de Google sin completar.
 class AuthCancelledException implements Exception {
   @override
-  String toString() => 'Inicio de sesión cancelado';
+  String toString() => 'AuthCancelledException';
 }
