@@ -1071,12 +1071,15 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                   ),
                   const SizedBox(height: 12),
                   ...recos.map((r) {
+                    final visitado = _tipsVisitadosSesion.contains(r.id);
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 8),
-                      child: Material(
-                        color: Colors.white,
+                      child: Opacity(
+                        opacity: visitado ? 0.55 : 1,
+                        child: Material(
+                        color: visitado ? const Color(0xFFF1F5F9) : Colors.white,
                         borderRadius: BorderRadius.circular(14),
-                        elevation: 1,
+                        elevation: visitado ? 0 : 1,
                         child: InkWell(
                           onTap: () => _ejecutarTip(r),
                           borderRadius: BorderRadius.circular(14),
@@ -1114,11 +1117,15 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                                     ],
                                   ),
                                 ),
-                                Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
+                                Icon(
+                                  visitado ? Icons.check_circle_outline_rounded : Icons.chevron_right_rounded,
+                                  color: visitado ? const Color(0xFF94A3B8) : Colors.grey.shade400,
+                                ),
                               ],
                             ),
                           ),
                         ),
+                      ),
                       ),
                     );
                   }),
