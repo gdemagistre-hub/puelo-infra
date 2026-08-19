@@ -4,6 +4,7 @@ rules_version = '2';
 // 2026-08-14: Mensajes M1 conversaciones/eventos append-only (write CF only).
 // 2026-08-14: fiados (Me deben) subcolección owner-only.
 // 2026-08-18: Phase 1 scoring_features (Vertex export, admin only).
+// 2026-08-18: stats write admin (batch lock scoring_job + runs).
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -78,12 +79,13 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // stats: scoring_job lock/runs + agregados — solo admin
     match /stats/{doc} {
       allow read: if isAdmin();
-      allow write: if false;
+      allow write: if isAdmin();
       match /{document=**} {
         allow read: if isAdmin();
-        allow write: if false;
+        allow write: if isAdmin();
       }
     }
 
