@@ -230,9 +230,72 @@ class ScoringService {
     return 'bajo';
   }
   static String labelNivel(String? nivel) => nivel ?? 'Sin datos';
-  static String labelBadge(String? badge) => badge ?? '';
-  static String explicacionBadge(String? badge) => '';
-  static ColorBadge coloresBadge(String? badge) => const ColorBadge(0xFF94A3B8, 0xFFF8FAFC);
+
+  /// Etiqueta legible para UI (nunca mostrar el id crudo).
+  static String labelBadge(String? badge) {
+    switch ((badge ?? '').toLowerCase().trim()) {
+      case 'nuevo':
+        return 'Nuevo';
+      case 'registrado':
+        return 'Registrado';
+      case 'bronce':
+        return 'Bronce';
+      case 'bronce_plus':
+        return 'Bronce Plus';
+      case 'plata':
+        return 'Plata';
+      case 'oro':
+        return 'Oro';
+      case '':
+        return 'Sin nivel aún';
+      default:
+        return badge!
+            .split('_')
+            .where((p) => p.isNotEmpty)
+            .map((p) => '${p[0].toUpperCase()}${p.substring(1)}')
+            .join(' ');
+    }
+  }
+
+  static String explicacionBadge(String? badge) {
+    switch ((badge ?? '').toLowerCase().trim()) {
+      case 'nuevo':
+        return 'Acabás de empezar · completá tu perfil';
+      case 'registrado':
+        return 'Datos básicos cargados · validá tu DNI para subir';
+      case 'bronce':
+        return 'Perfil sólido · seguí sumando validaciones';
+      case 'bronce_plus':
+        return 'Identidad validada · los clientes te ven con más confianza';
+      case 'plata':
+        return 'Trayectoria comprobada · alto nivel de confianza';
+      case 'oro':
+        return 'Referente de confianza en tu zona';
+      default:
+        return '';
+    }
+  }
+
+  /// foreground = texto, background = chip/fondo suave.
+  static ColorBadge coloresBadge(String? badge) {
+    switch ((badge ?? '').toLowerCase().trim()) {
+      case 'nuevo':
+        return const ColorBadge(0xFF64748B, 0xFFF1F5F9);
+      case 'registrado':
+        return const ColorBadge(0xFF0284C7, 0xFFE0F2FE);
+      case 'bronce':
+        return const ColorBadge(0xFF9A6B2F, 0xFFF5E6D3);
+      case 'bronce_plus':
+        return const ColorBadge(0xFF8B6914, 0xFFF0E6C8);
+      case 'plata':
+        return const ColorBadge(0xFF475569, 0xFFE2E8F0);
+      case 'oro':
+        return const ColorBadge(0xFFA16207, 0xFFFEF3C7);
+      default:
+        return const ColorBadge(0xFF94A3B8, 0xFFF8FAFC);
+    }
+  }
+
   static List<Map<String, String>> generarConsejosConfianza(Map<String, dynamic> data, {int fotosPortfolio = 0}) => [];
   static Future<void> actualizarStatsNegocio({required String uid, int? nMovimientos, int? nCobros, int? nFiadosCobrados, int? nFiadosPendientes, bool? tieneFondoEmergencia}) async {}
 }
