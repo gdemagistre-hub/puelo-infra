@@ -19,11 +19,6 @@ class AuthService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   /// Snapshot liviano del usuario Auth (para claims / debug).
-  ///
-  /// Campos útiles:
-  /// - uid, email, displayName, photoURL, emailVerified
-  /// - metadata.creationTime / lastSignInTime
-  /// - providerData[] (providerId, uid, email, displayName, photoURL)
   Map<String, dynamic>? authUserSnapshot() {
     final user = _auth.currentUser;
     if (user == null) return null;
@@ -95,9 +90,9 @@ class AuthService {
 
   /// Crea o actualiza `usuarios/{uid}` con datos del provider.
   ///
-  /// En cada login con Google sincronizamos nombre/apellido/email.
-  /// La foto de perfil solo se seed-ea si el usuario aún no tiene una
-  /// (no pisamos selfie subida a Storage).
+  /// Nombre/apellido/email se sincronizan desde Google.
+  /// Foto: no se pisa una selfie de Storage; si no hay foto se seed-ea
+  /// desde Google (login y restore).
   Future<Map<String, dynamic>> ensureUserProfile(
     User user, {
     required String providerId,
@@ -116,7 +111,6 @@ class AuthService {
       }
     }
 
-    // Preferir displayName del providerData de Google si viene más completo.
     for (final p in user.providerData) {
       if (p.providerId == 'google.com' &&
           (p.displayName ?? '').trim().isNotEmpty) {
@@ -166,8 +160,6 @@ class AuthService {
       'updated_at': FieldValue.serverTimestamp(),
     };
 
-    // Identidad desde Google: nombre/email sí; foto NO si el usuario ya
-    // cargó selfie propia (Storage). Solo seed si aún no hay foto.
     if (nombre.isNotEmpty) patch['nombre'] = nombre;
     if (apellido.isNotEmpty) patch['apellido'] = apellido;
     if (email.isNotEmpty) patch['email'] = email;
@@ -192,10 +184,26 @@ class AuthService {
 
     await ref.set(patch, SetOptions(merge: true));
     final updated = await ref.get();
-    return Map<String, dynamic>.from(updated.data() ?? {...existing, ...patch});
+    final out = Map<String, dynamic>.from(updated.data() ?? {...existing, ...patch});
+    // Fallback de sesión: si Firestore quedó sin foto, usar photoURL de Google
+    // para esta sesión (y persistir seed si aplica).
+    final outPhoto = (out['url_foto_perfil'] ?? out['foto_perfil'] ?? '')
+        .toString()
+        .trim();
+    if (outPhoto.isEmpty && photo.isNotEmpty) {
+      out['url_foto_perfil'] = photo;
+      out['foto_perfil_origen'] = 'google';
+      try {
+        await ref.set({
+          'url_foto_perfil': photo,
+          'foto_perfil_origen': 'google',
+          'updated_at': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } catch (_) {}
+    }
+    return out;
   }
 
-  /// Cierra Firebase Auth + Google Sign-In (si aplica) + UserSession.
   Future<void> signOut() async {
     try {
       if (!kIsWeb) {
@@ -213,7 +221,6 @@ class AuthService {
   }
 }
 
-/// El usuario cerró el selector de Google sin completar.
 class AuthCancelledException implements Exception {
   @override
   String toString() => 'AuthCancelledException';
