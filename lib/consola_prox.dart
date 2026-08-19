@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import 'scoring_service.dart';
 import 'user_session.dart';
 
 /// Consola de monitoreo Prox.
@@ -48,6 +49,10 @@ class _ConsolaProxWidgetState extends State<ConsolaProxWidget> {
   int _sessionStarts = 0;
   int _sessionEnds = 0;
 
+  // Scoring batch (Phase 1)
+  bool _batchRunning = false;
+  String? _batchMsg;
+
   @override
   void initState() {
     super.initState();
@@ -72,8 +77,6 @@ class _ConsolaProxWidgetState extends State<ConsolaProxWidget> {
     });
 
     try {
-      // Muestra acotada: últimos 400 eventos (costo controlado).
-      // Ideal: Cloud Function agrega a stats/prox_* y la consola solo lee stats.
       final snap = await FirebaseFirestore.instance
           .collection('analytics_events')
           .orderBy('client_ts', descending: true)
@@ -164,6 +167,42 @@ class _ConsolaProxWidgetState extends State<ConsolaProxWidget> {
     return (values.reduce((a, b) => a + b) / values.length).round();
   }
 
+  Future<void> _runScoringBatch({bool force = false}) async {
+    if (_batchRunning) return;
+    setState(() {
+      _batchRunning = true;
+      _batchMsg = null;
+    });
+    try {
+      final r = await ScoringService.ejecutarBatchDiario(
+        trigger: 'manual_admin',
+        force: force,
+      );
+      final msg =
+          'Scoring ${r.status}: ${r.actualizados}/${r.procesados} usuarios · '
+          'run ${r.runId}'
+          '${r.errores.isEmpty ? '' : ' · errores: ${r.errores.length}'}';
+      if (!mounted) return;
+      setState(() => _batchMsg = msg);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          duration: const Duration(seconds: 6),
+        ),
+      );
+    } catch (e) {
+      final msg = 'Batch falló: $e';
+      if (!mounted) return;
+      setState(() => _batchMsg = msg);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), backgroundColor: Colors.red.shade700),
+      );
+      debugPrint('ConsolaProx batch: $e');
+    } finally {
+      if (mounted) setState(() => _batchRunning = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -215,6 +254,8 @@ class _ConsolaProxWidgetState extends State<ConsolaProxWidget> {
                         children: [
                           _bannerSeguridad(),
                           const SizedBox(height: 12),
+                          _scoringBatchCard(),
+                          const SizedBox(height: 12),
                           _kpiRow(),
                           const SizedBox(height: 20),
                           _sectionTitle('Demora de carga (p95 / avg ms)'),
@@ -223,7 +264,7 @@ class _ConsolaProxWidgetState extends State<ConsolaProxWidget> {
                           _sectionTitle('Tiempo en pantalla (avg dwell ms)'),
                           _dwellTable(),
                           const SizedBox(height: 20),
-                          _sectionTitle('Última pantalla antes de abandonar'),
+                          _sectionTitle('Ultima pantalla antes de abandonar'),
                           _rankingMap(_lastScreenCounts),
                           const SizedBox(height: 20),
                           _sectionTitle('Vistas por pantalla'),
@@ -252,6 +293,83 @@ class _ConsolaProxWidgetState extends State<ConsolaProxWidget> {
     );
   }
 
+  Widget _scoringBatchCard() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF28B5CD).withOpacity(0.35)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Scoring batch',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+              color: Color(0xFF1E293B),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Recalcula badges, scores y exporta features_v1 a la '
+            'coleccion scoring_features (Phase 1 / Vertex). '
+            'Solo admin. Puede tardar 1-3 min.',
+            style: TextStyle(fontSize: 12, height: 1.35, color: Colors.grey.shade700),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _batchRunning ? null : () => _runScoringBatch(),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF28B5CD),
+                    foregroundColor: Colors.white,
+                  ),
+                  icon: _batchRunning
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.play_arrow_rounded, size: 20),
+                  label: Text(
+                    _batchRunning ? 'Corriendo...' : 'Correr scoring 1x',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton(
+                onPressed:
+                    _batchRunning ? null : () => _runScoringBatch(force: true),
+                child: const Text('Force'),
+              ),
+            ],
+          ),
+          if (_batchMsg != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              _batchMsg!,
+              style: TextStyle(fontSize: 11, color: Colors.grey.shade800),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _bannerSeguridad() {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -262,7 +380,7 @@ class _ConsolaProxWidgetState extends State<ConsolaProxWidget> {
       ),
       child: const Text(
         'Solo administradores. Los eventos no guardan nombre, email, '
-        'teléfono ni documento. Aplicá firestore.rules en el proyecto '
+        'telefono ni documento. Aplica firestore.rules en el proyecto '
         'para bloquear lecturas a usuarios no admin.',
         style: TextStyle(fontSize: 12, height: 1.35, color: Color(0xFF9A3412)),
       ),
