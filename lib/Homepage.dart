@@ -1078,7 +1078,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                         borderRadius: BorderRadius.circular(14),
                         elevation: 1,
                         child: InkWell(
-                          onTap: r.onTap,
+                          onTap: () => _ejecutarTip(r),
                           borderRadius: BorderRadius.circular(14),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
