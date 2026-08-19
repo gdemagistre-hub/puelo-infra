@@ -5,20 +5,12 @@ import 'scoring_service.dart';
 import 'user_session.dart';
 
 /// Consola de monitoreo Prox.
-///
-/// Seguridad:
-/// - Solo entra si `UserSession.datosCompletos['es_admin'] == true`.
-/// - No muestra PII (nombres, teléfonos, emails).
-/// - Lectura acotada (últimos eventos, límite duro).
-/// - Las reglas de Firestore deben denegar lectura de analytics a no-admin
-///   cuando exista Firebase Auth + claim/campo admin verificado en servidor.
 class ConsolaProxWidget extends StatefulWidget {
   const ConsolaProxWidget({super.key});
 
   static const String routeName = 'ConsolaProx';
   static const String routePath = '/consolaProx';
 
-  /// Gate client-side. Complementar siempre con reglas Firestore.
   static bool get puedeAcceder {
     final data = UserSession().datosCompletos;
     if (data == null) return false;
@@ -39,7 +31,6 @@ class _ConsolaProxWidgetState extends State<ConsolaProxWidget> {
   String? _error;
   List<QueryDocumentSnapshot> _events = [];
 
-  // Agregados en cliente sobre la muestra reciente (no es warehouse).
   final Map<String, int> _viewsByScreen = {};
   final Map<String, List<int>> _loadMsByScreen = {};
   final Map<String, List<int>> _dwellMsByScreen = {};
@@ -49,7 +40,6 @@ class _ConsolaProxWidgetState extends State<ConsolaProxWidget> {
   int _sessionStarts = 0;
   int _sessionEnds = 0;
 
-  // Scoring batch (Phase 1)
   bool _batchRunning = false;
   String? _batchMsg;
 
@@ -92,8 +82,8 @@ class _ConsolaProxWidgetState extends State<ConsolaProxWidget> {
         setState(() {
           _loading = false;
           _error =
-              'No se pudieron leer eventos. Verificá reglas Firestore e índice '
-              'en client_ts. Detalle técnico solo en logs de admin.';
+              'No se pudieron leer eventos. Verifica reglas Firestore e indice '
+              'en client_ts.';
         });
       }
       debugPrint('ConsolaProx load error: $e');
@@ -178,20 +168,20 @@ class _ConsolaProxWidgetState extends State<ConsolaProxWidget> {
         trigger: 'manual_admin',
         force: force,
       );
+      final detail = r.errores.isEmpty ? '' : ' | ${r.errores.first}';
       final msg =
-          'Scoring ${r.status}: ${r.actualizados}/${r.procesados} usuarios · '
-          'run ${r.runId}'
-          '${r.errores.isEmpty ? '' : ' · errores: ${r.errores.length}'}';
+          'Scoring ${r.status}: ${r.actualizados}/${r.procesados} usuarios | '
+          'run ${r.runId}$detail';
       if (!mounted) return;
       setState(() => _batchMsg = msg);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(msg),
-          duration: const Duration(seconds: 6),
+          duration: const Duration(seconds: 10),
         ),
       );
     } catch (e) {
-      final msg = 'Batch falló: $e';
+      final msg = 'Batch fallo: $e';
       if (!mounted) return;
       setState(() => _batchMsg = msg);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -279,8 +269,7 @@ class _ConsolaProxWidgetState extends State<ConsolaProxWidget> {
                               : _rankingMap(_errorsByScreen),
                           const SizedBox(height: 20),
                           Text(
-                            'Muestra: ${_events.length} eventos recientes. '
-                            'No incluye datos personales.',
+                            'Muestra: ${_events.length} eventos recientes.',
                             style: TextStyle(
                               fontSize: 11,
                               color: Colors.grey.shade600,
@@ -320,9 +309,7 @@ class _ConsolaProxWidgetState extends State<ConsolaProxWidget> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Recalcula badges, scores y exporta features_v1 a la '
-            'coleccion scoring_features (Phase 1 / Vertex). '
-            'Solo admin. Puede tardar 1-3 min.',
+            'Recalcula badges, scores y exporta features_v1. Solo admin.',
             style: TextStyle(fontSize: 12, height: 1.35, color: Colors.grey.shade700),
           ),
           const SizedBox(height: 12),
@@ -360,7 +347,7 @@ class _ConsolaProxWidgetState extends State<ConsolaProxWidget> {
           ),
           if (_batchMsg != null) ...[
             const SizedBox(height: 10),
-            Text(
+            SelectableText(
               _batchMsg!,
               style: TextStyle(fontSize: 11, color: Colors.grey.shade800),
             ),
@@ -379,9 +366,7 @@ class _ConsolaProxWidgetState extends State<ConsolaProxWidget> {
         border: Border.all(color: const Color(0xFFFDBA74)),
       ),
       child: const Text(
-        'Solo administradores. Los eventos no guardan nombre, email, '
-        'telefono ni documento. Aplica firestore.rules en el proyecto '
-        'para bloquear lecturas a usuarios no admin.',
+        'Solo administradores.',
         style: TextStyle(fontSize: 12, height: 1.35, color: Color(0xFF9A3412)),
       ),
     );
@@ -449,7 +434,7 @@ class _ConsolaProxWidgetState extends State<ConsolaProxWidget> {
       );
 
   Widget _timingTable() {
-    if (_loadMsByScreen.isEmpty) return _empty('Sin timings aún');
+    if (_loadMsByScreen.isEmpty) return _empty('Sin timings aun');
     final keys = _loadMsByScreen.keys.toList()
       ..sort((a, b) =>
           (_p95(_loadMsByScreen[b]!) ?? 0)
@@ -466,7 +451,7 @@ class _ConsolaProxWidgetState extends State<ConsolaProxWidget> {
   }
 
   Widget _dwellTable() {
-    if (_dwellMsByScreen.isEmpty) return _empty('Sin dwell aún');
+    if (_dwellMsByScreen.isEmpty) return _empty('Sin dwell aun');
     final keys = _dwellMsByScreen.keys.toList()
       ..sort((a, b) =>
           (_avg(_dwellMsByScreen[b]!) ?? 0)
