@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Paso del tour contextual sobre el Home (estilo coach-mark clásico).
+/// Paso del tour contextual sobre el Home (estilo coach-mark clásico Uber/eBay).
 class HomeTourStep {
   final String title;
   final String body;
@@ -18,7 +18,7 @@ class HomeTourStep {
   });
 }
 
-/// Copy alineado a las pantallas de ayuda (prestador / cliente).
+/// Copy alineado a las pantallas de ayuda (PDF) + tono clásico de onboarding.
 List<HomeTourStep> tourStepsFor({required bool modoPrestador}) {
   if (modoPrestador) {
     return const [
@@ -41,7 +41,7 @@ List<HomeTourStep> tourStepsFor({required bool modoPrestador}) {
       HomeTourStep(
         title: 'Tu tarjeta digital',
         body:
-            'Esta es tu tarjeta de presentación para enviar a clientes. Es la misma que ellos pueden encontrar al buscar un servicio.',
+            'Esta es tu tarjeta de presentación para enviar a clientes. Es la misma que ellos pueden encontrar al buscar por un servicio.',
         highlightAlign: Alignment(0, -0.08),
         highlightWidthFactor: 0.9,
         highlightHeightFactor: 0.12,
@@ -65,7 +65,7 @@ List<HomeTourStep> tourStepsFor({required bool modoPrestador}) {
       HomeTourStep(
         title: 'Academia',
         body:
-            'Academia de microfinanzas y tips de oficio. Siempre hay algo para aprender.',
+            'Academia de microfinanzas. Siempre hay algo para aprender.',
         highlightAlign: Alignment(0.78, 0.92),
         highlightWidthFactor: 0.18,
         highlightHeightFactor: 0.09,
@@ -77,7 +77,7 @@ List<HomeTourStep> tourStepsFor({required bool modoPrestador}) {
     HomeTourStep(
       title: 'Menú de configuración',
       body:
-          'Configurá tu perfil y domicilio. Tu domicilio favorece mostrar prestadores de la zona donde vivís.',
+          'Menú de configuración del usuario. Tu domicilio favorece a mostrar prestadores de trabajo de la zona donde vivís.',
       highlightAlign: Alignment(-0.92, -0.78),
       highlightWidthFactor: 0.22,
       highlightHeightFactor: 0.08,
@@ -85,7 +85,7 @@ List<HomeTourStep> tourStepsFor({required bool modoPrestador}) {
     HomeTourStep(
       title: 'Pantalla de cliente',
       body:
-          'Esta pantalla es propia de quien busca servicios. Elegí un oficio o escribí lo que necesitás.',
+          'Esta pantalla es propia de un cliente que busca servicios. Elegí un oficio o escribí lo que necesitás.',
       highlightAlign: Alignment(0, -0.52),
       highlightWidthFactor: 0.9,
       highlightHeightFactor: 0.16,
@@ -93,7 +93,7 @@ List<HomeTourStep> tourStepsFor({required bool modoPrestador}) {
     HomeTourStep(
       title: 'Prestadores con más confianza',
       body:
-          'Acá podés buscar prestadores de servicio mejor evaluados en tu zona, ordenados por reputación.',
+          'Acá podés buscar por los prestadores de servicio mejor evaluados en tu zona.',
       highlightAlign: Alignment(0, 0.32),
       highlightWidthFactor: 0.9,
       highlightHeightFactor: 0.14,
