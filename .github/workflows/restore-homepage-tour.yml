@@ -1,0 +1,49 @@
+name: Restore Homepage with Home Tour
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/restore-homepage-tour.yml'
+      - 'tools/homepage_tour_chunks/**'
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reassemble Homepage from base64 chunks
+        run: |
+          set -e
+          python3 << 'PY'
+          from pathlib import Path
+          import base64
+          root = Path('tools/homepage_tour_chunks')
+          parts = sorted(root.glob('chunk_*.b64'), key=lambda p: int(p.stem.split('_')[1]))
+          assert parts, 'no chunks'
+          b64 = ''.join(p.read_text().strip() for p in parts)
+          data = base64.b64decode(b64)
+          text = data.decode('utf-8')
+          assert 'HomeTourOverlay' in text, 'missing tour'
+          assert 'class HomePageWidget' in text
+          assert 'PLACEHOLDER' not in text
+          Path('lib/Homepage.dart').write_bytes(data)
+          print('Wrote lib/Homepage.dart', len(data), 'bytes', text.count(chr(10))+1, 'lines')
+          PY
+          wc -c lib/Homepage.dart
+          grep -c HomeTourOverlay lib/Homepage.dart
+          grep -c _maybeStartHomeTour lib/Homepage.dart
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add lib/Homepage.dart
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "fix(home): restaurar Homepage completo + tour coach-marks primera vez (cliente/prestador)"
+            git push origin HEAD:main
+          fi
