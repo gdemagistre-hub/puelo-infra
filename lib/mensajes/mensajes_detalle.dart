@@ -56,6 +56,27 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
     setState(() => _otherName = name);
   }
 
+  /// Copia promedio/n eval al cache de sesion para que Home lo muestre al toque.
+  void _syncEstrellasSesion(Map<String, dynamic> result) {
+    final session = UserSession();
+    session.invalidateHomeCache();
+    final nRaw = result['n_evaluaciones'];
+    final pRaw = result['promedio'];
+    if (session.datosCompletos == null || nRaw == null) return;
+    final n = nRaw is num ? nRaw.toInt() : int.tryParse('$nRaw') ?? 0;
+    final p = pRaw is num ? pRaw.toDouble() : double.tryParse('$pRaw') ?? 0.0;
+    session.datosCompletos = {
+      ...session.datosCompletos!,
+      'list_promedio': p,
+      'list_n_evaluaciones': n,
+      'list_n_eval': n,
+      'promedioEstrellas': p,
+      'nEvaluaciones': n,
+      'cantidad_evaluaciones': n,
+      'cantidadEvaluadores': n,
+    };
+  }
+
   Future<void> _enviarTexto() async {
     final t = _textCtrl.text.trim();
     if (t.isEmpty || _sending) return;
@@ -176,12 +197,13 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
   }) async {
     setState(() => _busy = true);
     try {
-      await MensajesService.instance.responderCalificacion(
+      final result = await MensajesService.instance.responderCalificacion(
         conversacionId: widget.conversacionId,
         calificacionEventId: calificacionEventId,
         decision: decision,
         respuestaTexto: respuestaTexto,
       );
+      _syncEstrellasSesion(result);
       if (!mounted) return;
       final conRespuesta = decision == 'respondido' ||
           (respuestaTexto != null && respuestaTexto.trim().isNotEmpty);
@@ -189,8 +211,8 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
         SnackBar(
           content: Text(
             conRespuesta
-                ? 'Evaluaci\u00f3n publicada con tu respuesta. Las estrellas se actualizan en tu perfil al instante.'
-                : 'Evaluaci\u00f3n aceptada y publicada. Las estrellas se actualizan en tu perfil al instante.',
+                ? 'Evaluaci\u00f3n publicada con tu respuesta. Volv\u00e9 a Home para ver las estrellas.'
+                : 'Evaluaci\u00f3n aceptada. Volv\u00e9 a Home para ver las estrellas en tu perfil.',
           ),
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 5),
