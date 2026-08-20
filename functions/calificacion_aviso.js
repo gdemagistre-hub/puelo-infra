@@ -2,7 +2,7 @@
  * Aviso al prestador cuando un cliente califica un trabajo.
  * - Crea/actualiza conversación + evento calificacion_recibida (append-only)
  * - Push FCM al prestador
- * - responderCalificacion: acepta/publica + opcional respuesta texto
+ * - responderCalificacion: acepta/publica + actualiza promedio en usuarios/{prestador}
  */
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
@@ -85,6 +85,79 @@ function estrellasLabel(n) {
   if (v <= 0) return "una evaluación";
   if (v === 1) return "1 estrella";
   return `${v} estrellas`;
+}
+
+/**
+ * Recalcula promedio y cantidad de evaluaciones publicadas del prestador
+ * y escribe campos denormalizados que lee Home / tarjeta / buscador.
+ */
+async function refreshPromedioPrestador(prestadorUid) {
+  if (!prestadorUid) return { n: 0, promedio: 0 };
+
+  const snap = await db
+    .collection("calificaciones")
+    .where("prestador_id", "==", prestadorUid)
+    .limit(200)
+    .get();
+
+  let sum = 0;
+  let n = 0;
+  for (const doc of snap.docs) {
+    const d = doc.data() || {};
+    const estado = String(d.estado || "").toLowerCase();
+    const publicada =
+      estado === "publicada" ||
+      d.aceptado_por_prestador === true ||
+      d.publica_por_timeout === true;
+    if (!publicada) continue;
+    const stars = Number(d.estrellas ?? d.rating) || 0;
+    if (stars < 1 || stars > 5) continue;
+    sum += stars;
+    n += 1;
+  }
+
+  // Fallback: algunos docs usan trabajador_id en vez de prestador_id
+  if (n === 0) {
+    const snap2 = await db
+      .collection("calificaciones")
+      .where("trabajador_id", "==", prestadorUid)
+      .limit(200)
+      .get();
+    for (const doc of snap2.docs) {
+      const d = doc.data() || {};
+      const estado = String(d.estado || "").toLowerCase();
+      const publicada =
+        estado === "publicada" ||
+        d.aceptado_por_prestador === true ||
+        d.publica_por_timeout === true;
+      if (!publicada) continue;
+      const stars = Number(d.estrellas ?? d.rating) || 0;
+      if (stars < 1 || stars > 5) continue;
+      sum += stars;
+      n += 1;
+    }
+  }
+
+  const promedio = n > 0 ? Math.round((sum / n) * 10) / 10 : 0;
+
+  await db
+    .collection("usuarios")
+    .doc(prestadorUid)
+    .set(
+      {
+        list_promedio: n > 0 ? promedio : null,
+        list_n_evaluaciones: n,
+        list_n_eval: n,
+        promedioEstrellas: n > 0 ? promedio : 0,
+        nEvaluaciones: n,
+        cantidad_evaluaciones: n,
+        cantidadEvaluadores: n,
+        list_updated_at: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+  return { n, promedio };
 }
 
 exports.avisarCalificacionPrestador = onCall(
@@ -230,7 +303,7 @@ exports.responderCalificacion = onCall(
   {
     cors: true,
     memory: "256MiB",
-    timeoutSeconds: 30,
+    timeoutSeconds: 45,
     region: "us-east1",
   },
   async (request) => {
@@ -359,6 +432,14 @@ exports.responderCalificacion = onCall(
 
     await batch.commit();
 
+    // Impacto inmediato en perfil (Home / tarjeta / buscador)
+    let stats = { n: 0, promedio: 0 };
+    try {
+      stats = await refreshPromedioPrestador(actorUid);
+    } catch (e) {
+      console.warn("refreshPromedioPrestador", e.message || e);
+    }
+
     return {
       ok: true,
       conversacion_id: convId,
@@ -367,6 +448,8 @@ exports.responderCalificacion = onCall(
       respuesta_event_id: respRef.id,
       decision: respDoc.decision,
       publicada: true,
+      promedio: stats.promedio,
+      n_evaluaciones: stats.n,
     };
   }
 );
