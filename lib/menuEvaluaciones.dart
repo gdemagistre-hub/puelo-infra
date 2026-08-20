@@ -47,8 +47,8 @@ class MenuEvaluacionesWidget extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             esPrestador
-                ? 'Como prestador también podés mostrar trabajos hechos.'
-                : 'Contá cómo te fue para ayudar a otros a confiar.',
+                ? 'Como prestador pod\u00e9s mostrar trabajos hechos en tu portfolio.'
+                : 'Cont\u00e1 c\u00f3mo te fue para ayudar a otros a confiar.',
             style: const TextStyle(
               fontSize: 14,
               color: AppColors.textMuted,
@@ -57,7 +57,6 @@ class MenuEvaluacionesWidget extends StatelessWidget {
           ),
           const SizedBox(height: 24),
 
-          // —— Cliente: acción primaria con más peso visual ——
           const _SectionLabel(
             label: 'Si contrataste un servicio',
             color: AppColors.cliente,
@@ -66,7 +65,7 @@ class MenuEvaluacionesWidget extends StatelessWidget {
           _PrimaryActionCard(
             titulo: 'Calificar el trabajo',
             subtitulo:
-                '¿Cómo te fue con el trabajo? Tu opinión ayuda a otros a elegir con más confianza.',
+                'Eleg\u00ed al prestador, pon\u00e9 estrellas y un comentario. Las fotos del trabajo las publica solo el prestador.',
             icono: Icons.star_rounded,
             accent: AppColors.cliente,
             onTap: () => Navigator.push(
@@ -80,13 +79,14 @@ class MenuEvaluacionesWidget extends StatelessWidget {
           if (esPrestador) ...[
             const SizedBox(height: 28),
             const _SectionLabel(
-              label: 'Si ofrecés servicios',
+              label: 'Si ofrec\u00e9s servicios',
               color: AppColors.prestador,
             ),
             const SizedBox(height: 12),
             _ActionCard(
               titulo: 'Mostrar trabajo realizado',
-              subtitulo: 'Subí fotos de un servicio que brindaste (portfolio).',
+              subtitulo:
+                  'Sub\u00ed fotos de un servicio que brindaste (portfolio en tu tarjeta).',
               icono: Icons.photo_camera_back_rounded,
               accent: AppColors.prestador,
               onTap: () => Navigator.push(
@@ -112,7 +112,6 @@ class MenuEvaluacionesWidget extends StatelessWidget {
             ),
           ],
 
-          // Tip inferior para no dejar la pantalla “vacía”
           if (!esPrestador) ...[
             const SizedBox(height: 28),
             Container(
@@ -135,7 +134,7 @@ class MenuEvaluacionesWidget extends StatelessWidget {
                   SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Las estrellas se publican cuando el prestador responde o a los 7 días. Así ambos lados quedan protegidos.',
+                      'Las estrellas se publican cuando el prestador responde o a los 7 d\u00edas. As\u00ed ambos lados quedan protegidos.',
                       style: TextStyle(
                         fontSize: 13,
                         height: 1.4,
@@ -171,7 +170,6 @@ class MenuEvaluacionesWidget extends StatelessWidget {
   }
 }
 
-/// Card primaria (más peso): borde izquierdo + icono grande + sombra suave.
 class _PrimaryActionCard extends StatelessWidget {
   final String titulo;
   final String subtitulo;
@@ -257,7 +255,6 @@ class _PrimaryActionCard extends StatelessWidget {
   }
 }
 
-/// Card estándar (secundaria).
 class _ActionCard extends StatelessWidget {
   final String titulo;
   final String subtitulo;
