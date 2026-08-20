@@ -24,7 +24,7 @@ class ReadinessService {
   static bool _noVacio(dynamic v) =>
       v != null && v.toString().trim().isNotEmpty;
 
-  /// Calcula readiness a partir del doc usuario + señales opcionales de subcolecciones.
+  /// Calcula readiness a partir del doc usuario + senales opcionales de subcolecciones.
   static ReadinessResult calcular(
     Map<String, dynamic> data, {
     int nMovimientos = 0,
@@ -206,7 +206,7 @@ class ReadinessService {
   }
 
   /// Enrichment liviano: cuenta movimientos (tope) sin barrer todo.
-  static Future<({int mov, int cobros, bool fondo})> _señalesNegocio(
+  static Future<({int mov, int cobros, bool fondo})> _senalesNegocio(
     String uid,
     Map<String, dynamic> data,
   ) async {
@@ -301,7 +301,7 @@ class ReadinessService {
         procesados++;
         try {
           final data = doc.data();
-          final sig = await _señalesNegocio(doc.id, data);
+          final sig = await _senalesNegocio(doc.id, data);
           final nCap = _academiaFromData(data);
           final r = calcular(
             data,
@@ -355,7 +355,7 @@ class ReadinessService {
   static Future<ReadinessResult> recalcularUid(String uid) async {
     final doc = await _db.collection('usuarios').doc(uid).get();
     final data = doc.data() ?? {};
-    final sig = await _señalesNegocio(uid, data);
+    final sig = await _senalesNegocio(uid, data);
     final r = calcular(
       data,
       nMovimientos: sig.mov,
