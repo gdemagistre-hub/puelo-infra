@@ -81,7 +81,7 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
     }
   }
 
-  Future<void> _responder({
+  Future<void> _responderRecibo({
     required String reciboEventId,
     required String decision,
     String? motivo,
@@ -161,10 +161,102 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
       ),
     );
     if (ok == true) {
-      await _responder(
+      await _responderRecibo(
         reciboEventId: reciboEventId,
         decision: 'rechazado',
         motivo: ctrl.text,
+      );
+    }
+  }
+
+  Future<void> _responderCalificacion({
+    required String calificacionEventId,
+    required String decision,
+    String? respuestaTexto,
+  }) async {
+    setState(() => _busy = true);
+    try {
+      await MensajesService.instance.responderCalificacion(
+        conversacionId: widget.conversacionId,
+        calificacionEventId: calificacionEventId,
+        decision: decision,
+        respuestaTexto: respuestaTexto,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            decision == 'respondido' ||
+                    (respuestaTexto != null && respuestaTexto.trim().isNotEmpty)
+                ? 'Evaluaci\u00f3n publicada \u00b7 respuesta enviada'
+                : 'Evaluaci\u00f3n aceptada \u00b7 ya cuenta en tu perfil',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(MensajesService.humanizeError(e)),
+          backgroundColor: const Color(0xFFB91C1C),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _confirmResponderCalificacion(String eventId) async {
+    final ctrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Responder evaluaci\u00f3n'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Tu respuesta queda p\u00fablica junto a la evaluaci\u00f3n. '
+              'M\u00e1ximo 200 caracteres.',
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF64748B),
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              maxLength: 200,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Tu respuesta',
+                hintText: 'Gracias por confiar\u2026',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Publicar respuesta'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      final texto = ctrl.text.trim();
+      await _responderCalificacion(
+        calificacionEventId: eventId,
+        decision: texto.isEmpty ? 'aceptado' : 'respondido',
+        respuestaTexto: texto.isEmpty ? null : texto,
       );
     }
   }
@@ -224,7 +316,8 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Recibos y mensajes quedan registrados. Los recibos se sellan y no se editan ni se borran.',
+                    'Recibos, evaluaciones y mensajes quedan registrados. '
+                    'Los recibos se sellan; las evaluaciones se publican al aceptar.',
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.35,
@@ -258,20 +351,27 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
                 }
                 final events = snap.data!.docs;
 
-                final respuestas = <String, Map<String, dynamic>>{};
+                final respuestasRecibo = <String, Map<String, dynamic>>{};
+                final respuestasCalif = <String, Map<String, dynamic>>{};
                 for (final e in events) {
                   final d = e.data();
                   final t = d['tipo'] as String? ?? '';
                   if (t == 'recibo_aceptado' || t == 'recibo_rechazado') {
                     final rid = d['recibo_event_id'] as String?;
-                    if (rid != null) respuestas[rid] = d;
+                    if (rid != null) respuestasRecibo[rid] = d;
+                  }
+                  if (t == 'calificacion_aceptada' ||
+                      t == 'calificacion_respondida') {
+                    final cid = d['calificacion_event_id'] as String?;
+                    if (cid != null) respuestasCalif[cid] = d;
                   }
                 }
 
-                // Timeline: recibos + textos (omitir eventos de respuesta sueltos)
                 final timeline = events.where((e) {
                   final t = e.data()['tipo'] as String? ?? '';
-                  return t == 'recibo_emitido' || t == 'mensaje_texto';
+                  return t == 'recibo_emitido' ||
+                      t == 'mensaje_texto' ||
+                      t == 'calificacion_recibida';
                 }).toList();
 
                 if (timeline.isEmpty) {
@@ -331,8 +431,28 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
                       );
                     }
 
-                    // recibo_emitido
-                    final resp = respuestas[doc.id];
+                    if (tipo == 'calificacion_recibida') {
+                      final resp = respuestasCalif[doc.id];
+                      final soyCliente = d['actor_uid'] == myUid;
+                      final puedoResponder =
+                          !soyCliente && resp == null && !_busy;
+                      return _CalificacionCard(
+                        data: d,
+                        eventId: doc.id,
+                        respuesta: resp,
+                        soyCliente: soyCliente,
+                        puedoResponder: puedoResponder,
+                        otherName: _otherName,
+                        onAceptar: () => _responderCalificacion(
+                          calificacionEventId: doc.id,
+                          decision: 'aceptado',
+                        ),
+                        onResponder: () =>
+                            _confirmResponderCalificacion(doc.id),
+                      );
+                    }
+
+                    final resp = respuestasRecibo[doc.id];
                     final soyEmisor = d['actor_uid'] == myUid;
                     final puedoResponder =
                         !soyEmisor && resp == null && !_busy;
@@ -344,7 +464,7 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
                       soyEmisor: soyEmisor,
                       puedoResponder: puedoResponder,
                       otherName: _otherName,
-                      onAceptar: () => _responder(
+                      onAceptar: () => _responderRecibo(
                         reciboEventId: doc.id,
                         decision: 'aceptado',
                       ),
@@ -355,7 +475,6 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
               },
             ),
           ),
-          // Composer
           Material(
             color: Colors.white,
             elevation: 8,
@@ -488,6 +607,228 @@ class _TextoBubble extends StatelessWidget {
                 ],
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CalificacionCard extends StatelessWidget {
+  final Map<String, dynamic> data;
+  final String eventId;
+  final Map<String, dynamic>? respuesta;
+  final bool soyCliente;
+  final bool puedoResponder;
+  final String? otherName;
+  final VoidCallback onAceptar;
+  final VoidCallback onResponder;
+
+  const _CalificacionCard({
+    required this.data,
+    required this.eventId,
+    required this.respuesta,
+    required this.soyCliente,
+    required this.puedoResponder,
+    required this.otherName,
+    required this.onAceptar,
+    required this.onResponder,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final estrellas = (data['estrellas'] is num)
+        ? (data['estrellas'] as num).toInt()
+        : int.tryParse('${data['estrellas']}') ?? 0;
+    final comentario = (data['comentario'] as String?)?.trim() ?? '';
+    final iso = (data['created_at_iso'] as String?) ?? '';
+    final decision = respuesta?['decision'] as String?;
+    final respTexto = (respuesta?['respuesta_texto'] as String?)?.trim() ?? '';
+    final quien = otherName ?? 'la otra parte';
+
+    Color border = const Color(0xFFF59E0B);
+    String estadoLabel = soyCliente
+        ? 'Esperando a $quien'
+        : 'Pendiente de tu confirmaci\u00f3n';
+    Color estadoColor = const Color(0xFFB45309);
+
+    if (decision == 'aceptado') {
+      border = const Color(0xFF16A34A);
+      estadoLabel = 'Aceptada';
+      estadoColor = const Color(0xFF16A34A);
+    } else if (decision == 'respondido') {
+      border = const Color(0xFF28B5CD);
+      estadoLabel = 'Respondida';
+      estadoColor = const Color(0xFF1A8FA3);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        elevation: 2,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: border.withOpacity(0.65), width: 1.5),
+          ),
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF59E0B).withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'Evaluaci\u00f3n',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFB45309),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      soyCliente ? 'Vos enviaste' : 'Te calificaron',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    estadoLabel,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: estadoColor,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: List.generate(5, (i) {
+                  final filled = i < estrellas;
+                  return Icon(
+                    filled ? Icons.star_rounded : Icons.star_outline_rounded,
+                    size: 28,
+                    color: filled
+                        ? const Color(0xFFF59E0B)
+                        : const Color(0xFFCBD5E1),
+                  );
+                }),
+              ),
+              if (comentario.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(
+                  comentario,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    height: 1.4,
+                    color: Color(0xFF334155),
+                  ),
+                ),
+              ],
+              if (iso.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  iso.replaceFirst('T', ' ').split('.').first,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF94A3B8),
+                  ),
+                ),
+              ],
+              if (respTexto.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0FDFA),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF99F6E4)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        soyCliente ? 'Respuesta del prestador' : 'Tu respuesta',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F766E),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        respTexto,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          height: 1.35,
+                          color: Color(0xFF134E4A),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              if (puedoResponder) ...[
+                const SizedBox(height: 16),
+                const Text(
+                  '\u00bfPublicamos esta evaluaci\u00f3n en tu perfil?',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: onAceptar,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF16A34A),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: const Text(
+                          'Aceptar',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: onResponder,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF1A8FA3),
+                          side: const BorderSide(color: Color(0xFF28B5CD)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: const Text(
+                          'Responder',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
           ),
         ),
       ),
