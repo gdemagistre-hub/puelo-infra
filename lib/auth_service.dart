@@ -5,18 +5,20 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 import 'user_session.dart';
 
-/// Auth real (Google primero; FB/Apple placeholders).
+/// Auth real (Google + email/password; FB/Apple placeholders).
 ///
-/// Flujo:
-/// 1) Sign-in con provider → Firebase Auth
-/// 2) Asegura doc `usuarios/{uid}` (crea o merge de campos auth)
-/// 3) Carga sesión en [UserSession]
+/// Flujo email:
+/// 1) registerWithEmail → crea user + manda mail de verificación
+/// 2) Usuario valida el link del mail
+/// 3) signInWithEmail exige emailVerified → ensureUserProfile + UserSession
 class AuthService {
   AuthService._();
   static final AuthService instance = AuthService._();
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  User? get currentUser => _auth.currentUser;
 
   /// Snapshot liviano del usuario Auth (para claims / debug).
   Map<String, dynamic>? authUserSnapshot() {
@@ -39,6 +41,10 @@ class AuthService {
           .toList(),
     };
   }
+
+  // ---------------------------------------------------------------------------
+  // Google
+  // ---------------------------------------------------------------------------
 
   Future<void> signInWithGoogle() async {
     UserCredential cred;
@@ -88,9 +94,233 @@ class AuthService {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Email / password
+  // ---------------------------------------------------------------------------
+
+  /// Crea cuenta, manda mail de verificación.
+  /// No abre sesión completa de app hasta que el mail esté verificado.
+  ///
+  /// Retorna el [User] recién creado (aún sin emailVerified).
+  Future<User> registerWithEmail({
+    required String email,
+    required String password,
+    String? nombre,
+    String? apellido,
+  }) async {
+    final e = email.trim().toLowerCase();
+    if (e.isEmpty || !e.contains('@')) {
+      throw AuthValidationException('Ingresá un email válido.');
+    }
+    if (password.length < 6) {
+      throw AuthValidationException(
+        'La contraseña debe tener al menos 6 caracteres.',
+      );
+    }
+
+    try {
+      final cred = await _auth.createUserWithEmailAndPassword(
+        email: e,
+        password: password,
+      );
+      final user = cred.user;
+      if (user == null) {
+        throw StateError('Registro sin user');
+      }
+
+      final display = [
+        (nombre ?? '').trim(),
+        (apellido ?? '').trim(),
+      ].where((s) => s.isNotEmpty).join(' ');
+      if (display.isNotEmpty) {
+        await user.updateDisplayName(display);
+        await user.reload();
+      }
+
+      await user.sendEmailVerification(
+        ActionCodeSettings(
+          url: 'https://lifewalletpuelo.web.app/',
+          handleCodeInApp: false,
+        ),
+      );
+
+      // Doc mínimo: pendiente hasta verificar.
+      final ref = _db.collection('usuarios').doc(user.uid);
+      await ref.set({
+        'nombre': (nombre ?? '').trim(),
+        'apellido': (apellido ?? '').trim(),
+        'email': e,
+        'auth_provider': 'password',
+        'auth_uid': user.uid,
+        'es_trabajador': false,
+        'estado': 'pendiente_email',
+        'email_verified': false,
+        'creado_en': FieldValue.serverTimestamp(),
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      return _auth.currentUser ?? user;
+    } on FirebaseAuthException catch (e) {
+      throw AuthValidationException(humanizeAuthError(e));
+    }
+  }
+
+  /// Login email/password. Exige email verificado.
+  Future<void> signInWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    final e = email.trim().toLowerCase();
+    if (e.isEmpty || password.isEmpty) {
+      throw AuthValidationException('Completá email y contraseña.');
+    }
+
+    try {
+      final cred = await _auth.signInWithEmailAndPassword(
+        email: e,
+        password: password,
+      );
+      final user = cred.user;
+      if (user == null) {
+        throw StateError('Login sin user');
+      }
+
+      await user.reload();
+      final refreshed = _auth.currentUser ?? user;
+
+      if (!refreshed.emailVerified) {
+        throw EmailNotVerifiedException(refreshed.email ?? e);
+      }
+
+      final data = await ensureUserProfile(refreshed, providerId: 'password');
+      // Marcar verificado en perfil.
+      try {
+        await _db.collection('usuarios').doc(refreshed.uid).set({
+          'email_verified': true,
+          'estado': 'activo',
+          'updated_at': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } catch (_) {}
+
+      UserSession().iniciarSesion(
+        refreshed.uid,
+        {...data, 'email_verified': true, 'estado': 'activo'},
+        authProvider: 'password',
+        isDevImpersonation: false,
+      );
+    } on EmailNotVerifiedException {
+      rethrow;
+    } on AuthValidationException {
+      rethrow;
+    } on FirebaseAuthException catch (e) {
+      throw AuthValidationException(humanizeAuthError(e));
+    }
+  }
+
+  /// Tras verificar el mail: reload + si ok, abre sesión de app.
+  /// Útil desde la pantalla “Revisá tu email”.
+  Future<bool> completeEmailVerificationIfReady() async {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+    await user.reload();
+    final refreshed = _auth.currentUser;
+    if (refreshed == null || !refreshed.emailVerified) return false;
+
+    final data = await ensureUserProfile(refreshed, providerId: 'password');
+    try {
+      await _db.collection('usuarios').doc(refreshed.uid).set({
+        'email_verified': true,
+        'estado': 'activo',
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (_) {}
+
+    UserSession().iniciarSesion(
+      refreshed.uid,
+      {...data, 'email_verified': true, 'estado': 'activo'},
+      authProvider: 'password',
+      isDevImpersonation: false,
+    );
+    return true;
+  }
+
+  Future<void> resendVerificationEmail() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw AuthValidationException(
+        'No hay una sesión pendiente. Volvé a registrarte o iniciá sesión.',
+      );
+    }
+    if (user.emailVerified) return;
+    try {
+      await user.sendEmailVerification(
+        ActionCodeSettings(
+          url: 'https://lifewalletpuelo.web.app/',
+          handleCodeInApp: false,
+        ),
+      );
+    } on FirebaseAuthException catch (e) {
+      throw AuthValidationException(humanizeAuthError(e));
+    }
+  }
+
+  Future<void> sendPasswordReset(String email) async {
+    final e = email.trim().toLowerCase();
+    if (e.isEmpty || !e.contains('@')) {
+      throw AuthValidationException('Ingresá un email válido.');
+    }
+    try {
+      await _auth.sendPasswordResetEmail(
+        email: e,
+        actionCodeSettings: ActionCodeSettings(
+          url: 'https://lifewalletpuelo.web.app/',
+          handleCodeInApp: false,
+        ),
+      );
+    } on FirebaseAuthException catch (ex) {
+      throw AuthValidationException(humanizeAuthError(ex));
+    }
+  }
+
+  static String humanizeAuthError(Object? e) {
+    if (e is FirebaseAuthException) {
+      switch (e.code) {
+        case 'email-already-in-use':
+          return 'Ese email ya tiene una cuenta. Probá iniciar sesión.';
+        case 'invalid-email':
+          return 'El email no es válido.';
+        case 'weak-password':
+          return 'La contraseña es demasiado débil (mínimo 6 caracteres).';
+        case 'user-not-found':
+        case 'wrong-password':
+        case 'invalid-credential':
+          return 'Email o contraseña incorrectos.';
+        case 'user-disabled':
+          return 'Esta cuenta está deshabilitada.';
+        case 'too-many-requests':
+          return 'Demasiados intentos. Esperá un momento y probá de nuevo.';
+        case 'network-request-failed':
+          return 'Sin conexión. Revisá tu internet.';
+        case 'operation-not-allowed':
+          return 'Email/contraseña no está habilitado en Firebase. Activá el proveedor.';
+        default:
+          return e.message?.isNotEmpty == true
+              ? e.message!
+              : 'Error de autenticación (${e.code}).';
+      }
+    }
+    final s = '$e';
+    if (s.length > 160) return '${s.substring(0, 157)}…';
+    return s;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Perfil Firestore
+  // ---------------------------------------------------------------------------
+
   /// Crea o actualiza `usuarios/{uid}` con datos del provider.
   ///
-  /// Nombre/apellido/email se sincronizan desde Google.
+  /// Nombre/apellido/email se sincronizan desde Google / Auth.
   /// Foto: no se pisa una selfie de Storage; si no hay foto se seed-ea
   /// desde Google (login y restore).
   Future<Map<String, dynamic>> ensureUserProfile(
@@ -145,6 +375,7 @@ class AuthService {
         'auth_uid': user.uid,
         'es_trabajador': false,
         'estado': 'activo',
+        'email_verified': user.emailVerified,
         'creado_en': FieldValue.serverTimestamp(),
         'updated_at': FieldValue.serverTimestamp(),
       };
@@ -158,6 +389,7 @@ class AuthService {
       'auth_provider': providerId,
       'auth_uid': user.uid,
       'updated_at': FieldValue.serverTimestamp(),
+      'email_verified': user.emailVerified,
     };
 
     if (nombre.isNotEmpty) patch['nombre'] = nombre;
@@ -178,15 +410,16 @@ class AuthService {
     }
 
     final estado = (existing['estado'] ?? '').toString();
-    if (estado == 'pendiente_validacion' || estado.isEmpty) {
+    if (estado == 'pendiente_validacion' ||
+        estado == 'pendiente_email' ||
+        estado.isEmpty) {
       patch['estado'] = 'activo';
     }
 
     await ref.set(patch, SetOptions(merge: true));
     final updated = await ref.get();
-    final out = Map<String, dynamic>.from(updated.data() ?? {...existing, ...patch});
-    // Fallback de sesión: si Firestore quedó sin foto, usar photoURL de Google
-    // para esta sesión (y persistir seed si aplica).
+    final out =
+        Map<String, dynamic>.from(updated.data() ?? {...existing, ...patch});
     final outPhoto = (out['url_foto_perfil'] ?? out['foto_perfil'] ?? '')
         .toString()
         .trim();
@@ -224,4 +457,18 @@ class AuthService {
 class AuthCancelledException implements Exception {
   @override
   String toString() => 'AuthCancelledException';
+}
+
+class EmailNotVerifiedException implements Exception {
+  final String email;
+  EmailNotVerifiedException(this.email);
+  @override
+  String toString() => 'EmailNotVerifiedException($email)';
+}
+
+class AuthValidationException implements Exception {
+  final String message;
+  AuthValidationException(this.message);
+  @override
+  String toString() => message;
 }
