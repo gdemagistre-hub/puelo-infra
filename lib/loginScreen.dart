@@ -34,6 +34,12 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
   Map<String, dynamic>? _selectedUserData;
   bool _loadingGoogle = false;
   bool _loadingDev = false;
+  bool _loadingEmail = false;
+  bool _showEmailForm = false;
+  bool _obscurePass = true;
+
+  final _emailCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
 
   /// One-shot (sin snapshots de colección completa).
   late final Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>>
@@ -47,6 +53,13 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
   void initState() {
     super.initState();
     _usuariosDevFuture = _loadUsuariosDev();
+  }
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _passCtrl.dispose();
+    super.dispose();
   }
 
   Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>>
@@ -167,6 +180,142 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
     } finally {
       if (mounted) setState(() => _loadingGoogle = false);
     }
+  }
+
+  Future<void> _entrarConEmail() async {
+    final email = _emailCtrl.text.trim();
+    final pass = _passCtrl.text;
+    if (email.isEmpty || pass.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Completá email y contraseña.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _loadingEmail = true);
+    try {
+      await AuthService.instance.signInWithEmail(
+        email: email,
+        password: pass,
+      );
+      if (!mounted) return;
+      ProxAnalytics.instance.action('login_email', screen: '/login');
+      _navegarPostLogin();
+    } on EmailNotVerifiedException catch (e) {
+      if (!mounted) return;
+      _mostrarDialogoNoVerificado(e.email);
+    } on AuthValidationException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AuthService.humanizeAuthError(e)),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _loadingEmail = false);
+    }
+  }
+
+  Future<void> _olvidePassword() async {
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Escribí tu email arriba para enviarte el reset.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    setState(() => _loadingEmail = true);
+    try {
+      await AuthService.instance.sendPasswordReset(email);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Si existe una cuenta con $email, te mandamos un mail para cambiar la contraseña.',
+          ),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    } on AuthValidationException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message), behavior: SnackBarBehavior.floating),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AuthService.humanizeAuthError(e)),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _loadingEmail = false);
+    }
+  }
+
+  void _mostrarDialogoNoVerificado(String email) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Email sin verificar',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
+        content: Text(
+          'Tu cuenta ($email) todavía no confirmó el mail.\n\n'
+          'Abrí el enlace que te mandamos y después volvé a iniciar sesión.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                // Si quedó sesión parcial, reenviar.
+                await AuthService.instance.resendVerificationEmail();
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Reenviamos el mail de verificación.'),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(AuthService.humanizeAuthError(e)),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            },
+            child: const Text('Reenviar mail'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Entendido'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _proximamente(String provider) {
@@ -316,9 +465,95 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
     );
   }
 
+  Widget _buildEmailForm({required bool busy}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          controller: _emailCtrl,
+          keyboardType: TextInputType.emailAddress,
+          autocorrect: false,
+          enabled: !busy,
+          decoration: InputDecoration(
+            labelText: 'Email',
+            prefixIcon: const Icon(Icons.email_outlined),
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _passCtrl,
+          obscureText: _obscurePass,
+          enabled: !busy,
+          onSubmitted: (_) => busy ? null : _entrarConEmail(),
+          decoration: InputDecoration(
+            labelText: 'Contraseña',
+            prefixIcon: const Icon(Icons.lock_outline),
+            suffixIcon: IconButton(
+              icon: Icon(
+                _obscurePass
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+              ),
+              onPressed: () => setState(() => _obscurePass = !_obscurePass),
+            ),
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: busy ? null : _olvidePassword,
+            child: const Text(
+              'Olvidé mi contraseña',
+              style: TextStyle(fontSize: 13),
+            ),
+          ),
+        ),
+        SizedBox(
+          height: 50,
+          child: ElevatedButton(
+            onPressed: busy ? null : _entrarConEmail,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            child: _loadingEmail
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Text(
+                    'Entrar con email',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final busy = _loadingGoogle || _loadingDev;
+    final busy = _loadingGoogle || _loadingDev || _loadingEmail;
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -403,6 +638,31 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                   ),
                   const SizedBox(height: 14),
                   _buildLoginButton(
+                    onPressed: busy
+                        ? null
+                        : () => setState(() => _showEmailForm = !_showEmailForm),
+                    icon: _buildIconCircle(
+                      backgroundColor: primaryColor.withOpacity(0.12),
+                      child: Icon(
+                        Icons.email_outlined,
+                        color: primaryColor,
+                        size: 16,
+                      ),
+                    ),
+                    label: _showEmailForm
+                        ? 'Ocultar email'
+                        : 'Continuar con email',
+                    backgroundColor: Colors.white,
+                    textColor: textColor,
+                    hasBorder: true,
+                    borderColor: primaryColor.withOpacity(0.35),
+                  ),
+                  if (_showEmailForm) ...[
+                    const SizedBox(height: 16),
+                    _buildEmailForm(busy: busy),
+                  ],
+                  const SizedBox(height: 14),
+                  _buildLoginButton(
                     onPressed: busy ? null : () => _proximamente('Apple'),
                     icon: _buildIconCircle(
                       backgroundColor: Colors.white.withOpacity(0.15),
@@ -455,7 +715,7 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                                 );
                               },
                         child: const Text(
-                          'Crear usuario',
+                          'Crear cuenta',
                           style: TextStyle(
                             color: primaryColor,
                             fontWeight: FontWeight.bold,
