@@ -1,16 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:uuid/uuid.dart';
-import 'user_session.dart';
-import 'email_service.dart';
-import 'theme/app_colors.dart';
-import 'theme/app_copy.dart';
 
-/// Alta mínima de cuenta.
-/// Solo: nombre, apellido + canal de validación (WhatsApp o email).
-/// Documento y rol prestador se completan después (datos personales / oficios).
+import 'Homepage.dart';
+import 'auth_service.dart';
+import 'elige_camino.dart';
+import 'theme/app_colors.dart';
+
+/// Alta de cuenta con email + contraseña (Firebase Auth).
+/// Tras registrarse debe verificar el mail antes de entrar a la app.
 class RegistroCuentaWidget extends StatefulWidget {
   const RegistroCuentaWidget({super.key});
 
@@ -25,193 +21,149 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
   final _formKey = GlobalKey<FormState>();
   final _nombreController = TextEditingController();
   final _apellidoController = TextEditingController();
-  final _whatsappController = TextEditingController();
   final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _password2Controller = TextEditingController();
 
-  String _metodoValidacion = 'whatsapp'; // whatsapp | email
   bool _isLoading = false;
-  String? _tokenValidacion;
-  String? _linkValidacion;
-  String? _invitacionLink;
+  bool _obscure1 = true;
+  bool _obscure2 = true;
+  bool _pendienteVerificacion = false;
+  String? _emailRegistrado;
 
   @override
   void dispose() {
     _nombreController.dispose();
     _apellidoController.dispose();
-    _whatsappController.dispose();
     _emailController.dispose();
+    _passwordController.dispose();
+    _password2Controller.dispose();
     super.dispose();
   }
 
   Future<void> _registrar() async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (_metodoValidacion == 'whatsapp' &&
-        _whatsappController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ingresá un número de WhatsApp')),
-      );
-      return;
-    }
-    if (_metodoValidacion == 'email' && _emailController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ingresá un email')),
-      );
-      return;
-    }
-
     setState(() => _isLoading = true);
-    final db = FirebaseFirestore.instance;
-    const uuid = Uuid();
-
     try {
-      _tokenValidacion = uuid.v4().toUpperCase();
-
-      final Map<String, dynamic> dataUsuario = {
-        'nombre': _nombreController.text.trim(),
-        'apellido': _apellidoController.text.trim(),
-        'telefono': _whatsappController.text.trim(),
-        'email': _emailController.text.trim(),
-        'tiene_whatsapp': _metodoValidacion == 'whatsapp',
-        'es_trabajador': false,
-        'estado': 'pendiente_validacion',
-        'token_validacion': _tokenValidacion,
-        'metodo_validacion': _metodoValidacion,
-        'creado_en': FieldValue.serverTimestamp(),
-      };
-
-      if (UserSession().pendingValidacionToken != null) {
-        dataUsuario['pending_domicilio_token'] =
-            UserSession().pendingValidacionToken;
-      }
-
-      await db.collection('usuarios').add(dataUsuario);
-
-      _linkValidacion =
-          'https://lifewalletpuelo.web.app/#/validar?token=$_tokenValidacion';
-
-      if (_metodoValidacion == 'whatsapp') {
-        final String numero =
-            _whatsappController.text.trim().replaceAll(RegExp(r'[^0-9+]'), '');
-        final String mensaje = Uri.encodeComponent(
-          'Hola ${_nombreController.text.trim()}!\n\n'
-          'Este es tu enlace para activar tu cuenta en Puelo:\n\n'
-          '$_linkValidacion',
-        );
-        _invitacionLink = 'https://wa.me/$numero?text=$mensaje';
-
-        if (mounted) _mostrarPopupWhatsApp();
-      } else {
-        await EmailService.enviarValidacionCuenta(
-          toEmail: _emailController.text.trim(),
-          toName: _nombreController.text.trim(),
-          validationLink: _linkValidacion!,
-        );
-
-        if (mounted) _mostrarPopupEmailEnviado();
-      }
+      await AuthService.instance.registerWithEmail(
+        email: _emailController.text,
+        password: _passwordController.text,
+        nombre: _nombreController.text,
+        apellido: _apellidoController.text,
+      );
+      if (!mounted) return;
+      setState(() {
+        _pendienteVerificacion = true;
+        _emailRegistrado = _emailController.text.trim().toLowerCase();
+      });
+    } on AuthValidationException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${AppCopy.errorGenerico} ($e)')),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AuthService.humanizeAuthError(e)),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _mostrarPopupWhatsApp() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Cuenta creada',
-          style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
+  Future<void> _reenviarMail() async {
+    setState(() => _isLoading = true);
+    try {
+      await AuthService.instance.resendVerificationEmail();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Te reenviamos el mail. Revisá también spam.'),
+          behavior: SnackBarBehavior.floating,
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Enviate el enlace de activación por WhatsApp para confirmar y activar la cuenta.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  if (_invitacionLink != null) {
-                    final uri = Uri.parse(_invitacionLink!);
-                    if (await canLaunchUrl(uri)) {
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
-                    }
-                  }
-                },
-                icon: const Icon(Icons.chat),
-                label: const Text('Abrir WhatsApp'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF25D366),
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.pop(context);
-              },
-              child: const Text('Cerrar'),
-            ),
-          ],
+      );
+    } on AuthValidationException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message), behavior: SnackBarBehavior.floating),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AuthService.humanizeAuthError(e)),
+          behavior: SnackBarBehavior.floating,
         ),
-      ),
-    );
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
-  void _mostrarPopupEmailEnviado() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Revisá tu email',
-          style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
-        ),
-        content: const Text(
-          'Te enviamos un enlace para activar tu cuenta. Si no lo ves, mirá en spam.',
-          textAlign: TextAlign.center,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pop(context);
-            },
-            child: const Text('Entendido'),
+  Future<void> _yaVerifique() async {
+    setState(() => _isLoading = true);
+    try {
+      final ok = await AuthService.instance.completeEmailVerificationIfReady();
+      if (!mounted) return;
+      if (!ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Todavía no figura verificado. Abrí el link del mail y volvé a tocar acá.',
+            ),
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 5),
           ),
-        ],
-      ),
+        );
+        return;
+      }
+      _navegarPostLogin();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AuthService.humanizeAuthError(e)),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _navegarPostLogin() {
+    if (EligeCaminoWidget.necesitaElegir()) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const EligeCaminoWidget()),
+        (_) => false,
+      );
+      return;
+    }
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const HomePageWidget()),
+      (_) => false,
     );
   }
 
-  Widget _chipMetodo({
-    required String label,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    return ChoiceChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: (_) => onTap(),
-      selectedColor: primaryColor.withOpacity(0.2),
-      labelStyle: TextStyle(
-        color: selected ? primaryColor : textColor,
-        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+  InputDecoration _dec(String label, {Widget? prefix, Widget? suffix}) {
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: prefix,
+      suffixIcon: suffix,
+      filled: true,
+      fillColor: Colors.white,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide.none,
       ),
     );
   }
@@ -227,131 +179,245 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
           icon: const Icon(Icons.arrow_back, color: textColor),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Crear cuenta',
-          style: TextStyle(color: textColor, fontWeight: FontWeight.w700),
+        title: Text(
+          _pendienteVerificacion ? 'Verificá tu email' : 'Crear cuenta',
+          style: const TextStyle(color: textColor, fontWeight: FontWeight.w700),
         ),
       ),
       body: SafeArea(
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-            children: [
-              const Text(
-                'Tus datos',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: textColor),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Con nombre y un contacto ya podés empezar. Documento y más datos los cargás después si querés.',
-                style: TextStyle(fontSize: 14, color: Colors.grey.shade600, height: 1.4),
-              ),
-              const SizedBox(height: 24),
-              TextFormField(
-                controller: _nombreController,
-                textCapitalization: TextCapitalization.words,
-                decoration: InputDecoration(
-                  labelText: 'Nombre *',
-                  prefixIcon: const Icon(Icons.person_outline),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+        child: _pendienteVerificacion
+            ? _buildPendienteVerificacion()
+            : Form(
+                key: _formKey,
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+                  children: [
+                    const Text(
+                      'Creá tu cuenta',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: textColor,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Te vamos a mandar un mail para confirmar que el email es tuyo. '
+                      'Sin eso no se puede entrar.',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    TextFormField(
+                      controller: _nombreController,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: _dec(
+                        'Nombre *',
+                        prefix: const Icon(Icons.person_outline),
+                      ),
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Obligatorio' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _apellidoController,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: _dec(
+                        'Apellido *',
+                        prefix: const Icon(Icons.person_outline),
+                      ),
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Obligatorio' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      autocorrect: false,
+                      decoration: _dec(
+                        'Email *',
+                        prefix: const Icon(Icons.email_outlined),
+                      ),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Obligatorio';
+                        if (!v.contains('@')) return 'Email inválido';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _passwordController,
+                      obscureText: _obscure1,
+                      decoration: _dec(
+                        'Contraseña *',
+                        prefix: const Icon(Icons.lock_outline),
+                        suffix: IconButton(
+                          icon: Icon(
+                            _obscure1
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                          ),
+                          onPressed: () =>
+                              setState(() => _obscure1 = !_obscure1),
+                        ),
+                      ),
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return 'Obligatorio';
+                        if (v.length < 6) return 'Mínimo 6 caracteres';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _password2Controller,
+                      obscureText: _obscure2,
+                      decoration: _dec(
+                        'Repetir contraseña *',
+                        prefix: const Icon(Icons.lock_outline),
+                        suffix: IconButton(
+                          icon: Icon(
+                            _obscure2
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                          ),
+                          onPressed: () =>
+                              setState(() => _obscure2 = !_obscure2),
+                        ),
+                      ),
+                      validator: (v) {
+                        if (v != _passwordController.text) {
+                          return 'No coincide con la contraseña';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 28),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _registrar,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Crear cuenta',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 16,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
                 ),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Obligatorio' : null,
               ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _apellidoController,
-                textCapitalization: TextCapitalization.words,
-                decoration: InputDecoration(
-                  labelText: 'Apellido *',
-                  prefixIcon: const Icon(Icons.person_outline),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-                ),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Obligatorio' : null,
-              ),
-              const SizedBox(height: 28),
-              const Text(
-                'Cómo te validamos',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: textColor),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  _chipMetodo(
-                    label: 'WhatsApp',
-                    selected: _metodoValidacion == 'whatsapp',
-                    onTap: () => setState(() => _metodoValidacion = 'whatsapp'),
-                  ),
-                  const SizedBox(width: 10),
-                  _chipMetodo(
-                    label: 'Email',
-                    selected: _metodoValidacion == 'email',
-                    onTap: () => setState(() => _metodoValidacion = 'email'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              if (_metodoValidacion == 'whatsapp')
-                TextFormField(
-                  controller: _whatsappController,
-                  keyboardType: TextInputType.phone,
-                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9+]'))],
-                  decoration: InputDecoration(
-                    labelText: 'WhatsApp *',
-                    hintText: '54911...',
-                    prefixIcon: const Icon(Icons.chat_outlined),
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-                  ),
-                  validator: (v) {
-                    if (_metodoValidacion != 'whatsapp') return null;
-                    if (v == null || v.trim().isEmpty) return 'Obligatorio';
-                    return null;
-                  },
-                )
-              else
-                TextFormField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
-                    labelText: 'Email *',
-                    prefixIcon: const Icon(Icons.email_outlined),
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-                  ),
-                  validator: (v) {
-                    if (_metodoValidacion != 'email') return null;
-                    if (v == null || v.trim().isEmpty) return 'Obligatorio';
-                    if (!v.contains('@')) return 'Email inválido';
-                    return null;
-                  },
-                ),
-              const SizedBox(height: 28),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _registrar,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    elevation: 0,
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Text('Registrarme y validar', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                ),
-              ),
-            ],
+      ),
+    );
+  }
+
+  Widget _buildPendienteVerificacion() {
+    final casilla = _emailRegistrado ?? 'tu casilla';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Icon(Icons.mark_email_unread_outlined,
+              size: 64, color: primaryColor),
+          const SizedBox(height: 20),
+          const Text(
+            'Revisá tu email',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: textColor,
+            ),
           ),
-        ),
+          const SizedBox(height: 12),
+          Text(
+            'Te mandamos un enlace a $casilla.\n\n'
+            'Abrilo para activar la cuenta. Si no lo ves, mirá en spam.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 15,
+              height: 1.45,
+              color: Colors.grey.shade700,
+            ),
+          ),
+          const SizedBox(height: 28),
+          SizedBox(
+            height: 52,
+            child: ElevatedButton(
+              onPressed: _isLoading ? null : _yaVerifique,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                elevation: 0,
+              ),
+              child: _isLoading
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text(
+                      'Ya verifiqué · Entrar',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton(
+            onPressed: _isLoading ? null : _reenviarMail,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: primaryColor,
+              side: BorderSide(color: primaryColor.withOpacity(0.4)),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            child: const Text('Reenviar mail de verificación'),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: _isLoading
+                ? null
+                : () async {
+                    await AuthService.instance.signOut();
+                    if (mounted) Navigator.pop(context);
+                  },
+            child: const Text('Volver al login'),
+          ),
+        ],
       ),
     );
   }

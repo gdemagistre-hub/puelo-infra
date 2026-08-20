@@ -11,18 +11,22 @@ import 'consola_prox.dart';
 import 'user_session.dart';
 import 'auth_service.dart';
 import 'loginScreen.dart';
+import 'onboarding/home_tour_service.dart';
 import 'theme/app_colors.dart';
 
 class MenuPerfilOpcionesWidget extends StatelessWidget {
   final VoidCallback? onClose;
   final bool modoPrestador;
   final VoidCallback? onRolPuedeHaberCambiado;
+  /// Reinicia y muestra el tour de Home (coach marks).
+  final VoidCallback? onRequestHomeTour;
 
   const MenuPerfilOpcionesWidget({
     super.key,
     this.onClose,
     this.modoPrestador = false,
     this.onRolPuedeHaberCambiado,
+    this.onRequestHomeTour,
   });
 
   Color get primaryColor =>
@@ -82,6 +86,12 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
       MaterialPageRoute(builder: (_) => const LoginScreenWidget()),
       (_) => false,
     );
+  }
+
+  Future<void> _abrirGuiaRapida(BuildContext context) async {
+    await HomeTourService.instance.reset(modoPrestador: modoPrestador);
+    onClose?.call();
+    onRequestHomeTour?.call();
   }
 
   @override
@@ -159,6 +169,14 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
         onTap: () =>
             _abrirFlotante(context, const PerfilCompletoFlotanteWidget()),
       ),
+      if (onRequestHomeTour != null)
+        _MenuItem(
+          icon: Icons.help_outline_rounded,
+          label: 'Guía rápida de la app',
+          subtitle:
+              'Repetí el recorrido de la primera vez: menú, roles y barra de abajo.',
+          onTap: () => _abrirGuiaRapida(context),
+        ),
       if (UserSession().isAdmin)
         _MenuItem(
           icon: Icons.monitor_heart_outlined,

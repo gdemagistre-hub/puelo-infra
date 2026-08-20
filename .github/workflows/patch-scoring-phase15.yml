@@ -1,0 +1,17 @@
+name: Patch scoring phase1.5
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          python3 scripts/patch_scoring_phase15.py
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add lib/scoring_service.dart functions/scoringCore.js
+          git commit -m "feat(scoring): badge bronce + tips + CF align v1.2-phase1.5" || echo no-changes
+          git push

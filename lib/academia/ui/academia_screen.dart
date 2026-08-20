@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../equipate/ui/equipate_screen.dart';
 import '../data/catalogo_lecciones.dart';
 import '../models/leccion.dart';
 import 'leccion_detalle_screen.dart';
@@ -20,60 +19,7 @@ class AcademiaScreen extends StatelessWidget {
     final body = ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
       children: [
-        Material(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          elevation: 1,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const EquipateScreen()),
-              );
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: _primary.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.build_circle_outlined,
-                        color: _primary),
-                  ),
-                  const SizedBox(width: 14),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Equípate',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 15,
-                            color: _text,
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Herramientas y simulador (modo prueba)',
-                          style: TextStyle(color: _muted, fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right_rounded,
-                      color: Color(0xFF94A3B8)),
-                ],
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
+        // Equípate oculto en esta etapa (no se usa).
         const Text(
           'Tips cortos para tu oficio',
           style: TextStyle(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -26,16 +27,29 @@ final ProxRouteObserver proxRouteObserver = ProxRouteObserver();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: const FirebaseOptions(
-      apiKey: 'AIzaSyAr6iPh8NaDBD4qwo3LvfpE4j9k7RfKTwQ',
-      authDomain: 'lifewalletpuelo.firebaseapp.com',
-      projectId: 'lifewalletpuelo',
-      storageBucket: 'lifewalletpuelo.firebasestorage.app',
-      messagingSenderId: '74624927314',
-      appId: '1:74624927314:web:3fadcc533dd1f3a985818b',
-    ),
-  );
+  // Web: options explícitas. Android/iOS: appId nativo (evita crash al abrir APK).
+  if (kIsWeb) {
+    await Firebase.initializeApp(
+      options: const FirebaseOptions(
+        apiKey: 'AIzaSyAr6iPh8NaDBD4qwo3LvfpE4j9k7RfKTwQ',
+        authDomain: 'lifewalletpuelo.firebaseapp.com',
+        projectId: 'lifewalletpuelo',
+        storageBucket: 'lifewalletpuelo.firebasestorage.app',
+        messagingSenderId: '74624927314',
+        appId: '1:74624927314:web:3fadcc533dd1f3a985818b',
+      ),
+    );
+  } else {
+    await Firebase.initializeApp(
+      options: const FirebaseOptions(
+        apiKey: 'AIzaSyAr6iPh8NaDBD4qwo3LvfpE4j9k7RfKTwQ',
+        appId: '1:74624927314:android:8e3376cf776fd40285818b',
+        messagingSenderId: '74624927314',
+        projectId: 'lifewalletpuelo',
+        storageBucket: 'lifewalletpuelo.firebasestorage.app',
+      ),
+    );
+  }
 
   if (AppEnv.verboseLogging) {
     debugPrint('Puelo env=${AppEnv.label} showDevTools=${AppEnv.showDevTools}');

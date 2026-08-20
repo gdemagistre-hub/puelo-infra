@@ -1,0 +1,40 @@
+name: Restore Homepage with Home Tour
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/restore-homepage-tour.yml'
+      - 'tools/homepage_restore/apply_home_tour_patch.py'
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Restore Homepage from e91f788 + apply tour patch
+        run: |
+          set -e
+          git show e91f788fd7f44cbc6cea5e097c15196a8e4729a5:lib/Homepage.dart > lib/Homepage.dart
+          wc -c lib/Homepage.dart
+          python3 tools/homepage_restore/apply_home_tour_patch.py
+          wc -c lib/Homepage.dart
+          grep -c HomeTourOverlay lib/Homepage.dart
+          grep -c _maybeStartHomeTour lib/Homepage.dart
+          grep -c "onboarding/home_tour" lib/Homepage.dart
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add lib/Homepage.dart
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "fix(home): restaurar Homepage completo + tour coach-marks primera vez (cliente/prestador)"
+            git push origin HEAD:main
+          fi

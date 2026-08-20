@@ -1,6 +1,6 @@
 /**
  * Scoring batch core (Admin SDK).
- * Model v1.2-phase1-cf — batch diario sin depender de la app.
+ * Model v1.2-phase1.5-cf — batch diario sin depender de la app.
  */
 const admin = require("firebase-admin");
 if (!admin.apps.length) admin.initializeApp();
@@ -56,15 +56,15 @@ function scoreIdentidadSimple(data) {
 
 function badgeSimple(data, scoreId) {
   const geo = data.direccion_geo || {};
+  const base =
+    noVacio(data.nombre) && noVacio(data.apellido) && noVacio(data.telefono);
   const reg =
-    noVacio(data.nombre) &&
-    noVacio(data.apellido) &&
-    noVacio(data.telefono) &&
+    base &&
     noVacio(data.doc_numero || data.numero_documento) &&
     (geo.localidad_id || geo.localidad_nombre);
-  if (reg && data.doc_validado === true && scoreId >= 50) return "bronce_plus";
+  if (base && data.doc_validado === true) return "bronce_plus";
   if (reg && scoreId >= 35) return "bronce";
-  if (reg) return "registrado";
+  if (base) return "registrado";
   return "nuevo";
 }
 
