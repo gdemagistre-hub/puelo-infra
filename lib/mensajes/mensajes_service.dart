@@ -58,7 +58,12 @@ class MensajesService {
       if (parts[1] == myUid && parts[0].isNotEmpty) return parts[0];
     }
 
-    for (final key in ['prestador_uid', 'cliente_uid', 'pending_recibo_actor_uid']) {
+    for (final key in [
+      'prestador_uid',
+      'cliente_uid',
+      'pending_recibo_actor_uid',
+      'pending_calificacion_actor_uid',
+    ]) {
       final v = data?[key]?.toString() ?? '';
       if (v.isNotEmpty && v != myUid) return v;
     }
@@ -162,6 +167,30 @@ class MensajesService {
     }
   }
 
+  /// Prestador acepta o responde una calificación pendiente (publica al score).
+  Future<Map<String, dynamic>> responderCalificacion({
+    required String conversacionId,
+    required String calificacionEventId,
+    String decision = 'aceptado',
+    String? respuestaTexto,
+  }) async {
+    if (!hasFirebaseAuth) {
+      throw StateError('Necesitás entrar con Google para responder');
+    }
+    try {
+      final result = await _fn.httpsCallable('responderCalificacion').call({
+        'conversacion_id': conversacionId,
+        'calificacion_event_id': calificacionEventId,
+        'decision': decision,
+        if (respuestaTexto != null && respuestaTexto.trim().isNotEmpty)
+          'respuesta_texto': respuestaTexto.trim(),
+      });
+      return Map<String, dynamic>.from(result.data as Map);
+    } catch (e) {
+      throw StateError(humanizeError(e));
+    }
+  }
+
   static String humanizeError(Object? e) {
     final s = '$e';
     final lower = s.toLowerCase();
@@ -186,7 +215,7 @@ class MensajesService {
     if (lower.contains('deadline') || lower.contains('timeout') || lower.contains('unavailable')) {
       return 'Sin conexión o el servidor no respondió. Probá de nuevo.';
     }
-    final m = RegExp(r'(?:FirebaseFunctionsException:?\s*)?(?:\[[^\]]*\]\s*)?(.+)')
+    final m = RegExp(r'(?:FirebaseFunctionsException:\s*)?(?:\[[^\]]*\]\s*)?(.+)')
         .firstMatch(s);
     final msg = (m?.group(1) ?? s).trim();
     if (msg.length > 160) return '${msg.substring(0, 157)}…';

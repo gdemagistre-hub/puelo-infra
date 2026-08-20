@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'Homepage.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_copy.dart';
@@ -45,6 +47,30 @@ class _CalificarTrabajoWidgetState extends State<CalificarTrabajoWidget> {
     );
   }
 
+  /// Avisa al prestador (inbox + push). Soft-fail: la calificación ya quedó guardada.
+  Future<void> _avisarPrestador({
+    required String calificacionId,
+    required int estrellas,
+    required String comentario,
+  }) async {
+    if (FirebaseAuth.instance.currentUser == null) {
+      debugPrint('avisarPrestador: sin Auth Google — skip CF');
+      return;
+    }
+    try {
+      final fn = FirebaseFunctions.instanceFor(region: 'us-east1');
+      await fn.httpsCallable('avisarCalificacionPrestador').call({
+        'calificacion_id': calificacionId,
+        'prestador_uid': widget.trabajadorId,
+        'trabajo_id': widget.trabajoId,
+        'estrellas': estrellas,
+        'comentario': comentario,
+      });
+    } catch (e) {
+      debugPrint('avisarCalificacionPrestador: $e');
+    }
+  }
+
   Future<void> _guardarCalificacion() async {
     if (_estrellasSeleccionadas == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -60,15 +86,12 @@ class _CalificarTrabajoWidgetState extends State<CalificarTrabajoWidget> {
 
     final trabajoRef =
         FirebaseFirestore.instance.collection('trabajos').doc(widget.trabajoId);
-    final trabajadorRef = FirebaseFirestore.instance
-        .collection('usuarios')
-        .doc(widget.trabajadorId);
+    final comentario = _comentarioController.text.trim();
 
     try {
-      // 1) Marca el trabajo (sin publicar estrellas al perfil todavía)
       await FirebaseFirestore.instance.runTransaction((transaction) async {
         transaction.update(trabajoRef, {
-          'comentarioCliente': _comentarioController.text.trim(),
+          'comentarioCliente': comentario,
           'estrellas': _estrellasSeleccionadas,
           'clienteUid': widget.clienteId,
           'calificado': true,
@@ -77,17 +100,15 @@ class _CalificarTrabajoWidgetState extends State<CalificarTrabajoWidget> {
         });
       });
 
-      // 2) Calificación en cuarentena: visible en score/perfil solo cuando
-      //    - el prestador acepta / responde, o
-      //    - pasan 7 días (batch scoring F1)
-      await FirebaseFirestore.instance.collection('calificaciones').add({
+      final calRef =
+          await FirebaseFirestore.instance.collection('calificaciones').add({
         'prestador_id': widget.trabajadorId,
         'trabajador_id': widget.trabajadorId,
         'cliente_id': widget.clienteId,
         'trabajo_id': widget.trabajoId,
         'estrellas': _estrellasSeleccionadas,
         'rating': _estrellasSeleccionadas,
-        'comentario': _comentarioController.text.trim(),
+        'comentario': comentario,
         'estado': 'pendiente_respuesta_prestador',
         'tipo': 'trabajo',
         'con_foto': false,
@@ -96,6 +117,12 @@ class _CalificarTrabajoWidgetState extends State<CalificarTrabajoWidget> {
         'created_at': FieldValue.serverTimestamp(),
         'fecha': FieldValue.serverTimestamp(),
       });
+
+      await _avisarPrestador(
+        calificacionId: calRef.id,
+        estrellas: _estrellasSeleccionadas,
+        comentario: comentario,
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
