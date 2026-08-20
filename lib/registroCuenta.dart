@@ -4,7 +4,6 @@ import 'Homepage.dart';
 import 'auth_service.dart';
 import 'elige_camino.dart';
 import 'theme/app_colors.dart';
-import 'user_session.dart';
 
 /// Alta de cuenta con email + contraseña (Firebase Auth).
 /// Tras registrarse debe verificar el mail antes de entrar a la app.
@@ -335,6 +334,7 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
   }
 
   Widget _buildPendienteVerificacion() {
+    final casilla = _emailRegistrado ?? 'tu casilla';
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
       child: Column(
@@ -354,7 +354,7 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
           ),
           const SizedBox(height: 12),
           Text(
-            'Te mandamos un enlace a\n${_emailRegistrado ?? 'tu casilla'}.\n\n'
+            'Te mandamos un enlace a $casilla.\n\n'
             'Abrilo para activar la cuenta. Si no lo ves, mirá en spam.',
             textAlign: TextAlign.center,
             style: TextStyle(
