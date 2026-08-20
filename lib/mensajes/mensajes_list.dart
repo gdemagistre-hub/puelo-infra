@@ -6,7 +6,7 @@ import 'emitir_recibo_sheet.dart';
 import 'mensajes_detalle.dart';
 import 'mensajes_service.dart';
 
-/// Tab Mensajes embebido: lista de hilos (recibos).
+/// Tab Mensajes embebido: lista de hilos (recibos + evaluaciones).
 class MensajesListScreen extends StatelessWidget {
   final bool embedded;
   const MensajesListScreen({super.key, this.embedded = true});
@@ -114,7 +114,6 @@ class MensajesListScreen extends StatelessWidget {
   }
 }
 
-/// Leyenda fija bajo el título de la pestaña.
 class _LeyendaHeader extends StatelessWidget {
   const _LeyendaHeader();
 
@@ -135,8 +134,8 @@ class _LeyendaHeader extends StatelessWidget {
           const SizedBox(width: 10),
           const Expanded(
             child: Text(
-              'Los recibos se emiten desde la tarjeta digital de la otra persona. '
-              'Acá los ves y respondés.',
+              'Acá ves recibos y evaluaciones pendientes. '
+              'Los recibos se emiten desde la tarjeta digital; las evaluaciones las enviá el cliente.',
               style: TextStyle(
                 fontSize: 13,
                 height: 1.35,
@@ -177,7 +176,7 @@ class _EmptyState extends StatelessWidget {
         ),
         const SizedBox(height: 24),
         const Text(
-          'Todavía no hay recibos',
+          'Todavía no hay mensajes',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 20,
@@ -187,8 +186,8 @@ class _EmptyState extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         const Text(
-          'Buscá a la persona, abrí su tarjeta digital y tocá “Emitir recibo”. '
-          'Cada recibo queda sellado y no se puede editar.',
+          'Cuando un cliente te califique o te emitan un recibo, aparece acá. '
+          'También podés emitir un recibo desde la tarjeta digital.',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 14,
@@ -207,16 +206,6 @@ class _EmptyState extends StatelessWidget {
           label: const Text(
             'Emitir recibo',
             style: TextStyle(fontWeight: FontWeight.w800),
-          ),
-        ),
-        const SizedBox(height: 10),
-        const Text(
-          'También podés usar el botón de abajo si ya conocés el código de la otra persona.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 12,
-            height: 1.4,
-            color: Color(0xFF94A3B8),
           ),
         ),
       ],
@@ -298,7 +287,8 @@ class _HiloTileState extends State<_HiloTile> {
   @override
   Widget build(BuildContext context) {
     final summary = (widget.data['last_summary'] as String?) ?? 'Conversación';
-    final pending = widget.data['pending_recibo_event_id'] != null;
+    final pending = widget.data['pending_recibo_event_id'] != null ||
+        widget.data['pending_calificacion_event_id'] != null;
     final name = _otherName ?? '…';
     final initial = name.isNotEmpty && name != '…' ? name[0].toUpperCase() : '?';
 
