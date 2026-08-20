@@ -8,6 +8,7 @@ import 'capacitacionesflotante.dart';
 import 'perfilCompletoflotante.dart';
 import 'registroTrabajador.dart';
 import 'consola_prox.dart';
+import 'admin/readiness_admin_screen.dart';
 import 'user_session.dart';
 import 'auth_service.dart';
 import 'loginScreen.dart';
@@ -177,7 +178,20 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
               'Repetí el recorrido de la primera vez: menú, roles y barra de abajo.',
           onTap: () => _abrirGuiaRapida(context),
         ),
-      if (UserSession().isAdmin)
+      if (UserSession().isAdmin) ...[
+        _MenuItem(
+          icon: Icons.account_balance_outlined,
+          label: 'Madurez microcrédito',
+          subtitle:
+              'Tablero de readiness 0–100 y preparación Academia. Solo admin.',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const ReadinessAdminScreen(),
+              ),
+            );
+          },
+        ),
         _MenuItem(
           icon: Icons.monitor_heart_outlined,
           label: 'Consola Prox',
@@ -189,6 +203,7 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
             );
           },
         ),
+      ],
       _MenuItem(
         icon: Icons.logout_rounded,
         label: 'Cerrar sesión',
