@@ -43,6 +43,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   static const Color _misNumerosPrimary = Color(0xFF28B5CD);
   static const Color _misNumerosDark = Color(0xFF1F9BB0);
 
+  /// Alto del area de iconos de la barra (sin SafeArea inferior).
+  static const double _navBarHeight = 64;
+
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   // 0 Home | 1 Evaluar | 2 Mis números | 3 Mensajes | 4 Academia
   int _currentIndex = 0;
@@ -105,6 +108,15 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       _puedeSerAmbos = esPrestador;
       _modoPrestador = widget.initialModoPrestador ?? esPrestador;
     });
+  }
+
+  /// Cambia de tab; al volver a Home refresca perfil (estrellas, etc.).
+  void _selectTab(int index) {
+    if (_currentIndex == index) return;
+    setState(() => _currentIndex = index);
+    if (index == 0) {
+      _refrescarDatosSesion();
+    }
   }
 
   String _getInitials() {
@@ -292,7 +304,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       case 1:
         return const MenuEvaluacionesWidget(embedded: true);
       case 2:
-        return MisNumerosShell(onBackToHome: () => setState(() => _currentIndex = 0));
+        return MisNumerosShell(onBackToHome: () => _selectTab(0));
       case 3:
         return const MensajesListScreen(embedded: true);
       case 4:
@@ -302,9 +314,43 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     }
   }
 
+  /// Contenido con slide desde abajo (detras de la barra flotante).
+  Widget _buildAnimatedTabBody() {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 320),
+      reverseDuration: const Duration(milliseconds: 220),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) {
+        final slide = Tween<Offset>(
+          begin: const Offset(0, 0.14),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+        ));
+        return SlideTransition(
+          position: slide,
+          child: FadeTransition(
+            opacity: animation,
+            child: child,
+          ),
+        );
+      },
+      child: KeyedSubtree(
+        key: ValueKey<String>('tab_$_currentIndex${_modoPrestador ? '_p' : '_c'}'),
+        child: _tabBody,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final onHome = _currentIndex == 0;
+    final bottomSafe = MediaQuery.of(context).padding.bottom;
+    // Espacio para que el contenido no quede bajo la barra (64 + safe + margen boton central).
+    final contentBottomPad = _navBarHeight + bottomSafe + 12;
+
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: const Color(0xFFF1F5F9),
@@ -332,38 +378,58 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                 style: TextStyle(color: primaryColor, fontWeight: FontWeight.w800),
               ),
             ),
-      body: _tabBody,
-      bottomNavigationBar: _buildBottomNav(),
+      // Enfoque B: contenido a pantalla completa; barra flotante encima.
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned.fill(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: contentBottomPad),
+              child: _buildAnimatedTabBody(),
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _buildBottomNav(),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildBottomNav() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 16,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 64,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                _navItem(0, Icons.home_rounded, 'Home'),
-                _navItem(1, Icons.star_outline_rounded, 'Evaluar'),
-                _centerMisNumerosButton(),
-                _mensajesNavItem(),
-                _navItem(4, Icons.school_outlined, 'Academia'),
-              ],
+    return Material(
+      color: Colors.transparent,
+      elevation: 0,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 18,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: _navBarHeight,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  _navItem(0, Icons.home_rounded, 'Home'),
+                  _navItem(1, Icons.star_outline_rounded, 'Evaluar'),
+                  _centerMisNumerosButton(),
+                  _mensajesNavItem(),
+                  _navItem(4, Icons.school_outlined, 'Academia'),
+                ],
+              ),
             ),
           ),
         ),
@@ -376,7 +442,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6, left: 4, right: 4),
       child: GestureDetector(
-        onTap: () => setState(() => _currentIndex = 2),
+        onTap: () => _selectTab(2),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -440,9 +506,17 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           if (snap.hasData) {
             for (final doc in snap.data!.docs) {
               final d = doc.data();
-              if (d['pending_recibo_event_id'] == null) continue;
-              final actor = (d['pending_recibo_actor_uid'] ?? '').toString();
-              if (actor.isEmpty || actor != uid) pending++;
+              final hasRecibo = d['pending_recibo_event_id'] != null;
+              final hasCalif = d['pending_calificacion_event_id'] != null;
+              if (!hasRecibo && !hasCalif) continue;
+              if (hasRecibo) {
+                final actor = (d['pending_recibo_actor_uid'] ?? '').toString();
+                if (actor.isEmpty || actor != uid) pending++;
+              }
+              if (hasCalif) {
+                final actor = (d['pending_calificacion_actor_uid'] ?? '').toString();
+                if (actor.isEmpty || actor != uid) pending++;
+              }
             }
           }
           return _navItemContent(
@@ -467,7 +541,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     final showBadge = badgeCount > 0;
     final badgeText = badgeCount > 9 ? '9+' : '$badgeCount';
     return InkWell(
-      onTap: onTap ?? () => setState(() => _currentIndex = index),
+      onTap: onTap ?? () => _selectTab(index),
       borderRadius: BorderRadius.circular(14),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
