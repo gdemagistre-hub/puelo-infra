@@ -1,13 +1,12 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:image_picker/image_picker.dart';
 import 'calificarTrabajo.dart';
 import 'Homepage.dart';
 import 'user_session.dart';
-import 'platform_capabilities.dart';
+import 'theme/app_colors.dart';
 
+/// Cliente elige prestador y pasa a calificar (estrellas + comentario).
+/// Las fotos de trabajos solo las carga el prestador (portfolio).
 class CargaTrabajoClienteWidget extends StatefulWidget {
   const CargaTrabajoClienteWidget({super.key});
 
@@ -18,11 +17,8 @@ class CargaTrabajoClienteWidget extends StatefulWidget {
 
 class _CargaTrabajoClienteWidgetState extends State<CargaTrabajoClienteWidget> {
   DocumentReference? _selectedTrabajador;
-  final List<XFile> _selectedImages = [];
-  final ImagePicker _picker = ImagePicker();
-  bool _isUploading = false;
+  bool _isSaving = false;
 
-  /// One-shot acotado a prestadores (Sprint 0: sin snapshots de toda la colección).
   late final Future<QuerySnapshot<Map<String, dynamic>>> _trabajadoresFuture =
       FirebaseFirestore.instance
           .collection('usuarios')
@@ -30,41 +26,13 @@ class _CargaTrabajoClienteWidgetState extends State<CargaTrabajoClienteWidget> {
           .limit(80)
           .get();
 
-  Future<void> _pickImages() async {
-    if (!PlatformCapabilities.supportsGallery) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(PlatformCapabilities.cameraUnsupportedMessage)),
-      );
-      return;
-    }
-    try {
-      final List<XFile> images = await _picker.pickMultiImage(
-        maxWidth: 1920,
-        maxHeight: 1080,
-        imageQuality: 80,
-      );
-      if (images.isNotEmpty && mounted) {
-        setState(() => _selectedImages.addAll(images));
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudieron seleccionar imágenes: $e')),
-      );
-    }
-  }
-
-  Future<void> _uploadAndSave() async {
+  Future<void> _continuarACalificar() async {
     if (_selectedTrabajador == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, seleccioná un trabajador.')),
-      );
-      return;
-    }
-    if (_selectedImages.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tenés que seleccionar al menos una foto.')),
+        const SnackBar(
+          content: Text('Seleccion\u00e1 el prestador del servicio.'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
@@ -72,37 +40,17 @@ class _CargaTrabajoClienteWidgetState extends State<CargaTrabajoClienteWidget> {
     final sessionUid = UserSession().uid;
     if (sessionUid == null || sessionUid.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sesión no encontrada. Volvé a iniciar.')),
+        const SnackBar(
+          content: Text('Sesi\u00f3n no encontrada. Volv\u00e9 a iniciar.'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
 
-    setState(() {
-      _isUploading = true;
-    });
+    setState(() => _isSaving = true);
 
     try {
-      List<String> imageUrls = [];
-
-      for (var image in _selectedImages) {
-        String fileName =
-            '${DateTime.now().millisecondsSinceEpoch}_${image.name}';
-        // Sprint 0 storage rules: usuarios/{auth.uid}/...
-        Reference storageRef = FirebaseStorage.instance
-            .ref()
-            .child('usuarios/$sessionUid/trabajos/$fileName');
-        Uint8List fileBytes = await image.readAsBytes();
-
-        UploadTask uploadTask = storageRef.putData(
-          fileBytes,
-          SettableMetadata(contentType: 'image/jpeg'),
-        );
-
-        TaskSnapshot snapshot = await uploadTask;
-        String downloadUrl = await snapshot.ref.getDownloadURL();
-        imageUrls.add(downloadUrl);
-      }
-
       final clienteActualRef =
           FirebaseFirestore.instance.collection('usuarios').doc(sessionUid);
 
@@ -110,54 +58,56 @@ class _CargaTrabajoClienteWidgetState extends State<CargaTrabajoClienteWidget> {
           await FirebaseFirestore.instance.collection('trabajos').add({
         'trabajadorRef': _selectedTrabajador,
         'clienteRef': clienteActualRef,
-        'imagenes': imageUrls,
+        'usuario_id': _selectedTrabajador!.id,
         'fechaCarga': FieldValue.serverTimestamp(),
         'cargadoPor': 'Cliente',
+        'tipo': 'evaluacion',
         'calificado': false,
         'comentarioCliente': '',
         'estrellas': 0,
+        // Sin imagenes: el portfolio es solo del prestador.
       });
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('¡Trabajo cargado con éxito! Ahora podés calificar.'),
-          ),
-        );
+      if (!mounted) return;
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => CalificarTrabajoWidget(
-              trabajoId: nuevoTrabajoRef.id,
-              trabajadorId: _selectedTrabajador!.id,
-              clienteId: sessionUid,
-            ),
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CalificarTrabajoWidget(
+            trabajoId: nuevoTrabajoRef.id,
+            trabajadorId: _selectedTrabajador!.id,
+            clienteId: sessionUid,
           ),
-        );
-      }
+        ),
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al subir: $e')),
+          SnackBar(
+            content: Text('No se pudo continuar: $e'),
+            backgroundColor: const Color(0xFFB91C1C),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _isUploading = false;
-        });
-      }
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
-        title: const Text('Ingreso Cliente'),
-        backgroundColor: const Color(0xFF0F52BA),
-        foregroundColor: Colors.white,
+        title: const Text(
+          'Calificar servicio',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.text,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
         actions: [
           IconButton(
             icon: const Icon(Icons.home_rounded),
@@ -177,26 +127,64 @@ class _CargaTrabajoClienteWidgetState extends State<CargaTrabajoClienteWidget> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text(
-              'Seleccioná el Trabajador del servicio:',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              '\u00bfA qui\u00e9n calific\u00e1s?',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: AppColors.text,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Eleg\u00ed el prestador del trabajo. Despu\u00e9s vas a poner estrellas y un comentario. '
+              'Las fotos de trabajos solo las publica el prestador en su portfolio.',
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.4,
+                color: AppColors.textMuted,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Prestador',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: AppColors.text,
+              ),
             ),
             const SizedBox(height: 8),
             FutureBuilder<QuerySnapshot<Map<String, dynamic>>>(
               future: _trabajadoresFuture,
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
-                  return Text('Error al cargar prestadores: ${snapshot.error}');
+                  return Text(
+                    'Error al cargar prestadores: ${snapshot.error}',
+                    style: const TextStyle(color: Color(0xFFB91C1C)),
+                  );
                 }
                 if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
                 }
                 final items = snapshot.data!.docs;
                 return DropdownButtonFormField<DocumentReference>(
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.all(10),
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
                   ),
-                  hint: const Text('Elegir Trabajador'),
+                  hint: const Text('Elegir prestador'),
                   value: _selectedTrabajador,
                   items: items.map((doc) {
                     final data = doc.data();
@@ -208,7 +196,8 @@ class _CargaTrabajoClienteWidgetState extends State<CargaTrabajoClienteWidget> {
                       child: Text(
                         displayName.trim().isNotEmpty
                             ? displayName
-                            : 'Sin Nombre',
+                            : 'Sin nombre',
+                        overflow: TextOverflow.ellipsis,
                       ),
                     );
                   }).toList(),
@@ -216,85 +205,36 @@ class _CargaTrabajoClienteWidgetState extends State<CargaTrabajoClienteWidget> {
                 );
               },
             ),
-            const SizedBox(height: 30),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.grey[200],
-                foregroundColor: Colors.black87,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              icon: const Icon(Icons.photo_library),
-              label: const Text('Elegir fotos desde el dispositivo'),
-              onPressed: _isUploading ? null : _pickImages,
-            ),
-            const SizedBox(height: 15),
-            if (_selectedImages.isNotEmpty) ...[
-              const Text(
-                'Imágenes seleccionadas:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                height: 100,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _selectedImages.length,
-                  itemBuilder: (context, index) {
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8.0),
-                      child: Container(
-                        width: 100,
-                        height: 100,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(7),
-                          child: FutureBuilder<Uint8List>(
-                            future: _selectedImages[index].readAsBytes(),
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState ==
-                                      ConnectionState.done &&
-                                  snapshot.hasData) {
-                                return Image.memory(
-                                  snapshot.data!,
-                                  fit: BoxFit.cover,
-                                );
-                              }
-                              return const Center(
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
             const Spacer(),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0F52BA),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              onPressed: _isUploading ? null : _uploadAndSave,
-              child: _isUploading
-                  ? const SizedBox(
-                      height: 22,
-                      width: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
+            SizedBox(
+              height: 52,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.cliente,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                onPressed: _isSaving ? null : _continuarACalificar,
+                child: _isSaving
+                    ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'Continuar a calificar',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
-                    )
-                  : const Text(
-                      'Subir y calificar',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
+              ),
             ),
           ],
         ),
