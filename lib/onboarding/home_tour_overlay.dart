@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-/// Paso del tour contextual sobre el Home.
+/// Paso del tour contextual sobre el Home (estilo coach-mark clásico).
 class HomeTourStep {
   final String title;
   final String body;
-  /// Zona aproximada del acento visual (0–1 relativo a pantalla útil).
+  /// Zona aproximada del acento visual (Alignment -1..1 relativo a pantalla útil).
   final Alignment highlightAlign;
   final double highlightWidthFactor;
   final double highlightHeightFactor;
@@ -18,13 +18,14 @@ class HomeTourStep {
   });
 }
 
+/// Copy alineado a las pantallas de ayuda (prestador / cliente).
 List<HomeTourStep> tourStepsFor({required bool modoPrestador}) {
   if (modoPrestador) {
     return const [
       HomeTourStep(
-        title: 'Tu menú',
+        title: 'Menú de configuración',
         body:
-            'Acá configurás tu perfil, datos y preferencias. Todo lo importante de tu cuenta vive en este menú.',
+            'Desde acá configurás tu perfil, datos y preferencias. Todo lo importante de tu cuenta vive en este menú.',
         highlightAlign: Alignment(-0.92, -0.78),
         highlightWidthFactor: 0.22,
         highlightHeightFactor: 0.08,
@@ -32,23 +33,23 @@ List<HomeTourStep> tourStepsFor({required bool modoPrestador}) {
       HomeTourStep(
         title: 'Ofrezco / Busco',
         body:
-            'Con este botón cambiás entre tu perfil de prestador y el de cliente, cuando necesitás los dos.',
+            'Este botón cambia entre tu perfil de prestador de servicio y el de cliente, cuando necesitás los dos.',
         highlightAlign: Alignment(0.55, -0.78),
-        highlightWidthFactor: 0.32,
+        highlightWidthFactor: 0.34,
         highlightHeightFactor: 0.08,
       ),
       HomeTourStep(
         title: 'Tu tarjeta digital',
         body:
-            'Es tu presentación para enviar a clientes. Es la misma que ellos ven cuando te encuentran buscando un servicio.',
-        highlightAlign: Alignment(0, -0.12),
+            'Esta es tu tarjeta de presentación para enviar a clientes. Es la misma que ellos pueden encontrar al buscar un servicio.',
+        highlightAlign: Alignment(0, -0.08),
         highlightWidthFactor: 0.9,
         highlightHeightFactor: 0.12,
       ),
       HomeTourStep(
-        title: 'Home',
+        title: 'Volvés a esta pantalla',
         body:
-            'Desde cualquier sección, tocá Home para volver a esta pantalla.',
+            'Desde cualquier sección, tocá Home para volver a tu pantalla principal de prestador.',
         highlightAlign: Alignment(-0.72, 0.92),
         highlightWidthFactor: 0.18,
         highlightHeightFactor: 0.09,
@@ -56,15 +57,15 @@ List<HomeTourStep> tourStepsFor({required bool modoPrestador}) {
       HomeTourStep(
         title: 'Mis números',
         body:
-            'Gestioná cobros, gastos y tu bolsillo desde acá, de forma privada.',
-        highlightAlign: Alignment(0, 0.9),
-        highlightWidthFactor: 0.22,
-        highlightHeightFactor: 0.12,
+            'Gestioná tus números desde acá y de forma privada: cobros, gastos y tu bolsillo.',
+        highlightAlign: Alignment(0, 0.88),
+        highlightWidthFactor: 0.24,
+        highlightHeightFactor: 0.13,
       ),
       HomeTourStep(
         title: 'Academia',
         body:
-            'Tips cortos de microfinanzas y oficio. Siempre hay algo para aprender.',
+            'Academia de microfinanzas y tips de oficio. Siempre hay algo para aprender.',
         highlightAlign: Alignment(0.78, 0.92),
         highlightWidthFactor: 0.18,
         highlightHeightFactor: 0.09,
@@ -74,9 +75,9 @@ List<HomeTourStep> tourStepsFor({required bool modoPrestador}) {
 
   return const [
     HomeTourStep(
-      title: 'Tu menú',
+      title: 'Menú de configuración',
       body:
-          'Configurá tu perfil y domicilio. Tu zona ayuda a mostrar prestadores de donde vivís.',
+          'Configurá tu perfil y domicilio. Tu domicilio favorece mostrar prestadores de la zona donde vivís.',
       highlightAlign: Alignment(-0.92, -0.78),
       highlightWidthFactor: 0.22,
       highlightHeightFactor: 0.08,
@@ -84,16 +85,16 @@ List<HomeTourStep> tourStepsFor({required bool modoPrestador}) {
     HomeTourStep(
       title: 'Pantalla de cliente',
       body:
-          'Esta es tu vista para buscar servicios. Elegí un oficio o escribí lo que necesitás.',
-      highlightAlign: Alignment(0, -0.55),
+          'Esta pantalla es propia de quien busca servicios. Elegí un oficio o escribí lo que necesitás.',
+      highlightAlign: Alignment(0, -0.52),
       highlightWidthFactor: 0.9,
-      highlightHeightFactor: 0.14,
+      highlightHeightFactor: 0.16,
     ),
     HomeTourStep(
-      title: 'Más confianza',
+      title: 'Prestadores con más confianza',
       body:
-          'Desde acá buscás prestadores mejor evaluados en tu zona, ordenados por reputación.',
-      highlightAlign: Alignment(0, 0.35),
+          'Acá podés buscar prestadores de servicio mejor evaluados en tu zona, ordenados por reputación.',
+      highlightAlign: Alignment(0, 0.32),
       highlightWidthFactor: 0.9,
       highlightHeightFactor: 0.14,
     ),
@@ -108,7 +109,7 @@ List<HomeTourStep> tourStepsFor({required bool modoPrestador}) {
   ];
 }
 
-/// Overlay de coach-marks (primera vez). No bloquea el layout del Home.
+/// Overlay de coach-marks (primera vez). No altera el layout del Home.
 class HomeTourOverlay extends StatefulWidget {
   final bool modoPrestador;
   final Color accent;
@@ -147,7 +148,6 @@ class _HomeTourOverlayState extends State<HomeTourOverlay> {
     final size = MediaQuery.sizeOf(context);
     final pad = MediaQuery.paddingOf(context);
 
-    // Área útil (sin status bar) para alinear highlights.
     final usable = Size(size.width, size.height - pad.top);
     final hx = (step.highlightAlign.x + 1) / 2 * usable.width -
         (usable.width * step.highlightWidthFactor) / 2;
@@ -164,28 +164,27 @@ class _HomeTourOverlayState extends State<HomeTourOverlay> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Scrim + “agujero” suave (borde redondeado iluminado).
           CustomPaint(
             painter: _SpotlightPainter(
               hole: Rect.fromLTWH(
                 hx.clamp(8.0, size.width - 16),
                 hy.clamp(pad.top + 4, size.height - 40),
                 hw.clamp(48.0, size.width - 16),
-                hh.clamp(40.0, 120.0),
+                hh.clamp(40.0, 140.0),
               ),
               accent: widget.accent,
             ),
             size: size,
           ),
-
-          // Card del paso
           Positioned(
             left: 20,
             right: 20,
             top: cardBelow
                 ? (hy + hh + 16).clamp(pad.top + 80, size.height - 220)
                 : null,
-            bottom: cardBelow ? null : (size.height - hy + 12).clamp(90.0, size.height * 0.45),
+            bottom: cardBelow
+                ? null
+                : (size.height - hy + 12).clamp(90.0, size.height * 0.45),
             child: _TourCard(
               accent: widget.accent,
               stepIndex: _i,
