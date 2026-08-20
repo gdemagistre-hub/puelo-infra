@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'cargaTrabajoCliente.dart';
 import 'cargaTrabajoTrabajador.dart';
-import 'proximamente.dart';
+import 'evaluarCliente.dart';
 import 'user_session.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_copy.dart';
@@ -47,7 +47,7 @@ class MenuEvaluacionesWidget extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             esPrestador
-                ? 'Como prestador pod\u00e9s mostrar trabajos hechos en tu portfolio.'
+                ? 'Como prestador pod\u00e9s mostrar trabajos y evaluar clientes con los que ya tuviste contacto.'
                 : 'Cont\u00e1 c\u00f3mo te fue para ayudar a otros a confiar.',
             style: const TextStyle(
               fontSize: 14,
@@ -99,14 +99,14 @@ class MenuEvaluacionesWidget extends StatelessWidget {
             const SizedBox(height: 12),
             _ActionCard(
               titulo: 'Evaluar a un cliente',
-              subtitulo: AppCopy.ctaProximamente,
+              subtitulo:
+                  'Solo clientes con los que ya tuviste recibo, evaluaci\u00f3n o chat en Mensajes.',
               icono: Icons.how_to_reg_rounded,
               accent: AppColors.prestador,
-              muted: true,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const ProximamenteWidget(),
+                  builder: (context) => const EvaluarClienteWidget(),
                 ),
               ),
             ),
