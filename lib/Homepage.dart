@@ -24,6 +24,9 @@ import 'mis_numeros/mis_numeros_shell.dart';
 import 'academia/ui/academia_screen.dart';
 import 'mensajes/mensajes_list.dart';
 import 'services/fcm_service.dart';
+import 'package:showcaseview/showcaseview.dart';
+import 'onboarding/home_tour_service.dart';
+import 'onboarding/home_tour_overlay.dart';
 
 class HomePageWidget extends StatefulWidget {
   final bool? initialModoPrestador;
@@ -43,6 +46,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   static const Color _misNumerosPrimary = Color(0xFF28B5CD);
   static const Color _misNumerosDark = Color(0xFF1F9BB0);
 
+  /// Alto del area de iconos de la barra (sin SafeArea inferior).
+  static const double _navBarHeight = 64;
+
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   // 0 Home | 1 Evaluar | 2 Mis números | 3 Mensajes | 4 Academia
   int _currentIndex = 0;
@@ -58,6 +64,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
   /// Tips Confianza visitados en esta sesion (UI gris).
   final Set<String> _tipsVisitadosSesion = {};
+
+  /// Tour (showcaseview) — se dispara tras el primer frame.
+  bool _tourCheckDone = false;
 
   Color get primaryColor => _modoPrestador ? _prestadorPrimary : _clientePrimary;
   Color get primaryDark => _modoPrestador ? _prestadorDark : _clienteDark;
@@ -89,6 +98,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     if (foto.isNotEmpty) _urlFotoPerfil = foto;
     // FCM: registra token si hay Auth real (Google). Dev dropdown no tiene token Auth → no-op seguro.
     FcmService.instance.ensureStarted();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeStartHomeTour());
   }
 
   @override
@@ -106,6 +116,50 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       _modoPrestador = widget.initialModoPrestador ?? esPrestador;
     });
   }
+
+  /// Cambia de tab; al volver a Home refresca perfil (estrellas, etc.).
+  void _selectTab(int index) {
+    if (_currentIndex == index) return;
+    setState(() => _currentIndex = index);
+    if (index == 0) {
+      _refrescarDatosSesion();
+    }
+  }
+
+  Future<void> _maybeStartHomeTour() async {
+    if (!mounted || _currentIndex != 0) return;
+    final show = await HomeTourService.instance.shouldShow(
+      modoPrestador: _modoPrestador,
+    );
+    if (!mounted) return;
+    _tourCheckDone = true;
+    if (show) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _currentIndex != 0) return;
+        startHomeTourShowcase(modoPrestador: _modoPrestador);
+      });
+    }
+  }
+
+  Future<void> _finishHomeTour() async {
+    await HomeTourService.instance.markDone(modoPrestador: _modoPrestador);
+  }
+
+  /// Desde menú · Guía rápida.
+  void _requestHomeTour() {
+    setState(() => _currentIndex = 0);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      startHomeTourShowcase(modoPrestador: _modoPrestador);
+    });
+  }
+
+  void _toggleModoPrestador() {
+    setState(() => _modoPrestador = !_modoPrestador);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeStartHomeTour());
+  }
+
+
 
   String _getInitials() {
     final n = UserSession().nombreCompleto.trim();
@@ -292,7 +346,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       case 1:
         return const MenuEvaluacionesWidget(embedded: true);
       case 2:
-        return MisNumerosShell(onBackToHome: () => setState(() => _currentIndex = 0));
+        return MisNumerosShell(onBackToHome: () => _selectTab(0));
       case 3:
         return const MensajesListScreen(embedded: true);
       case 4:
@@ -302,10 +356,48 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     }
   }
 
+  /// Contenido con slide desde abajo (detras de la barra flotante).
+  Widget _buildAnimatedTabBody() {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 320),
+      reverseDuration: const Duration(milliseconds: 220),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) {
+        final slide = Tween<Offset>(
+          begin: const Offset(0, 0.14),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+        ));
+        return SlideTransition(
+          position: slide,
+          child: FadeTransition(
+            opacity: animation,
+            child: child,
+          ),
+        );
+      },
+      child: KeyedSubtree(
+        key: ValueKey<String>('tab_$_currentIndex${_modoPrestador ? '_p' : '_c'}'),
+        child: _tabBody,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final onHome = _currentIndex == 0;
-    return Scaffold(
+    final bottomSafe = MediaQuery.of(context).padding.bottom;
+    // Espacio para que el contenido no quede bajo la barra (64 + safe + margen boton central).
+    final contentBottomPad = _navBarHeight + bottomSafe + 12;
+
+    return ShowCaseWidget(
+      onFinish: () {
+        _finishHomeTour();
+      },
+      builder: (context) => Scaffold(
       key: _scaffoldKey,
       backgroundColor: const Color(0xFFF1F5F9),
       drawer: Drawer(
@@ -315,6 +407,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             modoPrestador: _modoPrestador,
             onClose: () => Navigator.of(context).pop(),
             onRolPuedeHaberCambiado: _detectarRol,
+            onRequestHomeTour: _requestHomeTour,
           ),
         ),
       ),
@@ -332,38 +425,59 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                 style: TextStyle(color: primaryColor, fontWeight: FontWeight.w800),
               ),
             ),
-      body: _tabBody,
-      bottomNavigationBar: _buildBottomNav(),
+      // Enfoque B: contenido a pantalla completa; barra flotante encima.
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned.fill(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: contentBottomPad),
+              child: _buildAnimatedTabBody(),
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _buildBottomNav(),
+          ),
+        ],
+      ),
+      ),
     );
   }
 
   Widget _buildBottomNav() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 16,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 64,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                _navItem(0, Icons.home_rounded, 'Home'),
-                _navItem(1, Icons.star_outline_rounded, 'Evaluar'),
-                _centerMisNumerosButton(),
-                _mensajesNavItem(),
-                _navItem(4, Icons.school_outlined, 'Academia'),
-              ],
+    return Material(
+      color: Colors.transparent,
+      elevation: 0,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 18,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: _navBarHeight,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  _navItem(0, Icons.home_rounded, 'Home'),
+                  _navItem(1, Icons.star_outline_rounded, 'Evaluar'),
+                  _centerMisNumerosButton(),
+                  _mensajesNavItem(),
+                  _navAcademiaShowcase(),
+                ],
+              ),
             ),
           ),
         ),
@@ -373,10 +487,15 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
   Widget _centerMisNumerosButton() {
     final selected = _currentIndex == 2;
-    return Padding(
+    return homeShowcase(
+      key: HomeTourKeys.navMisNumeros,
+      modoPrestador: _modoPrestador,
+      accent: primaryColor,
+      tooltipPosition: TooltipPosition.top,
+      child: Padding(
       padding: const EdgeInsets.only(bottom: 6, left: 4, right: 4),
       child: GestureDetector(
-        onTap: () => setState(() => _currentIndex = 2),
+        onTap: () => _selectTab(2),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -418,6 +537,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           ],
         ),
       ),
+    ),
     );
   }
 
@@ -440,9 +560,17 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           if (snap.hasData) {
             for (final doc in snap.data!.docs) {
               final d = doc.data();
-              if (d['pending_recibo_event_id'] == null) continue;
-              final actor = (d['pending_recibo_actor_uid'] ?? '').toString();
-              if (actor.isEmpty || actor != uid) pending++;
+              final hasRecibo = d['pending_recibo_event_id'] != null;
+              final hasCalif = d['pending_calificacion_event_id'] != null;
+              if (!hasRecibo && !hasCalif) continue;
+              if (hasRecibo) {
+                final actor = (d['pending_recibo_actor_uid'] ?? '').toString();
+                if (actor.isEmpty || actor != uid) pending++;
+              }
+              if (hasCalif) {
+                final actor = (d['pending_calificacion_actor_uid'] ?? '').toString();
+                if (actor.isEmpty || actor != uid) pending++;
+              }
             }
           }
           return _navItemContent(
@@ -456,7 +584,18 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     );
   }
 
+Widget _navAcademiaShowcase() {
+    return homeShowcase(
+      key: HomeTourKeys.navAcademia,
+      modoPrestador: _modoPrestador,
+      accent: primaryColor,
+      tooltipPosition: TooltipPosition.top,
+      child: _navItem(4, Icons.school_outlined, 'Academia'),
+    );
+  }
+
   Widget _navItem(int index, IconData icon, String label, {VoidCallback? onTap, int badgeCount = 0}) {
+
     return Expanded(
       child: _navItemContent(index, icon, label, onTap: onTap, badgeCount: badgeCount),
     );
@@ -467,7 +606,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     final showBadge = badgeCount > 0;
     final badgeText = badgeCount > 9 ? '9+' : '$badgeCount';
     return InkWell(
-      onTap: onTap ?? () => setState(() => _currentIndex = index),
+      onTap: onTap ?? () => _selectTab(index),
       borderRadius: BorderRadius.circular(14),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
@@ -541,10 +680,15 @@ class _HomePageWidgetState extends State<HomePageWidget> {
           padding: const EdgeInsets.fromLTRB(8, 12, 16, 40),
           child: Row(
             children: [
-              IconButton(
-                onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-                icon: const Icon(Icons.menu_rounded, color: Colors.white, size: 28),
-                tooltip: 'Menú',
+              homeShowcase(
+                key: HomeTourKeys.menu,
+                modoPrestador: _modoPrestador,
+                accent: primaryColor,
+                child: IconButton(
+                  onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                  icon: const Icon(Icons.menu_rounded, color: Colors.white, size: 28),
+                  tooltip: 'Menú',
+                ),
               ),
               Expanded(
                 child: Column(
@@ -557,18 +701,23 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                 ),
               ),
               if (_puedeSerAmbos) ...[
-                GestureDetector(
-                  onTap: () => setState(() => _modoPrestador = !_modoPrestador),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.18), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white.withOpacity(0.35))),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(_modoPrestador ? Icons.handyman_rounded : Icons.search_rounded, size: 16, color: Colors.white),
-                        const SizedBox(width: 6),
-                        Text(_modoPrestador ? 'Ofrezco' : 'Busco', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
-                      ],
+                homeShowcase(
+                  key: HomeTourKeys.roleToggle,
+                  modoPrestador: _modoPrestador,
+                  accent: primaryColor,
+                  child: GestureDetector(
+                    onTap: _toggleModoPrestador,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.18), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white.withOpacity(0.35))),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(_modoPrestador ? Icons.handyman_rounded : Icons.search_rounded, size: 16, color: Colors.white),
+                          const SizedBox(width: 6),
+                          Text(_modoPrestador ? 'Ofrezco' : 'Busco', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -607,21 +756,26 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         _buildBrandHeader(subtitle: '¿Qué servicio necesitás hoy?'),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-          child: Material(
-            color: Colors.white,
-            elevation: 2,
-            borderRadius: BorderRadius.circular(16),
-            child: TextField(
-              controller: _searchCtrl,
-              focusNode: _searchFocus,
-              textInputAction: TextInputAction.search,
-              onChanged: _onSearchChanged,
-              onSubmitted: _submitBusqueda,
-              decoration: InputDecoration(
-                hintText: '¿Qué servicio necesitás?',
-                prefixIcon: Icon(Icons.search_rounded, color: _clientePrimary),
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+          child: homeShowcase(
+            key: HomeTourKeys.searchOrConfianza,
+            modoPrestador: false,
+            accent: _clientePrimary,
+            child: Material(
+              color: Colors.white,
+              elevation: 2,
+              borderRadius: BorderRadius.circular(16),
+              child: TextField(
+                controller: _searchCtrl,
+                focusNode: _searchFocus,
+                textInputAction: TextInputAction.search,
+                onChanged: _onSearchChanged,
+                onSubmitted: _submitBusqueda,
+                decoration: InputDecoration(
+                  hintText: '¿Qué servicio necesitás?',
+                  prefixIcon: Icon(Icons.search_rounded, color: _clientePrimary),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                ),
               ),
             ),
           ),
@@ -688,32 +842,38 @@ class _HomePageWidgetState extends State<HomePageWidget> {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
-          child: Material(
-            borderRadius: BorderRadius.circular(20),
-            elevation: 4,
-            child: InkWell(
+          child: homeShowcase(
+            key: HomeTourKeys.primaryBlock,
+            modoPrestador: false,
+            accent: _clientePrimary,
+            tooltipPosition: TooltipPosition.top,
+            child: Material(
               borderRadius: BorderRadius.circular(20),
-              onTap: () => _abrirBuscador(),
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  gradient: LinearGradient(colors: [_clientePrimary, _clienteDark]),
-                ),
-                child: const Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Prestadores con más confianza', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800)),
-                          SizedBox(height: 6),
-                          Text('Ordenados por zona y calificación', style: TextStyle(color: Colors.white70, fontSize: 13)),
-                        ],
+              elevation: 4,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () => _abrirBuscador(),
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: LinearGradient(colors: [_clientePrimary, _clienteDark]),
+                  ),
+                  child: const Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Prestadores con más confianza', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800)),
+                            SizedBox(height: 6),
+                            Text('Ordenados por zona y calificación', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                          ],
+                        ),
                       ),
-                    ),
-                    Icon(Icons.verified_user_rounded, color: Colors.white, size: 34),
-                  ],
+                      Icon(Icons.verified_user_rounded, color: Colors.white, size: 34),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -904,7 +1064,11 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       padding: EdgeInsets.zero,
       children: [
         _buildBrandHeader(subtitle: 'Así te ven quienes buscan trabajo'),
-        Transform.translate(
+        homeShowcase(
+          key: HomeTourKeys.searchOrConfianza,
+          modoPrestador: true,
+          accent: _prestadorPrimary,
+          child: Transform.translate(
           offset: const Offset(0, -18),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1050,9 +1214,14 @@ class _HomePageWidgetState extends State<HomePageWidget> {
             ),
           ),
         ),
+        ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Material(
+          child: homeShowcase(
+            key: HomeTourKeys.primaryBlock,
+            modoPrestador: true,
+            accent: _prestadorPrimary,
+            child: Material(
             borderRadius: BorderRadius.circular(18),
             elevation: 3,
             child: InkWell(
@@ -1090,6 +1259,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
               ),
             ),
           ),
+        ),
         ),
         Builder(
           builder: (context) {
