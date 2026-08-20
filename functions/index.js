@@ -1,6 +1,7 @@
 /**
  * Cloud Functions — Puelo (lifewalletpuelo)
  * Scoring, validación domicilio, vault recovery (Mis números), mensajes recibos.
+ * 2026-08-20: aviso calificación prestador (push + inbox).
  */
 const { onRequest, onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
@@ -789,6 +790,13 @@ exports.responderRecibo = onCall(
 // Mensajes M5 — texto libre (append-only)
 // ---------------------------------------------------------------------------
 exports.enviarMensajeTexto = require("./mensajes_texto").enviarMensajeTexto;
+
+// ---------------------------------------------------------------------------
+// Calificaciones — aviso al prestador (push FCM + inbox Mensajes)
+// ---------------------------------------------------------------------------
+const calificacionAviso = require("./calificacion_aviso");
+exports.avisarCalificacionPrestador = calificacionAviso.avisarCalificacionPrestador;
+exports.responderCalificacion = calificacionAviso.responderCalificacion;
 
 // ---------------------------------------------------------------------------
 // Mis números — fiados vencidos (Me deben) → FCM batch
