@@ -183,15 +183,17 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
         respuestaTexto: respuestaTexto,
       );
       if (!mounted) return;
+      final conRespuesta = decision == 'respondido' ||
+          (respuestaTexto != null && respuestaTexto.trim().isNotEmpty);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            decision == 'respondido' ||
-                    (respuestaTexto != null && respuestaTexto.trim().isNotEmpty)
-                ? 'Evaluaci\u00f3n publicada \u00b7 respuesta enviada'
-                : 'Evaluaci\u00f3n aceptada \u00b7 ya cuenta en tu perfil',
+            conRespuesta
+                ? 'Evaluaci\u00f3n publicada con tu respuesta. Las estrellas se actualizan en tu perfil al instante.'
+                : 'Evaluaci\u00f3n aceptada y publicada. Las estrellas se actualizan en tu perfil al instante.',
           ),
           behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 5),
         ),
       );
     } catch (e) {
