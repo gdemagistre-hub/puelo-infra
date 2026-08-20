@@ -4,7 +4,7 @@ on:
   push:
     paths:
       - '.github/workflows/restore-homepage-tour.yml'
-      - 'tools/homepage_tour_chunks/**'
+      - 'tools/homepage_restore/apply_home_tour_patch.py'
 
 jobs:
   restore:
@@ -13,28 +13,19 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Reassemble Homepage from base64 chunks
+      - name: Restore Homepage from e91f788 + apply tour patch
         run: |
           set -e
-          python3 << 'PY'
-          from pathlib import Path
-          import base64
-          root = Path('tools/homepage_tour_chunks')
-          parts = sorted(root.glob('chunk_*.b64'), key=lambda p: int(p.stem.split('_')[1]))
-          assert parts, 'no chunks'
-          b64 = ''.join(p.read_text().strip() for p in parts)
-          data = base64.b64decode(b64)
-          text = data.decode('utf-8')
-          assert 'HomeTourOverlay' in text, 'missing tour'
-          assert 'class HomePageWidget' in text
-          assert 'PLACEHOLDER' not in text
-          Path('lib/Homepage.dart').write_bytes(data)
-          print('Wrote lib/Homepage.dart', len(data), 'bytes', text.count(chr(10))+1, 'lines')
-          PY
+          git show e91f788fd7f44cbc6cea5e097c15196a8e4729a5:lib/Homepage.dart > lib/Homepage.dart
+          wc -c lib/Homepage.dart
+          python3 tools/homepage_restore/apply_home_tour_patch.py
           wc -c lib/Homepage.dart
           grep -c HomeTourOverlay lib/Homepage.dart
           grep -c _maybeStartHomeTour lib/Homepage.dart
+          grep -c "onboarding/home_tour" lib/Homepage.dart
 
       - name: Commit and push
         run: |
