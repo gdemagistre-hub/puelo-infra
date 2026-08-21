@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../mis_numeros/ui/thousands_formatter.dart';
+import '../theme/prox_sounds.dart';
 import 'mensajes_service.dart';
 
 class EmitirReciboSheet extends StatefulWidget {
@@ -88,6 +89,8 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
         origen: _fijo ? 'tarjeta' : 'mensajes',
       );
       if (!mounted) return;
+      // Sonido de confirmación PROX (recibo emitido).
+      ProxSounds.playConfirm();
       Navigator.pop(context, res);
       final hash = (res['content_hash'] as String?) ?? '';
       ScaffoldMessenger.of(context).showSnackBar(
