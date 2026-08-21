@@ -5,6 +5,7 @@ import 'Homepage.dart';
 import 'elige_camino.dart';
 import 'loginScreen.dart';
 import 'user_session.dart';
+import 'theme/prox_sounds.dart';
 
 class SplashScreenWidget extends StatefulWidget {
   static const String routePath = '/splash';
@@ -47,6 +48,8 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
     );
 
     _controller.forward();
+    // Firma sonora PROX al ingreso (no bloquea el bootstrap).
+    ProxSounds.playOpen();
     _bootstrap();
   }
 

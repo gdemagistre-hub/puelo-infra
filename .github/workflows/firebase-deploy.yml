@@ -38,6 +38,19 @@ jobs:
             echo "WARN: content/academia no encontrado en el repo"
           fi
 
+      # Firma sonora PROX (open + confirm).
+      - name: Copy brand sounds
+        run: |
+          set -e
+          mkdir -p build/web/content
+          if [ -d content/brand ]; then
+            cp -a content/brand build/web/content/
+            echo "=== content/brand copiado ==="
+            ls -la build/web/content/brand/ || true
+          else
+            echo "WARN: content/brand no encontrado en el repo"
+          fi
+
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
