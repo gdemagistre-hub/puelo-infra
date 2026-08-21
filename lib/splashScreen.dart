@@ -6,7 +6,6 @@ import 'elige_camino.dart';
 import 'loginScreen.dart';
 import 'user_session.dart';
 import 'theme/app_copy.dart';
-import 'theme/prox_sounds.dart';
 
 class SplashScreenWidget extends StatefulWidget {
   static const String routePath = '/splash';
@@ -49,8 +48,8 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
     );
 
     _controller.forward();
-    // Firma sonora PROX al ingreso (en web el browser puede bloquear sin gesto).
-    ProxSounds.playOpen();
+    // Audio de ingreso: se dispara en el primer gesto del login (no acá:
+    // el browser bloquea autoplay sin interacción del usuario).
     _bootstrap();
   }
 
