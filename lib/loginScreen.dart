@@ -288,7 +288,6 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
             onPressed: () async {
               Navigator.pop(ctx);
               try {
-                // Si quedó sesión parcial, reenviar.
                 await AuthService.instance.resendVerificationEmail();
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -593,7 +592,18 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 12),
+                  Text(
+                    AppCopy.tagline,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: subTextColor,
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                   Text(
                     AppCopy.welcomeTitle,
                     textAlign: TextAlign.center,
