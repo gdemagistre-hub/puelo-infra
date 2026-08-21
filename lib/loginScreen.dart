@@ -15,6 +15,7 @@ import 'theme/app_colors.dart';
 import 'theme/app_copy.dart';
 import 'analytics/prox_analytics.dart';
 import 'config/app_env.dart';
+import 'theme/prox_sounds.dart';
 
 class LoginScreenWidget extends StatefulWidget {
   const LoginScreenWidget({super.key});
@@ -49,6 +50,9 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
   static const Color textColor = AppColors.text;
   static const Color subTextColor = AppColors.textMuted;
 
+  /// Firma sonora de ingreso: una vez, con gesto del usuario (web autoplay).
+  void _onFirstGesture() => ProxSounds.playOpenOnce();
+
   @override
   void initState() {
     super.initState();
@@ -82,6 +86,7 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
   }
 
   Future<void> _entrarDevDropdown() async {
+    ProxSounds.playOpenOnce();
     if (_selectedUserId == null || _selectedUserData == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -160,6 +165,7 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
   }
 
   Future<void> _entrarConGoogle() async {
+    ProxSounds.playOpenOnce();
     setState(() => _loadingGoogle = true);
     try {
       await AuthService.instance.signInWithGoogle();
@@ -183,6 +189,7 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
   }
 
   Future<void> _entrarConEmail() async {
+    ProxSounds.playOpenOnce();
     final email = _emailCtrl.text.trim();
     final pass = _passCtrl.text;
     if (email.isEmpty || pass.isEmpty) {
@@ -556,187 +563,191 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
 
     return Scaffold(
       backgroundColor: AppColors.bg,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 28.0, vertical: 24.0),
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (AppEnv.showDevTools) ...[
-                    _buildDevLoginPanel(busy: busy),
-                    const SizedBox(height: 32),
-                  ],
-                  Center(
-                    child: Image.asset(
-                      'assets/images/logo_prox_icon.png.png',
-                      height: 88,
-                      width: 88,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => Container(
-                        height: 80,
-                        width: 80,
-                        decoration: BoxDecoration(
-                          color: primaryColor,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Icon(
-                          Icons.handyman_rounded,
-                          color: Colors.white,
-                          size: 42,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    AppCopy.tagline,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: subTextColor,
-                      height: 1.35,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    AppCopy.welcomeTitle,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w800,
-                      color: textColor,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    AppCopy.welcomeSubtitle,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      color: subTextColor,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 36),
-                  _buildLoginButton(
-                    onPressed: busy ? null : _entrarConGoogle,
-                    icon: _buildIconCircle(
-                      backgroundColor: const Color(0xFFF1F5F9),
-                      child: const Text(
-                        'G',
-                        style: TextStyle(
-                          color: Color(0xFFDB4437),
-                          fontWeight: FontWeight.w900,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                    label: _loadingGoogle
-                        ? 'Conectando con Google…'
-                        : 'Continuar con Google',
-                    backgroundColor: Colors.white,
-                    textColor: textColor,
-                    hasBorder: true,
-                    loading: _loadingGoogle,
-                  ),
-                  const SizedBox(height: 14),
-                  _buildLoginButton(
-                    onPressed: busy
-                        ? null
-                        : () => setState(() => _showEmailForm = !_showEmailForm),
-                    icon: _buildIconCircle(
-                      backgroundColor: primaryColor.withOpacity(0.12),
-                      child: Icon(
-                        Icons.email_outlined,
-                        color: primaryColor,
-                        size: 16,
-                      ),
-                    ),
-                    label: _showEmailForm
-                        ? 'Ocultar email'
-                        : 'Continuar con email',
-                    backgroundColor: Colors.white,
-                    textColor: textColor,
-                    hasBorder: true,
-                    borderColor: primaryColor.withOpacity(0.35),
-                  ),
-                  if (_showEmailForm) ...[
-                    const SizedBox(height: 16),
-                    _buildEmailForm(busy: busy),
-                  ],
-                  const SizedBox(height: 14),
-                  _buildLoginButton(
-                    onPressed: busy ? null : () => _proximamente('Apple'),
-                    icon: _buildIconCircle(
-                      backgroundColor: Colors.white.withOpacity(0.15),
-                      child: const Icon(
-                        Icons.apple,
-                        color: Colors.white,
-                        size: 18,
-                      ),
-                    ),
-                    label: 'Continuar con Apple',
-                    backgroundColor: Colors.black,
-                    textColor: Colors.white,
-                  ),
-                  const SizedBox(height: 14),
-                  _buildLoginButton(
-                    onPressed: busy ? null : () => _proximamente('Facebook'),
-                    icon: _buildIconCircle(
-                      backgroundColor: Colors.white.withOpacity(0.2),
-                      child: const Text(
-                        'f',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
-                      ),
-                    ),
-                    label: 'Continuar con Facebook',
-                    backgroundColor: const Color(0xFF1877F2),
-                    textColor: Colors.white,
-                  ),
-                  const SizedBox(height: 32),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text(
-                        '¿Sos nuevo en PROX? ',
-                        style: TextStyle(color: subTextColor, fontSize: 14),
-                      ),
-                      GestureDetector(
-                        onTap: busy
-                            ? null
-                            : () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const RegistroCuentaWidget(),
-                                  ),
-                                );
-                              },
-                        child: const Text(
-                          'Crear cuenta',
-                          style: TextStyle(
+      body: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (_) => _onFirstGesture(),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 28.0, vertical: 24.0),
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (AppEnv.showDevTools) ...[
+                      _buildDevLoginPanel(busy: busy),
+                      const SizedBox(height: 32),
+                    ],
+                    Center(
+                      child: Image.asset(
+                        'assets/images/logo_prox_icon.png.png',
+                        height: 88,
+                        width: 88,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => Container(
+                          height: 80,
+                          width: 80,
+                          decoration: BoxDecoration(
                             color: primaryColor,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                            decoration: TextDecoration.underline,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Icon(
+                            Icons.handyman_rounded,
+                            color: Colors.white,
+                            size: 42,
                           ),
                         ),
                       ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      AppCopy.tagline,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: subTextColor,
+                        height: 1.35,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      AppCopy.welcomeTitle,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                        color: textColor,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      AppCopy.welcomeSubtitle,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        color: subTextColor,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 36),
+                    _buildLoginButton(
+                      onPressed: busy ? null : _entrarConGoogle,
+                      icon: _buildIconCircle(
+                        backgroundColor: const Color(0xFFF1F5F9),
+                        child: const Text(
+                          'G',
+                          style: TextStyle(
+                            color: Color(0xFFDB4437),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      label: _loadingGoogle
+                          ? 'Conectando con Google…'
+                          : 'Continuar con Google',
+                      backgroundColor: Colors.white,
+                      textColor: textColor,
+                      hasBorder: true,
+                      loading: _loadingGoogle,
+                    ),
+                    const SizedBox(height: 14),
+                    _buildLoginButton(
+                      onPressed: busy
+                          ? null
+                          : () => setState(() => _showEmailForm = !_showEmailForm),
+                      icon: _buildIconCircle(
+                        backgroundColor: primaryColor.withOpacity(0.12),
+                        child: Icon(
+                          Icons.email_outlined,
+                          color: primaryColor,
+                          size: 16,
+                        ),
+                      ),
+                      label: _showEmailForm
+                          ? 'Ocultar email'
+                          : 'Continuar con email',
+                      backgroundColor: Colors.white,
+                      textColor: textColor,
+                      hasBorder: true,
+                      borderColor: primaryColor.withOpacity(0.35),
+                    ),
+                    if (_showEmailForm) ...[
+                      const SizedBox(height: 16),
+                      _buildEmailForm(busy: busy),
                     ],
-                  ),
-                ],
+                    const SizedBox(height: 14),
+                    _buildLoginButton(
+                      onPressed: busy ? null : () => _proximamente('Apple'),
+                      icon: _buildIconCircle(
+                        backgroundColor: Colors.white.withOpacity(0.15),
+                        child: const Icon(
+                          Icons.apple,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ),
+                      label: 'Continuar con Apple',
+                      backgroundColor: Colors.black,
+                      textColor: Colors.white,
+                    ),
+                    const SizedBox(height: 14),
+                    _buildLoginButton(
+                      onPressed: busy ? null : () => _proximamente('Facebook'),
+                      icon: _buildIconCircle(
+                        backgroundColor: Colors.white.withOpacity(0.2),
+                        child: const Text(
+                          'f',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ),
+                      label: 'Continuar con Facebook',
+                      backgroundColor: const Color(0xFF1877F2),
+                      textColor: Colors.white,
+                    ),
+                    const SizedBox(height: 32),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          '¿Sos nuevo en PROX? ',
+                          style: TextStyle(color: subTextColor, fontSize: 14),
+                        ),
+                        GestureDetector(
+                          onTap: busy
+                              ? null
+                              : () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const RegistroCuentaWidget(),
+                                    ),
+                                  );
+                                },
+                          child: const Text(
+                            'Crear cuenta',
+                            style: TextStyle(
+                              color: primaryColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
