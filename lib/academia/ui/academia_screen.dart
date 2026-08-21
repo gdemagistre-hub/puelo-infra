@@ -1,25 +1,54 @@
 import 'package:flutter/material.dart';
 
+import '../data/academia_progress.dart';
 import '../data/catalogo_lecciones.dart';
 import '../models/leccion.dart';
 import 'leccion_detalle_screen.dart';
 
 /// Academia embebida en el tab de PROX.
-class AcademiaScreen extends StatelessWidget {
+class AcademiaScreen extends StatefulWidget {
   final bool embedded;
   const AcademiaScreen({super.key, this.embedded = true});
 
+  @override
+  State<AcademiaScreen> createState() => _AcademiaScreenState();
+}
+
+class _AcademiaScreenState extends State<AcademiaScreen> {
   static const Color _primary = Color(0xFF28B5CD);
   static const Color _secondary = Color(0xFF734BE4);
   static const Color _text = Color(0xFF0F172A);
   static const Color _muted = Color(0xFF64748B);
+
+  Set<String> _completadas = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarProgreso();
+  }
+
+  Future<void> _cargarProgreso() async {
+    final ids = await AcademiaProgress.idsCompletadas();
+    if (!mounted) return;
+    setState(() => _completadas = ids);
+  }
+
+  Future<void> _abrir(Leccion l) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => LeccionDetalleScreen(leccion: l),
+      ),
+    );
+    // Al volver, refrescar checks (por si se registró la lectura).
+    await _cargarProgreso();
+  }
 
   @override
   Widget build(BuildContext context) {
     final body = ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
       children: [
-        // Equípate oculto en esta etapa (no se usa).
         const Text(
           'Tips cortos para tu oficio',
           style: TextStyle(
@@ -29,27 +58,24 @@ class AcademiaScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
-        const Text(
-          'Lenguaje simple. Sin vueltas. Para usar en el día a día.',
-          style: TextStyle(color: _muted, fontSize: 13),
+        Text(
+          _completadas.isEmpty
+              ? 'Lenguaje simple. Sin vueltas. Para usar en el día a día.'
+              : 'Leídas: ${_completadas.length} · Gate readiness: 3+',
+          style: const TextStyle(color: _muted, fontSize: 13),
         ),
         const SizedBox(height: 20),
         ...catalogoLecciones.map(
           (l) => _LeccionCard(
             leccion: l,
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => LeccionDetalleScreen(leccion: l),
-                ),
-              );
-            },
+            completada: _completadas.contains(l.id),
+            onTap: () => _abrir(l),
           ),
         ),
       ],
     );
 
-    if (embedded) {
+    if (widget.embedded) {
       return ColoredBox(color: const Color(0xFFF1F5F9), child: body);
     }
     return Scaffold(
@@ -64,10 +90,15 @@ class AcademiaScreen extends StatelessWidget {
 }
 
 class _LeccionCard extends StatelessWidget {
-  const _LeccionCard({required this.leccion, required this.onTap});
+  const _LeccionCard({
+    required this.leccion,
+    required this.onTap,
+    this.completada = false,
+  });
 
   final Leccion leccion;
   final VoidCallback onTap;
+  final bool completada;
 
   @override
   Widget build(BuildContext context) {
@@ -90,14 +121,20 @@ class _LeccionCard extends StatelessWidget {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: AcademiaScreen._secondary.withOpacity(0.12),
+                    color: completada
+                        ? const Color(0xFFDCFCE7)
+                        : _AcademiaScreenState._secondary.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
-                    leccion.hasAudio
-                        ? Icons.headphones_outlined
-                        : Icons.menu_book_outlined,
-                    color: AcademiaScreen._secondary,
+                    completada
+                        ? Icons.check_rounded
+                        : (leccion.hasAudio
+                            ? Icons.headphones_outlined
+                            : Icons.menu_book_outlined),
+                    color: completada
+                        ? const Color(0xFF16A34A)
+                        : _AcademiaScreenState._secondary,
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -113,7 +150,8 @@ class _LeccionCard extends StatelessWidget {
                               vertical: 3,
                             ),
                             decoration: BoxDecoration(
-                              color: AcademiaScreen._secondary.withOpacity(0.12),
+                              color: _AcademiaScreenState._secondary
+                                  .withOpacity(0.12),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
@@ -121,7 +159,7 @@ class _LeccionCard extends StatelessWidget {
                               style: const TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w800,
-                                color: AcademiaScreen._secondary,
+                                color: _AcademiaScreenState._secondary,
                               ),
                             ),
                           ),
@@ -130,13 +168,25 @@ class _LeccionCard extends StatelessWidget {
                             '${leccion.minutos} min',
                             style: const TextStyle(
                               fontSize: 12,
-                              color: AcademiaScreen._muted,
+                              color: _AcademiaScreenState._muted,
                             ),
                           ),
                           if (leccion.hasAudio) ...[
                             const SizedBox(width: 8),
                             const Icon(Icons.play_circle_outline,
-                                size: 16, color: AcademiaScreen._secondary),
+                                size: 16,
+                                color: _AcademiaScreenState._secondary),
+                          ],
+                          if (completada) ...[
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Leída',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF16A34A),
+                              ),
+                            ),
                           ],
                         ],
                       ),
@@ -146,14 +196,14 @@ class _LeccionCard extends StatelessWidget {
                         style: const TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 15,
-                          color: AcademiaScreen._text,
+                          color: _AcademiaScreenState._text,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         leccion.resumen,
                         style: const TextStyle(
-                          color: AcademiaScreen._muted,
+                          color: _AcademiaScreenState._muted,
                           fontSize: 13,
                           height: 1.35,
                         ),

@@ -1,6 +1,7 @@
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 
+import '../data/academia_progress.dart';
 import '../models/leccion.dart';
 
 class LeccionDetalleScreen extends StatefulWidget {
@@ -22,11 +23,31 @@ class _LeccionDetalleScreenState extends State<LeccionDetalleScreen> {
   bool _playing = false;
   bool _loadingAudio = false;
   String? _audioError;
+  bool _registrada = false;
+  bool _registrando = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Al abrir la cápsula se registra como leída (gate readiness Academia).
+    WidgetsBinding.instance.addPostFrameCallback((_) => _registrarLectura());
+  }
 
   @override
   void dispose() {
     _player.dispose();
     super.dispose();
+  }
+
+  Future<void> _registrarLectura() async {
+    if (_registrando || _registrada) return;
+    setState(() => _registrando = true);
+    final n = await AcademiaProgress.marcarCompletada(widget.leccion.id);
+    if (!mounted) return;
+    setState(() {
+      _registrando = false;
+      if (n != null) _registrada = true;
+    });
   }
 
   Future<void> _toggleAudio() async {
@@ -108,6 +129,26 @@ class _LeccionDetalleScreenState extends State<LeccionDetalleScreen> {
                 '${leccion.minutos} min de lectura',
                 style: const TextStyle(color: _muted),
               ),
+              if (_registrada) ...[
+                const SizedBox(width: 12),
+                const Icon(Icons.check_circle, size: 16, color: Color(0xFF16A34A)),
+                const SizedBox(width: 4),
+                const Text(
+                  'Registrada',
+                  style: TextStyle(
+                    color: Color(0xFF16A34A),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ] else if (_registrando) ...[
+                const SizedBox(width: 12),
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 20),
@@ -190,6 +231,42 @@ class _LeccionDetalleScreenState extends State<LeccionDetalleScreen> {
               color: _text,
             ),
           ),
+          const SizedBox(height: 28),
+          if (!_registrada)
+            FilledButton.icon(
+              onPressed: _registrando ? null : _registrarLectura,
+              style: FilledButton.styleFrom(
+                backgroundColor: _primary,
+                minimumSize: const Size.fromHeight(48),
+              ),
+              icon: const Icon(Icons.check_rounded),
+              label: Text(
+                _registrando ? 'Registrando…' : 'Marcar como leída',
+              ),
+            )
+          else
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFDCFCE7),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.check_circle, color: Color(0xFF16A34A)),
+                  SizedBox(width: 8),
+                  Text(
+                    'Cápsula registrada en tu progreso',
+                    style: TextStyle(
+                      color: Color(0xFF166534),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
