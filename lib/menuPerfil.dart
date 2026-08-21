@@ -28,7 +28,7 @@ class MenuPerfilWidget extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text(
-                'Tu perfil en Puelo',
+                'Tu perfil en PROX',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
