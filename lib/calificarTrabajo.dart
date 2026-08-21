@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'Homepage.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_copy.dart';
+import 'theme/prox_sounds.dart';
 
 class CalificarTrabajoWidget extends StatefulWidget {
   const CalificarTrabajoWidget({
@@ -125,6 +126,8 @@ class _CalificarTrabajoWidgetState extends State<CalificarTrabajoWidget> {
       );
 
       if (mounted) {
+        // Sonido de confirmación PROX (envío de calificación).
+        ProxSounds.playConfirm();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
