@@ -61,7 +61,7 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
         content: Text(
           UserSession().isDevImpersonation
               ? 'Vas a salir del modo prueba.'
-              : 'Vas a cerrar tu sesión de Puelo.',
+              : 'Vas a cerrar tu sesión de PROX.',
         ),
         actions: [
           TextButton(
@@ -166,7 +166,7 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
       _MenuItem(
         icon: Icons.badge_outlined,
         label: 'Mi perfil completo',
-        subtitle: 'Resumen de lo que tenés cargado en Puelo.',
+        subtitle: 'Resumen de lo que tenés cargado en PROX.',
         onTap: () =>
             _abrirFlotante(context, const PerfilCompletoFlotanteWidget()),
       ),
