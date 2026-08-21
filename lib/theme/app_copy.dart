@@ -10,6 +10,12 @@ class AppCopy {
   // —— Marca (solo cara al usuario) ——
   static const String appName = 'PROX';
 
+  /// Slogan oficial de marca.
+  static const String tagline = 'Trabajo de confianza, cerca tuyo.';
+
+  /// Nombre + slogan (landings, share, store).
+  static const String taglineFull = 'PROX — Trabajo de confianza, cerca tuyo.';
+
   /// Emails de soporte / contacto (cara al usuario).
   static const String emailInfo = 'info@puelo.app';
   static const String emailHelp = 'help@puelo.app';

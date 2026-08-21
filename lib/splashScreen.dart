@@ -5,6 +5,7 @@ import 'Homepage.dart';
 import 'elige_camino.dart';
 import 'loginScreen.dart';
 import 'user_session.dart';
+import 'theme/app_copy.dart';
 import 'theme/prox_sounds.dart';
 
 class SplashScreenWidget extends StatefulWidget {
@@ -48,7 +49,7 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
     );
 
     _controller.forward();
-    // Firma sonora PROX al ingreso (no bloquea el bootstrap).
+    // Firma sonora PROX al ingreso (en web el browser puede bloquear sin gesto).
     ProxSounds.playOpen();
     _bootstrap();
   }
@@ -108,20 +109,37 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
               opacity: _opacityAnimation.value,
               child: Transform.scale(
                 scale: _scaleAnimation.value,
-                child: Image.asset(
-                  'assets/images/logo_prox_splash.png.png',
-                  width: 200,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => Image.asset(
-                    'assets/images/lifewallet.png',
-                    width: 200,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const Icon(
-                      Icons.handyman_rounded,
-                      size: 80,
-                      color: Color(0xFF734BE4),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset(
+                      'assets/images/logo_prox_splash.png.png',
+                      width: 200,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => Image.asset(
+                        'assets/images/lifewallet.png',
+                        width: 200,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.handyman_rounded,
+                          size: 80,
+                          color: Color(0xFF734BE4),
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      AppCopy.tagline,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF64748B),
+                        letterSpacing: 0.1,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             );
