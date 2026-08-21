@@ -699,7 +699,7 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Text(
-                        '¿Sos nuevo en Puelo? ',
+                        '¿Sos nuevo en PROX? ',
                         style: TextStyle(color: subTextColor, fontSize: 14),
                       ),
                       GestureDetector(
@@ -752,11 +752,11 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
   }
 
   Widget _buildLoginButton({
-    required VoidCallback? onPressed,
     required Widget icon,
     required String label,
     required Color backgroundColor,
     required Color textColor,
+    VoidCallback? onPressed,
     bool hasBorder = false,
     Color? borderColor,
     bool loading = false,
