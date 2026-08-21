@@ -25,6 +25,8 @@ enum _Phase {
   pinSetup,
   pinUnlock,
   pinReset,
+  /// Tras PIN correcto: candado + «Desencriptando sus datos» (2 s).
+  decrypting,
   ready,
 }
 
@@ -35,6 +37,9 @@ class _MisNumerosShellState extends State<MisNumerosShell> {
   final _vencimientosStore = VencimientosStore();
   final _fiadosStore = FiadosStore();
   bool _storeLoaded = false;
+  bool _decryptingStarted = false;
+
+  static const Color _teal = Color(0xFF28B5CD);
 
   @override
   void initState() {
@@ -56,7 +61,7 @@ class _MisNumerosShellState extends State<MisNumerosShell> {
             _phase == _Phase.pinUnlock ||
             _phase == _Phase.pinReset) &&
         v.isUnlocked) {
-      _enterReady();
+      _startDecryptingThenReady();
     }
   }
 
@@ -77,6 +82,23 @@ class _MisNumerosShellState extends State<MisNumerosShell> {
       setState(() => _phase = _Phase.pinUnlock);
       return;
     }
+    // Ya desbloqueado en esta sesión: ir directo (sin repetir splash).
+    await _enterReady();
+  }
+
+  /// Solo después de PIN correcto: muestra splash 2 s y luego carga datos.
+  Future<void> _startDecryptingThenReady() async {
+    if (_decryptingStarted) return;
+    if (_phase == _Phase.decrypting ||
+        _phase == _Phase.ready ||
+        _phase == _Phase.loading) {
+      return;
+    }
+    _decryptingStarted = true;
+    if (!mounted) return;
+    setState(() => _phase = _Phase.decrypting);
+    await Future<void>.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
     await _enterReady();
   }
 
@@ -103,6 +125,7 @@ class _MisNumerosShellState extends State<MisNumerosShell> {
   }
 
   void _lock() {
+    _decryptingStarted = false;
     VaultSession.instance.lock();
     setState(() => _phase = _Phase.pinUnlock);
   }
@@ -126,20 +149,22 @@ class _MisNumerosShellState extends State<MisNumerosShell> {
         );
       case _Phase.pinSetup:
         return _PinSetupEmbedded(
-          onDone: () => _enterReady(),
+          onDone: _startDecryptingThenReady,
           onBack: widget.onBackToHome,
         );
       case _Phase.pinUnlock:
         return _PinUnlockEmbedded(
-          onUnlocked: () => _enterReady(),
+          onUnlocked: _startDecryptingThenReady,
           onForgotPin: () => setState(() => _phase = _Phase.pinReset),
           onBack: widget.onBackToHome,
         );
       case _Phase.pinReset:
         return _PinResetEmbedded(
-          onDone: () => _enterReady(),
+          onDone: _startDecryptingThenReady,
           onBack: () => setState(() => _phase = _Phase.pinUnlock),
         );
+      case _Phase.decrypting:
+        return const _DecryptingSplash();
       case _Phase.ready:
         return MisNumerosContent(
           store: _store,
@@ -149,6 +174,66 @@ class _MisNumerosShellState extends State<MisNumerosShell> {
           onLock: _lock,
         );
     }
+  }
+}
+
+/// Splash de 2 s tras PIN correcto.
+class _DecryptingSplash extends StatelessWidget {
+  const _DecryptingSplash();
+
+  static const Color _teal = Color(0xFF28B5CD);
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: const Color(0xFFF1F5F9),
+      child: SafeArea(
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 96,
+                height: 96,
+                decoration: BoxDecoration(
+                  color: _teal.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: _teal.withOpacity(0.35),
+                    width: 1.5,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.lock_rounded,
+                  size: 48,
+                  color: _teal,
+                ),
+              ),
+              const SizedBox(height: 28),
+              const Text(
+                'Desencriptando sus datos',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.text,
+                  letterSpacing: 0.1,
+                ),
+              ),
+              const SizedBox(height: 20),
+              const SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: _teal,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
