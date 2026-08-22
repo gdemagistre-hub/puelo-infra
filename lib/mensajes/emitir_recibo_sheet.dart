@@ -99,7 +99,6 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
         if (seen.contains(other)) continue;
         seen.add(other);
 
-        // Nombre desde denormalizado del hilo si existe
         String? nombre;
         for (final key in [
           'other_display_name',
@@ -149,7 +148,6 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
       _filtradas = match;
       _mostrarLista = true;
     });
-    // Si parece UID completo, resolver nombre
     if (q.length > 20 && !q.contains(' ')) {
       _resolverNombre(raw.trim());
     }
@@ -447,7 +445,7 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
               ],
               decoration: const InputDecoration(
                 labelText: 'Monto (ARS)',
-                prefixText: '\$ ',
+                prefixText: r'$ ',
                 hintText: '15.000',
                 border: OutlineInputBorder(),
               ),
@@ -459,11 +457,13 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
               spacing: 8,
               runSpacing: 8,
               children: _conceptos.map((c) {
-                final sel = _concepto == c.\$1;
+                final id = c.$1;
+                final label = c.$2;
+                final sel = _concepto == id;
                 return ChoiceChip(
-                  label: Text(c.\$2),
+                  label: Text(label),
                   selected: sel,
-                  onSelected: (_) => setState(() => _concepto = c.\$1),
+                  onSelected: (_) => setState(() => _concepto = id),
                   selectedColor: const Color(0xFF28B5CD).withOpacity(0.2),
                 );
               }).toList(),
