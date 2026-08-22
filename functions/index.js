@@ -873,3 +873,7 @@ exports.fiadosVtoHttp = onRequest(
     }
   }
 );
+
+// Auth emails (no-reply@puelo.app SMTP IONOS)
+const authEmails = require("./auth_emails");
+exports.sendAuthEmail = authEmails.sendAuthEmail;
