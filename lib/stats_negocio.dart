@@ -35,11 +35,12 @@ class StatsNegocioWriter {
       payload['stats_negocio.tiene_fondo_emergencia'] = tieneFondoEmergencia;
     }
     try {
-      await _db.collection('usuarios').doc(uid).update(payload);
+      // set+merge: crea stats_negocio si no existía; no exige doc previo con update.
+      await _db.collection('usuarios').doc(uid).set(payload, SetOptions(merge: true));
     } catch (e) {
       // Best-effort: no romper Mis Números si rules/sesión fallan.
       // ignore: avoid_print
-      print('StatsNegocioWriter.write: $e');
+      print('StatsNegocioWriter.write uid=$uid: $e');
     }
   }
 }
