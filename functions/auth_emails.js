@@ -2,11 +2,12 @@
  * Auth emails desde dominio propio (no-reply@puelo.app) vía Resend.
  *
  * Setup owner (una vez):
- * 1) Cuenta Resend → verificar dominio puelo.app (SPF/DKIM/DMARC)
+ * 1) Cuenta Resend → verificar dominio puelo.app (SPF/DKIM/DMARC que indique Resend)
  * 2) firebase functions:secrets:set RESEND_API_KEY --project lifewalletpuelo
- * 3) Redeploy functions
+ * 3) En este archivo, agregar secrets: ["RESEND_API_KEY"] al onCall y redeploy
+ *    (sin el binding, process.env.RESEND_API_KEY no llega a runtime)
  *
- * Sin RESEND_API_KEY la CF responde failed-precondition y el cliente cae al mail default de Firebase.
+ * Mientras no haya key, el cliente usa el mail default de Firebase Auth.
  */
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
@@ -80,11 +81,13 @@ async function sendResend({ to, subject, html }) {
  * Callable: { type: 'verify' | 'reset', email?: string }
  * - verify: requiere Auth; usa email del token
  * - reset: email obligatorio; no revela si existe la cuenta
+ *
+ * TEMP: sin secrets:[] para no bloquear deploy. Tras crear RESEND_API_KEY:
+ *   secrets: ["RESEND_API_KEY"]  + redeploy.
  */
 exports.sendAuthEmail = onCall(
   {
     region: "us-east1",
-    secrets: ["RESEND_API_KEY"],
     memory: "256MiB",
     timeoutSeconds: 30,
   },
