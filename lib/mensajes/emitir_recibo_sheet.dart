@@ -41,6 +41,8 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
   bool _loading = false;
   String? _error;
   String? _nombreResuelto;
+  /// UID real de la contraparte (el TextField muestra el nombre legible).
+  String? _selectedUid;
 
   List<_Sugerencia> _todas = [];
   List<_Sugerencia> _filtradas = [];
@@ -63,10 +65,13 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
   void initState() {
     super.initState();
     if (_fijo) {
-      _uidCtrl.text = widget.contraparteUidFijo!.trim();
+      _selectedUid = widget.contraparteUidFijo!.trim();
       _nombreResuelto = widget.contraparteNombre?.trim();
-      if (_nombreResuelto == null || _nombreResuelto!.isEmpty) {
-        _resolverNombre(_uidCtrl.text);
+      if (_nombreResuelto != null && _nombreResuelto!.isNotEmpty) {
+        _uidCtrl.text = _nombreResuelto!;
+      } else {
+        _uidCtrl.text = ''; // se completa al resolver nombre
+        _resolverNombre(_selectedUid!);
       }
     } else {
       _uidFocus.addListener(() {
@@ -200,6 +205,8 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
 
   void _filtrar(String raw) {
     final q = raw.trim().toLowerCase();
+    // Al tipear se invalida la selección previa (nombre visible ≠ uid).
+    _selectedUid = null;
     if (q.isEmpty) {
       setState(() {
         _filtradas = _todas;
@@ -215,16 +222,22 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
     setState(() {
       _filtradas = match;
       _mostrarLista = true;
+      _nombreResuelto = null;
     });
+    // Si parece un UID pegado (largo, sin espacios), resolvemos nombre.
     if (q.length > 20 && !q.contains(' ')) {
+      _selectedUid = raw.trim();
       _resolverNombre(raw.trim());
     }
   }
 
   void _elegir(_Sugerencia s) {
-    _uidCtrl.text = s.uid;
+    _selectedUid = s.uid;
+    // Mostrar nombre legible; el UID queda solo en _selectedUid.
+    final label = s.nombre.trim().isNotEmpty ? s.nombre.trim() : s.uid;
+    _uidCtrl.text = label;
     setState(() {
-      _nombreResuelto = s.nombre;
+      _nombreResuelto = label;
       _mostrarLista = false;
       _error = null;
     });
@@ -234,7 +247,13 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
   Future<void> _resolverNombre(String uid) async {
     final n = await MensajesService.instance.resolveDisplayName(uid);
     if (!mounted) return;
-    setState(() => _nombreResuelto = n);
+    setState(() {
+      _nombreResuelto = n;
+      // En modo fijo, el campo también muestra el nombre (no el UID).
+      if (_fijo && n.trim().isNotEmpty) {
+        _uidCtrl.text = n;
+      }
+    });
   }
 
   @override
@@ -252,15 +271,20 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
       _loading = true;
     });
     try {
-      final uid = _uidCtrl.text.trim();
+      final uid = (_selectedUid ?? _uidCtrl.text).trim();
       final monto = ThousandsFormatter.parse(_montoCtrl.text);
       if (uid.isEmpty) {
         throw StateError('Elegí a quién le pagaste.');
       }
+      // Si el campo tiene un nombre (no un UID) y no hay selección, pedir elegir de la lista.
+      final pareceUid = uid.length > 20 && !uid.contains(' ');
+      if (_selectedUid == null && !pareceUid && !_fijo) {
+        throw StateError('Elegí una persona de la lista (o pegá su UID).');
+      }
       if (monto == null || monto <= 0) throw StateError('Monto inválido');
 
       final res = await MensajesService.instance.emitirRecibo(
-        contraparteUid: uid,
+        contraparteUid: _selectedUid ?? uid,
         monto: monto,
         concepto: _concepto,
         nota: _notaCtrl.text,
@@ -376,7 +400,7 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
                 focusNode: _uidFocus,
                 decoration: InputDecoration(
                   labelText: 'A quién le pagaste',
-                  hintText: 'Nombre o UID',
+                  hintText: 'Buscá por nombre…',
                   border: const OutlineInputBorder(),
                   prefixIcon: const Icon(Icons.person_search_outlined),
                   suffixIcon: _cargandoSugerencias
@@ -394,6 +418,7 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
                               onPressed: () {
                                 _uidCtrl.clear();
                                 setState(() {
+                                  _selectedUid = null;
                                   _nombreResuelto = null;
                                   _filtradas = _todas;
                                   _mostrarLista = true;
