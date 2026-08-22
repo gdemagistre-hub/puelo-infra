@@ -46,8 +46,9 @@ class UserSession {
   /// Token Firebase Auth real (Google, email o mintDevSession).
   bool get hasRealAuth => FirebaseAuth.instance.currentUser != null;
 
-  /// Dropdown local sin custom token: Storage, CF y rules endurecidas fallan.
-  bool get needsRealAuth => isLoggedIn && isDevImpersonation && !hasRealAuth;
+  /// Sesión sin token Firebase (ex-dropdown, prefs viejas, etc.): Storage/CF/rules fallan.
+  /// TEMP: con dropdown oculto sigue sirviendo para sesiones residuales de prueba.
+  bool get needsRealAuth => isLoggedIn && !hasRealAuth;
 
   Map<String, dynamic>? get homeCacheIfFresh {
     final at = _homeCacheAt;
