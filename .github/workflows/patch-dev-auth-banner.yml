@@ -22,50 +22,61 @@ jobs:
           fi
           # Import
           if ! grep -q "dev_auth_banner.dart" "$FILE"; then
-            sed -i "s|import 'onboarding/home_tour_overlay.dart';|import 'onboarding/home_tour_overlay.dart';\nimport 'widgets/dev_auth_banner.dart';|" "$FILE"
+            if grep -q "home_tour_overlay.dart" "$FILE"; then
+              sed -i "s|import 'onboarding/home_tour_overlay.dart';|import 'onboarding/home_tour_overlay.dart';\nimport 'widgets/dev_auth_banner.dart';|" "$FILE"
+            else
+              # fallback: after last import of package/local
+              sed -i "0,/^import /s|^import |import 'widgets/dev_auth_banner.dart';\nimport |" "$FILE" || true
+              if ! grep -q "dev_auth_banner.dart" "$FILE"; then
+                echo "Could not add import"
+                exit 1
+              fi
+            fi
           fi
-          # Insert banner in Stack after Positioned.fill block (before bottom nav Positioned)
           python3 << 'PY'
           from pathlib import Path
+          import re
           p = Path("lib/Homepage.dart")
           t = p.read_text()
           if "DevAuthBanner" in t:
               print("already has banner")
               raise SystemExit(0)
-          needle = """          Positioned.fill(
-            child: Padding(
-              padding: EdgeInsets.only(bottom: contentBottomPad),
-              child: _buildAnimatedTabBody(),
-            ),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: _buildBottomNav(),
-          ),"""
-          insert = """          Positioned.fill(
-            child: Padding(
-              padding: EdgeInsets.only(bottom: contentBottomPad),
-              child: _buildAnimatedTabBody(),
-            ),
-          ),
-          const DevAuthBanner(),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: _buildBottomNav(),
-          ),"""
-          if needle not in t:
+
+          # Flexible: insert const DevAuthBanner() as Stack sibling right before
+          # the Positioned that builds the bottom nav (last nav bar).
+          # Match the closing of Positioned.fill(..._buildAnimatedTabBody...) then
+          # the following Positioned( ... _buildBottomNav() ...)
+          pattern = re.compile(
+              r"(Positioned\.fill\s*\(\s*child:\s*Padding\s*\(\s*"
+              r"padding:\s*EdgeInsets\.only\(bottom:\s*contentBottomPad\),\s*"
+              r"child:\s*_buildAnimatedTabBody\(\),\s*\),\s*\),\s*)"
+              r"(Positioned\s*\(\s*left:\s*0,\s*right:\s*0,\s*bottom:\s*0,\s*"
+              r"child:\s*_buildBottomNav\(\),\s*\),)",
+              re.DOTALL,
+          )
+          m = pattern.search(t)
+          if not m:
+              # Broader fallback: any Positioned.fill with _buildAnimatedTabBody followed by Positioned with _buildBottomNav
+              pattern2 = re.compile(
+                  r"(Positioned\.fill\([\s\S]*?_buildAnimatedTabBody\(\)[\s\S]*?\),\s*)"
+                  r"(Positioned\([\s\S]*?_buildBottomNav\(\)[\s\S]*?\),)",
+                  re.DOTALL,
+              )
+              m = pattern2.search(t)
+          if not m:
               raise SystemExit("Stack pattern not found in Homepage.dart")
-          p.write_text(t.replace(needle, insert, 1))
+
+          insert = m.group(1) + "          const DevAuthBanner(),\n          " + m.group(2)
+          t2 = t[: m.start()] + insert + t[m.end():]
+          p.write_text(t2)
           print("patched")
           PY
           if ! grep -q "DevAuthBanner" "$FILE"; then
             echo "Patch failed"
             exit 1
           fi
+          echo "--- snippet ---"
+          grep -n "DevAuthBanner\|dev_auth_banner" "$FILE" || true
       - name: Commit if changed
         run: |
           git config user.name "github-actions[bot]"
