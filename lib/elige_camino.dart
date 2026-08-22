@@ -127,8 +127,8 @@ class _EligeCaminoWidgetState extends State<EligeCaminoWidget> {
               _CaminoCard(
                 color: _cliente,
                 icon: Icons.search_rounded,
-                titulo: 'Necesito un trabajo',
-                subtitulo: 'Busco a alguien de confianza',
+                titulo: 'Busco un prestador confiable',
+                subtitulo: 'Necesito un oficio cerca, con gente de confianza',
                 enabled: !_saving,
                 onTap: () => _elegir('busco', quiereOfrecer: false),
               ),
@@ -136,8 +136,8 @@ class _EligeCaminoWidgetState extends State<EligeCaminoWidget> {
               _CaminoCard(
                 color: _prestador,
                 icon: Icons.handyman_rounded,
-                titulo: 'Quiero trabajar',
-                subtitulo: 'Ofrezco mis servicios',
+                titulo: 'Quiero presentar mis servicios',
+                subtitulo: 'Ofrezco mi oficio y busco clientes',
                 enabled: !_saving,
                 onTap: () => _elegir('ofrezo', quiereOfrecer: true),
               ),
