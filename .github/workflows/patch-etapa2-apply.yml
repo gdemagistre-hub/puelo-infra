@@ -1,0 +1,27 @@
+name: Apply Etapa 2 comprobante copy
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - scripts/etapa2_comprobante_copy.py
+      - .github/workflows/patch-etapa2-apply.yml
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply copy patches
+        run: python3 scripts/etapa2_comprobante_copy.py
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No changes"
+          else
+            git commit -m "ux(etapa2): apply comprobante copy (empty states + CF last_summary Pago)"
+            git push
+          fi
