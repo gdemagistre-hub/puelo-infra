@@ -49,6 +49,15 @@
       ]
     },
     {
+      "collectionGroup": "trabajos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "usuario_id", "order": "ASCENDING" },
+        { "fieldPath": "tipo", "order": "ASCENDING" },
+        { "fieldPath": "fechaCarga", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "conversaciones",
       "queryScope": "COLLECTION",
       "fields": [

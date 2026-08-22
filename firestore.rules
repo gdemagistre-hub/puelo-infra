@@ -5,6 +5,7 @@ rules_version = '2';
 // 2026-08-14: fiados (Me deben) subcolección owner-only.
 // 2026-08-18: Phase 1 scoring_features (Vertex export, admin only).
 // 2026-08-18: stats write admin (batch lock scoring_job + runs).
+// 2026-08-22: Etapa 0 — contactos/trabajos/calificaciones ya no son create:true.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -74,7 +75,14 @@ service cloud.firestore {
     }
 
     match /contactos/{id} {
-      allow create: if true;
+      // Etapa 0: create solo sesión real + campos mínimos (anti-spam).
+      allow create: if isSignedIn()
+        && request.resource.data.cliente_uid == request.auth.uid
+        && request.resource.data.prestador_uid is string
+        && request.resource.data.prestador_uid.size() > 0
+        && request.resource.data.cliente_uid != request.resource.data.prestador_uid
+        && request.resource.data.tipo in ['whatsapp', 'llamada']
+        && request.resource.data.origen in ['buscador', 'tarjeta'];
       allow read: if isAdmin();
       allow update, delete: if false;
     }
@@ -147,25 +155,51 @@ service cloud.firestore {
 
     match /trabajos/{id} {
       allow read: if true;
-      allow create: if true;
-      allow update: if true;
-      allow delete: if isAdmin() || (isSignedIn()
-        && resource.data.keys().hasAny(['usuario_id', 'usuarioId', 'uid'])
+      // portfolio: el prestador es owner (usuario_id == auth.uid)
+      // evaluacion: el cliente crea el doc (clienteRef == usuarios/auth.uid)
+      allow create: if isSignedIn()
+        && request.resource.data.tipo in ['portfolio', 'evaluacion']
         && (
-          resource.data.usuario_id == request.auth.uid
-          || resource.data.usuarioId == request.auth.uid
-          || resource.data.uid == request.auth.uid
-        ));
+          (
+            request.resource.data.tipo == 'portfolio'
+            && request.resource.data.usuario_id == request.auth.uid
+          ) || (
+            request.resource.data.tipo == 'evaluacion'
+            && request.resource.data.clienteRef == /databases/$(database)/documents/usuarios/$(request.auth.uid)
+          )
+        );
+      allow update: if isAdmin() || (
+        isSignedIn() && (
+          (
+            resource.data.tipo == 'portfolio'
+            && resource.data.usuario_id == request.auth.uid
+          ) || (
+            resource.data.tipo == 'evaluacion'
+            && resource.data.clienteRef == /databases/$(database)/documents/usuarios/$(request.auth.uid)
+          )
+        )
+      );
+      allow delete: if isAdmin() || (isSignedIn()
+        && resource.data.tipo == 'portfolio'
+        && resource.data.usuario_id == request.auth.uid);
     }
 
     match /trabajos_galeria/{id} {
-      allow read, create: if true;
+      allow read: if true;
+      allow create: if isSignedIn();
       allow update, delete: if isAdmin();
     }
 
     match /calificaciones/{id} {
       allow read: if true;
-      allow create: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.cliente_id == request.auth.uid
+        && request.resource.data.prestador_id is string
+        && request.resource.data.prestador_id.size() > 0
+        && request.resource.data.cliente_id != request.resource.data.prestador_id
+        && request.resource.data.estrellas is int
+        && request.resource.data.estrellas >= 1
+        && request.resource.data.estrellas <= 5;
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
