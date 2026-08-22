@@ -1,0 +1,65 @@
+name: Patch etapa3.2 emitir empty
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/patch-etapa32-emitir.yml"
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Patch empty states
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path("lib/mensajes/emitir_recibo_sheet.dart")
+          t = p.read_text(encoding="utf-8")
+          pairs = [
+          ("""                            _todas.isEmpty
+                                ? 'Todavía no hay contactos. '
+                                    'Abrí la tarjeta del prestador y tocá WhatsApp o Doy un pago. '
+                                    'También podés pegar el UID (está en su tarjeta).'
+                                : 'Sin coincidencias. Probá otro nombre o pegá el UID.',""",
+           """                            _todas.isEmpty
+                                ? 'Todavía no hay contactos en la app.\n\n'
+                                    '1) En Inicio buscá un prestador y abrí su tarjeta\n'
+                                    '2) Tocá WhatsApp o Llamar\n'
+                                    '3) Volvé acá: va a aparecer en la lista\n\n'
+                                    'También podés pegar el UID (está en su tarjeta).'
+                                : 'Sin coincidencias con ese nombre.\n'
+                                    'Probá otro texto o pegá el UID de su tarjeta.',"""),
+          ("""                'Aparecen prestadores que contactaste, clientes que te contactaron y conversaciones. '
+                'También podés pegar un UID.',""",
+           """                'Lista: prestadores que contactaste, clientes que te contactaron y conversaciones previas. '
+                'Si no aparece nadie, contactalo primero desde su tarjeta.',"""),
+          ("""              'Registrás un comprobante de pago. Quien lo recibe lo confirma. '
+              'No reemplaza factura. Queda sellado y no se puede editar.',""",
+           """              'Registrás un comprobante de lo que pagaste. Quien recibe el dinero lo confirma. '
+              'No reemplaza factura: queda sellado y no se puede editar.',"""),
+          ]
+          n = 0
+          for a, b in pairs:
+              if a in t:
+                  t = t.replace(a, b, 1)
+                  n += 1
+                  print('OK', n)
+              else:
+                  print('SKIP', n)
+          p.write_text(t, encoding='utf-8')
+          print('DONE', n)
+          PY
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add lib/mensajes/emitir_recibo_sheet.dart
+          if git diff --cached --quiet; then echo No changes; else
+            git pull --rebase origin main || true
+            git commit -m "etapa3.2: empty typeahead Doy un pago con pasos guiados"
+            git push
+          fi
