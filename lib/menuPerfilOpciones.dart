@@ -14,6 +14,8 @@ import 'auth_service.dart';
 import 'loginScreen.dart';
 import 'onboarding/home_tour_service.dart';
 import 'theme/app_colors.dart';
+import 'legales/documento_legal_screen.dart';
+import 'legales/textos_legales.dart';
 
 class MenuPerfilOpcionesWidget extends StatelessWidget {
   final VoidCallback? onClose;
@@ -49,6 +51,17 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
           );
         },
         transitionDuration: const Duration(milliseconds: 300),
+      ),
+    );
+  }
+
+  void _abrirLegal(BuildContext context, TipoDocumentoLegal tipo) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => DocumentoLegalScreen(
+          tipo: tipo,
+          modoPrestador: modoPrestador,
+        ),
       ),
     );
   }
@@ -158,7 +171,7 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
           label: 'Preparación y cursos',
           subtitle:
               'Cursos, matrículas o constancias con foto. '
-              'Se muestran en tu perfil; no modifican el puntaje de confianza.',
+              'Se muestran en tu perfil; no modifican tus distintivos de confianza.',
           onTap: () =>
               _abrirFlotante(context, const CapacitacionesFlotanteWidget()),
         ),
@@ -204,6 +217,24 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
           },
         ),
       ],
+      _MenuItem(
+        icon: Icons.description_outlined,
+        label: 'Términos y Condiciones',
+        subtitle: 'Uso de la app y gratuidad de esta etapa.',
+        onTap: () => _abrirLegal(context, TipoDocumentoLegal.terminos),
+      ),
+      _MenuItem(
+        icon: Icons.privacy_tip_outlined,
+        label: 'Privacidad e identidad',
+        subtitle: 'Qué datos usamos y qué nunca se publica.',
+        onTap: () => _abrirLegal(context, TipoDocumentoLegal.privacidad),
+      ),
+      _MenuItem(
+        icon: Icons.handshake_outlined,
+        label: 'Buenas prácticas',
+        subtitle: 'Cómo nos tratamos en la red de confianza.',
+        onTap: () => _abrirLegal(context, TipoDocumentoLegal.buenasPracticas),
+      ),
       _MenuItem(
         icon: Icons.logout_rounded,
         label: 'Cerrar sesión',
