@@ -134,8 +134,8 @@ class _LeyendaHeader extends StatelessWidget {
           const SizedBox(width: 10),
           const Expanded(
             child: Text(
-              'Acá ves recibos y evaluaciones pendientes. '
-              'Los recibos se emiten desde la tarjeta digital; las evaluaciones las enviá el cliente.',
+              'Emití recibos con el botón de abajo. Acá también ves evaluaciones '
+              'pendientes y las respuestas del cliente.',
               style: TextStyle(
                 fontSize: 13,
                 height: 1.35,
@@ -186,8 +186,9 @@ class _EmptyState extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         const Text(
-          'Cuando un cliente te califique o te emitan un recibo, aparece acá. '
-          'También podés emitir un recibo desde la tarjeta digital.',
+          'Cuando cobres, emití un recibo con el botón de abajo. '
+          'El cliente lo ve acá y lo confirma. '
+          'También aparecen las evaluaciones que te envíen.',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 14,
