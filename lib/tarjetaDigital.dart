@@ -106,11 +106,11 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
   void _emitirRecibo(String contraparteUid, String nombreMostrar) {
     final my = UserSession().uid;
     if (my == null || my.isEmpty) {
-      _alerta('Iniciá sesión con Google para emitir un recibo');
+      _alerta('Iniciá sesión con Google para registrar un pago');
       return;
     }
     if (my == contraparteUid) {
-      _alerta('No podés emitir un recibo a vos mismo');
+      _alerta('No podés registrar un pago a vos mismo');
       return;
     }
     showModalBottomSheet(
@@ -400,7 +400,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                         ),
                         icon: const Icon(Icons.receipt_long_rounded, size: 20),
                         label: const Text(
-                          'Emitir recibo',
+                          'Doy un pago',
                           style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
                         ),
                       ),

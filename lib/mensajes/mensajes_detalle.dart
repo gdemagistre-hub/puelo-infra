@@ -120,8 +120,8 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
         SnackBar(
           content: Text(
             decision == 'aceptado'
-                ? 'Recibo aceptado \u00b7 queda como evidencia'
-                : 'Recibo rechazado \u00b7 queda documentado',
+                ? 'Comprobante aceptado \u00b7 queda como evidencia'
+                : 'Comprobante rechazado \u00b7 queda documentado',
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -320,7 +320,7 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
         iconTheme: const IconThemeData(color: _primary),
         actions: [
           IconButton(
-            tooltip: 'Emitir recibo',
+            tooltip: 'Doy un pago',
             onPressed:
                 _otherUid == null || _otherUid!.isEmpty ? null : _openEmitir,
             icon: const Icon(Icons.receipt_long_rounded),
@@ -340,8 +340,8 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Recibos, evaluaciones y mensajes quedan registrados. '
-                    'Los recibos se sellan; las evaluaciones se publican al aceptar.',
+                    'Comprobantes, evaluaciones y mensajes quedan registrados. '
+                    'Los comprobantes se sellan; las evaluaciones se publican al aceptar.',
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.35,
@@ -429,7 +429,7 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
                               backgroundColor: _primary,
                             ),
                             icon: const Icon(Icons.receipt_long),
-                            label: const Text('Emitir recibo'),
+                            label: const Text('Doy un pago'),
                           ),
                         ],
                       ),
@@ -943,7 +943,7 @@ class _ReciboCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      soyEmisor ? 'Vos emitiste' : 'Te emitieron',
+                      soyEmisor ? 'Registraste un pago' : 'Te registraron un pago',
                       style: const TextStyle(
                         fontSize: 12,
                         color: Color(0xFF64748B),

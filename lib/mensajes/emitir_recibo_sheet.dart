@@ -131,6 +131,33 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
         debugPrint('EmitirReciboSheet conversaciones: $e');
       }
 
+      // Prestadores que yo contacté (soy cliente)
+      try {
+        final yoCliente = await FirebaseFirestore.instance
+            .collection('contactos')
+            .where('cliente_uid', isEqualTo: myUid)
+            .limit(40)
+            .get();
+        for (final doc in yoCliente.docs) {
+          final data = doc.data();
+          final other = (data['prestador_uid'] ?? '').toString().trim();
+          if (other.isEmpty || other == myUid) continue;
+          if (seen.contains(other)) continue;
+          seen.add(other);
+          final hint = (data['prestador_nombre'] ?? '').toString().trim();
+          final nombre = hint.isNotEmpty
+              ? hint
+              : await MensajesService.instance.resolveDisplayName(other);
+          list.add(_Sugerencia(
+            uid: other,
+            nombre: nombre,
+            origen: 'contacto',
+          ));
+        }
+      } catch (e) {
+        debugPrint('EmitirReciboSheet contactos cliente: $e');
+      }
+
       // 2) Contactos de la app (WA / llamada hacia mí como prestador)
       try {
         final cSnap = await FirebaseFirestore.instance
@@ -228,7 +255,7 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
       final uid = _uidCtrl.text.trim();
       final monto = ThousandsFormatter.parse(_montoCtrl.text);
       if (uid.isEmpty) {
-        throw StateError('Elegí a quién emitir el recibo.');
+        throw StateError('Elegí a quién le pagaste.');
       }
       if (monto == null || monto <= 0) throw StateError('Monto inválido');
 
@@ -246,7 +273,7 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Recibo emitido · sellado ${hash.length >= 8 ? hash.substring(0, 8) : hash}…',
+            'Comprobante registrado · sellado ${hash.length >= 8 ? hash.substring(0, 8) : hash}…',
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -289,13 +316,13 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
             ),
             const SizedBox(height: 16),
             const Text(
-              'Emitir recibo',
+              'Doy un pago',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 6),
             const Text(
-              'Quedará registrado una sola vez, con firma del contenido. '
-              'No se podrá editar ni borrar.',
+              'Registrás un comprobante de pago. Quien lo recibe lo confirma. '
+              'No reemplaza factura. Queda sellado y no se puede editar.',
               style: TextStyle(
                 fontSize: 13,
                 color: Color(0xFF64748B),
@@ -322,7 +349,7 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'Para',
+                            'Le pagás a',
                             style: TextStyle(
                               fontSize: 11,
                               color: Color(0xFF64748B),
@@ -348,7 +375,7 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
                 controller: _uidCtrl,
                 focusNode: _uidFocus,
                 decoration: InputDecoration(
-                  labelText: 'A quién',
+                  labelText: 'A quién le pagaste',
                   hintText: 'Nombre o UID',
                   border: const OutlineInputBorder(),
                   prefixIcon: const Icon(Icons.person_search_outlined),
@@ -544,7 +571,7 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
                       ),
                     )
                   : const Text(
-                      'Registrar recibo',
+                      'Registrar comprobante',
                       style: TextStyle(fontWeight: FontWeight.w800),
                     ),
             ),
