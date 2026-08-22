@@ -38,6 +38,9 @@ class UserSession {
   Map<String, dynamic>? _homeCacheData;
   static const Duration homeCacheTtl = Duration(seconds: 45);
 
+  /// Incrementa cuando cambian estrellas/badge/score en sesión (Home escucha).
+  final ValueNotifier<int> profileRevision = ValueNotifier<int>(0);
+
   bool get isLoggedIn => uid != null && uid!.isNotEmpty;
 
   /// Token Firebase Auth real (Google, email o mintDevSession).
@@ -62,6 +65,12 @@ class UserSession {
   void invalidateHomeCache() {
     _homeCacheData = null;
     _homeCacheAt = null;
+  }
+
+  /// Avisa a Home (y quien escuche) que datosCompletos cambió de forma relevante.
+  void notifyProfileChanged() {
+    invalidateHomeCache();
+    profileRevision.value = profileRevision.value + 1;
   }
 
   void iniciarSesion(
@@ -258,6 +267,7 @@ class UserSession {
     authProvider = null;
     isDevImpersonation = false;
     invalidateHomeCache();
+    profileRevision.value = 0;
     CatalogoGeoCache.instance.clear();
     try {
       final prefs = await SharedPreferences.getInstance();
