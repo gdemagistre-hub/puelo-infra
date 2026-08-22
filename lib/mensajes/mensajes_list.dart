@@ -6,7 +6,7 @@ import 'emitir_recibo_sheet.dart';
 import 'mensajes_detalle.dart';
 import 'mensajes_service.dart';
 
-/// Tab Mensajes embebido: lista de hilos (recibos + evaluaciones).
+/// Tab Mensajes embebido: lista de hilos (comprobantes + evaluaciones).
 class MensajesListScreen extends StatelessWidget {
   final bool embedded;
   const MensajesListScreen({super.key, this.embedded = true});
@@ -89,7 +89,7 @@ class MensajesListScreen extends StatelessWidget {
               backgroundColor: _primary,
               icon: const Icon(Icons.receipt_long_rounded, color: Colors.white),
               label: const Text(
-                'Emitir recibo',
+                'Doy un pago',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w800,
@@ -134,8 +134,8 @@ class _LeyendaHeader extends StatelessWidget {
           const SizedBox(width: 10),
           const Expanded(
             child: Text(
-              'Emití recibos con el botón de abajo. Acá también ves evaluaciones '
-              'pendientes y las respuestas del cliente.',
+              'Registrá un pago desde la tarjeta del prestador o con el botón. '
+              'Acá ves comprobantes para confirmar y evaluaciones.',
               style: TextStyle(
                 fontSize: 13,
                 height: 1.35,
@@ -186,9 +186,9 @@ class _EmptyState extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         const Text(
-          'Cuando cobres, emití un recibo con el botón de abajo. '
-          'El cliente lo ve acá y lo confirma. '
-          'También aparecen las evaluaciones que te envíen.',
+          'Cuando pagues, registrá el comprobante desde la tarjeta del prestador '
+          'o con el botón. Quien recibe el dinero lo confirma acá. '
+          'También aparecen las evaluaciones.',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 14,
@@ -205,7 +205,7 @@ class _EmptyState extends StatelessWidget {
           ),
           icon: const Icon(Icons.add),
           label: const Text(
-            'Emitir recibo',
+            'Doy un pago',
             style: TextStyle(fontWeight: FontWeight.w800),
           ),
         ),
