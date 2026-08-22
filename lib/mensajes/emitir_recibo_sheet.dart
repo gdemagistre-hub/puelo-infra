@@ -1,8 +1,16 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../mis_numeros/ui/thousands_formatter.dart';
 import '../theme/prox_sounds.dart';
+import '../user_session.dart';
 import 'mensajes_service.dart';
+
+class _Sugerencia {
+  final String uid;
+  final String nombre;
+  const _Sugerencia({required this.uid, required this.nombre});
+}
 
 class EmitirReciboSheet extends StatefulWidget {
   /// Si ya estás en un hilo / tarjeta, pasá la contraparte.
@@ -23,10 +31,16 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
   final _uidCtrl = TextEditingController();
   final _montoCtrl = TextEditingController();
   final _notaCtrl = TextEditingController();
+  final _uidFocus = FocusNode();
   String _concepto = 'sena';
   bool _loading = false;
   String? _error;
   String? _nombreResuelto;
+
+  List<_Sugerencia> _todas = [];
+  List<_Sugerencia> _filtradas = [];
+  bool _cargandoSugerencias = false;
+  bool _mostrarLista = false;
 
   static const _conceptos = [
     ('sena', 'Seña'),
@@ -49,7 +63,106 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
       if (_nombreResuelto == null || _nombreResuelto!.isEmpty) {
         _resolverNombre(_uidCtrl.text);
       }
+    } else {
+      _uidFocus.addListener(() {
+        if (_uidFocus.hasFocus) {
+          setState(() => _mostrarLista = true);
+        }
+      });
+      _cargarSugerencias();
     }
+  }
+
+  Future<void> _cargarSugerencias() async {
+    final myUid = UserSession().uid;
+    if (myUid == null || myUid.isEmpty) return;
+    setState(() => _cargandoSugerencias = true);
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('conversaciones')
+          .where('participantes', arrayContains: myUid)
+          .orderBy('last_event_at', descending: true)
+          .limit(25)
+          .get();
+
+      final seen = <String>{};
+      final list = <_Sugerencia>[];
+
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        final other = MensajesService.otherParticipantUid(
+          myUid: myUid,
+          convId: doc.id,
+          data: data,
+        );
+        if (other == null || other.isEmpty || other == myUid) continue;
+        if (seen.contains(other)) continue;
+        seen.add(other);
+
+        // Nombre desde denormalizado del hilo si existe
+        String? nombre;
+        for (final key in [
+          'other_display_name',
+          'contraparte_nombre',
+          'cliente_nombre',
+          'prestador_nombre',
+        ]) {
+          final v = (data[key] ?? '').toString().trim();
+          if (v.isNotEmpty) {
+            nombre = v;
+            break;
+          }
+        }
+        nombre ??= await MensajesService.instance.resolveDisplayName(other);
+        list.add(_Sugerencia(uid: other, nombre: nombre));
+        if (list.length >= 20) break;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _todas = list;
+        _filtradas = list;
+        _cargandoSugerencias = false;
+      });
+    } catch (e) {
+      debugPrint('EmitirReciboSheet._cargarSugerencias: $e');
+      if (!mounted) return;
+      setState(() => _cargandoSugerencias = false);
+    }
+  }
+
+  void _filtrar(String raw) {
+    final q = raw.trim().toLowerCase();
+    if (q.isEmpty) {
+      setState(() {
+        _filtradas = _todas;
+        _nombreResuelto = null;
+        _mostrarLista = true;
+      });
+      return;
+    }
+    final match = _todas.where((s) {
+      return s.nombre.toLowerCase().contains(q) ||
+          s.uid.toLowerCase().contains(q);
+    }).toList();
+    setState(() {
+      _filtradas = match;
+      _mostrarLista = true;
+    });
+    // Si parece UID completo, resolver nombre
+    if (q.length > 20 && !q.contains(' ')) {
+      _resolverNombre(raw.trim());
+    }
+  }
+
+  void _elegir(_Sugerencia s) {
+    _uidCtrl.text = s.uid;
+    setState(() {
+      _nombreResuelto = s.nombre;
+      _mostrarLista = false;
+      _error = null;
+    });
+    _uidFocus.unfocus();
   }
 
   Future<void> _resolverNombre(String uid) async {
@@ -63,6 +176,7 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
     _uidCtrl.dispose();
     _montoCtrl.dispose();
     _notaCtrl.dispose();
+    _uidFocus.dispose();
     super.dispose();
   }
 
@@ -75,9 +189,7 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
       final uid = _uidCtrl.text.trim();
       final monto = ThousandsFormatter.parse(_montoCtrl.text);
       if (uid.isEmpty) {
-        throw StateError(
-          'Elegí a quién emitir: abrí su tarjeta digital y tocá Emitir recibo.',
-        );
+        throw StateError('Elegí a quién emitir el recibo.');
       }
       if (monto == null || monto <= 0) throw StateError('Monto inválido');
 
@@ -89,7 +201,6 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
         origen: _fijo ? 'tarjeta' : 'mensajes',
       );
       if (!mounted) return;
-      // Sonido de confirmación PROX (recibo emitido).
       ProxSounds.playConfirm();
       Navigator.pop(context, res);
       final hash = (res['content_hash'] as String?) ?? '';
@@ -103,7 +214,8 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
       );
     } catch (e) {
       setState(() {
-        _error = e.toString()
+        _error = e
+            .toString()
             .replaceFirst('Exception: ', '')
             .replaceFirst('StateError: ', '')
             .replaceFirst('FirebaseFunctionsException: ', '');
@@ -158,7 +270,9 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
                 decoration: BoxDecoration(
                   color: const Color(0xFFE6F7FA),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF28B5CD).withOpacity(0.35)),
+                  border: Border.all(
+                    color: const Color(0xFF28B5CD).withOpacity(0.35),
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -193,16 +307,41 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
             ] else ...[
               TextField(
                 controller: _uidCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'UID de la otra persona',
-                  hintText: 'Mejor: abrí su tarjeta → Emitir recibo',
-                  border: OutlineInputBorder(),
+                focusNode: _uidFocus,
+                decoration: InputDecoration(
+                  labelText: 'A quién',
+                  hintText: 'Nombre o UID',
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.person_search_outlined),
+                  suffixIcon: _cargandoSugerencias
+                      ? const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : (_uidCtrl.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, size: 20),
+                              onPressed: () {
+                                _uidCtrl.clear();
+                                setState(() {
+                                  _nombreResuelto = null;
+                                  _filtradas = _todas;
+                                  _mostrarLista = true;
+                                });
+                              },
+                            )
+                          : null),
                 ),
-                onChanged: (v) {
-                  if (v.trim().length > 10) _resolverNombre(v.trim());
-                },
+                onChanged: _filtrar,
+                onTap: () => setState(() => _mostrarLista = true),
               ),
-              if (_nombreResuelto != null && _nombreResuelto!.isNotEmpty) ...[
+              if (_nombreResuelto != null &&
+                  _nombreResuelto!.isNotEmpty &&
+                  !_mostrarLista) ...[
                 const SizedBox(height: 8),
                 Text(
                   'Para: $_nombreResuelto',
@@ -212,17 +351,97 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
                   ),
                 ),
               ],
+              if (_mostrarLista) ...[
+                const SizedBox(height: 8),
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 200),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: _filtradas.isEmpty
+                      ? Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Text(
+                            _todas.isEmpty
+                                ? 'Todavía no tenés conversaciones. '
+                                    'Podés pegar el UID de la otra persona '
+                                    '(está en su tarjeta digital).'
+                                : 'Sin coincidencias. Probá otro nombre o pegá el UID.',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF64748B),
+                              height: 1.35,
+                            ),
+                          ),
+                        )
+                      : ListView.separated(
+                          shrinkWrap: true,
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          itemCount: _filtradas.length,
+                          separatorBuilder: (_, __) => const Divider(
+                            height: 1,
+                            color: Color(0xFFE2E8F0),
+                          ),
+                          itemBuilder: (context, i) {
+                            final s = _filtradas[i];
+                            final initial = s.nombre.isNotEmpty
+                                ? s.nombre[0].toUpperCase()
+                                : '?';
+                            return ListTile(
+                              dense: true,
+                              leading: CircleAvatar(
+                                radius: 16,
+                                backgroundColor:
+                                    const Color(0xFF28B5CD).withOpacity(0.15),
+                                child: Text(
+                                  initial,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF1A8FA3),
+                                  ),
+                                ),
+                              ),
+                              title: Text(
+                                s.nombre,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              subtitle: Text(
+                                s.uid.length > 12
+                                    ? '${s.uid.substring(0, 10)}…'
+                                    : s.uid,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF94A3B8),
+                                ),
+                              ),
+                              onTap: () => _elegir(s),
+                            );
+                          },
+                        ),
+                ),
+              ],
               const SizedBox(height: 8),
               const Text(
-                'Recomendado: desde la tarjeta digital de la otra persona, '
-                'tocá “Emitir recibo” (ahí no hace falta el UID).',
-                style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8), height: 1.35),
+                'Elegí de tu lista o pegá el UID. '
+                'También podés emitir desde la tarjeta digital de la persona.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF94A3B8),
+                  height: 1.35,
+                ),
               ),
             ],
             const SizedBox(height: 14),
             TextField(
               controller: _montoCtrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
               inputFormatters: [
                 ThousandsFormatter(allowDecimal: true),
               ],
@@ -240,11 +459,11 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
               spacing: 8,
               runSpacing: 8,
               children: _conceptos.map((c) {
-                final sel = _concepto == c.$1;
+                final sel = _concepto == c.\$1;
                 return ChoiceChip(
-                  label: Text(c.$2),
+                  label: Text(c.\$2),
                   selected: sel,
-                  onSelected: (_) => setState(() => _concepto = c.$1),
+                  onSelected: (_) => setState(() => _concepto = c.\$1),
                   selectedColor: const Color(0xFF28B5CD).withOpacity(0.2),
                 );
               }).toList(),
