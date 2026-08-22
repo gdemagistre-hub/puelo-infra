@@ -19,7 +19,6 @@ jobs:
           python3 << 'PY'
           from pathlib import Path
 
-          # tarjeta
           p = Path('lib/tarjetaDigital.dart')
           t = p.read_text()
           t = t.replace('Iniciá sesión con Google para emitir un recibo',
@@ -28,9 +27,8 @@ jobs:
                         'No podés registrar un pago a vos mismo')
           t = t.replace("'Emitir recibo'", "'Doy un pago'")
           p.write_text(t)
-          print('tarjeta', 'Doy un pago' in t, 'Emitir recibo' in t)
+          print('tarjeta Doy', 'Doy un pago' in t)
 
-          # detalle — user facing only
           p = Path('lib/mensajes/mensajes_detalle.dart')
           t = p.read_text()
           pairs = [
@@ -42,37 +40,95 @@ jobs:
              "'Comprobantes, evaluaciones y mensajes quedan registrados. '"),
             ("'Los recibos se sellan; las evaluaciones se publican al aceptar.'",
              "'Los comprobantes se sellan; las evaluaciones se publican al aceptar.'"),
-            ("? 'Recibo aceptado",
-             "? 'Comprobante aceptado"),
-            (": 'Recibo rechazado",
-             ": 'Comprobante rechazado"),
+            ("? 'Recibo aceptado", "? 'Comprobante aceptado"),
+            (": 'Recibo rechazado", ": 'Comprobante rechazado"),
           ]
           for a,b in pairs:
-              if a in t:
-                  t = t.replace(a,b)
-                  print('ok', a[:50])
-              else:
-                  print('miss', a[:50])
-          # unicode-escaped empty hint
-          t = t.replace(
-              "o emit\\u00ed un recibo cuando haya un pago o se\\u00f1a.",
-              "o registr\\u00e1 un pago cuando corresponda.",
-          )
+              print(('ok' if a in t else 'miss'), a[:48])
+              t = t.replace(a,b)
           t = t.replace(
               'o emití un recibo cuando haya un pago o seña.',
               'o registrá un pago cuando corresponda.',
           )
           p.write_text(t)
-          print('detalle done')
+
+          p = Path('lib/mensajes/emitir_recibo_sheet.dart')
+          t = p.read_text()
+          sheet = [
+            ("              'Emitir recibo',", "              'Doy un pago',"),
+            ("              'Quedará registrado una sola vez, con firma del contenido. '\n              'No se podrá editar ni borrar.',",
+             "              'Registrás un comprobante de pago. Quien lo recibe lo confirma. '\n              'No reemplaza factura. Queda sellado y no se puede editar.',"),
+            ("        throw StateError('Elegí a quién emitir el recibo.');",
+             "        throw StateError('Elegí a quién le pagaste.');"),
+            ("            'Recibo emitido · sellado",
+             "            'Comprobante registrado · sellado"),
+            ("                            'Para',", "                            'Le pagás a',"),
+            ("                  labelText: 'A quién',", "                  labelText: 'A quién le pagaste',"),
+            ("                  'Para: $_nombreResuelto',", "                  'Le pagás a: $_nombreResuelto',"),
+            ("                      'Registrar recibo',", "                      'Registrar comprobante',"),
+          ]
+          for a,b in sheet:
+              print(('ok' if a in t else 'miss'), a[:50])
+              t = t.replace(a,b)
+
+          needle = "            .where('prestador_uid', isEqualTo: myUid)"
+          insert = '''
+      // Prestadores que yo contacté (cliente → prestador)
+      try {
+        final yoCliente = await FirebaseFirestore.instance
+            .collection('contactos')
+            .where('cliente_uid', isEqualTo: myUid)
+            .limit(40)
+            .get();
+        for (final doc in yoCliente.docs) {
+          final data = doc.data();
+          final other = (data['prestador_uid'] ?? '').toString().trim();
+          if (other.isEmpty || other == myUid) continue;
+          if (seen.contains(other)) continue;
+          seen.add(other);
+          final hint = (data['prestador_nombre'] ?? '').toString().trim();
+          final nombre = hint.isNotEmpty
+              ? hint
+              : await MensajesService.instance.resolveDisplayName(other);
+          list.add(_Sugerencia(
+            uid: other,
+            nombre: nombre,
+            origen: 'contacto',
+          ));
+        }
+      } catch (e) {
+        debugPrint('EmitirReciboSheet contactos cliente: $e');
+      }
+'''
+          if "where('cliente_uid', isEqualTo: myUid)" not in t and needle in t:
+              idx = t.find("      // 2) Contactos")
+              if idx < 0:
+                  idx = t.find(needle)
+                  idx = t.rfind('\n', 0, idx)
+              t = t[:idx] + insert + t[idx:]
+              print('inserted cliente contactos query')
+          else:
+              print('cliente query skip', "cliente_uid" in t)
+
+          t = t.replace(
+              "                                ? 'Todavía no hay contactos ni conversaciones. '\n                                    'Cuando un cliente te escriba por WhatsApp o te llame '\n                                    'desde la app, aparece acá. '\n                                    'También podés pegar el UID (está en su tarjeta).'",
+              "                                ? 'Todavía no hay contactos. '\n                                    'El camino más simple: abrí la tarjeta del prestador '\n                                    'y tocá “Doy un pago”.'",
+          )
+          t = t.replace(
+              "                'Aparecen quienes te contactaron por la app y tus conversaciones. '\n                'También podés pegar un UID.',",
+              "                'Aparecen contactos de la app y conversaciones. '\n                'También podés pegar un UID o ir a la tarjeta del prestador.',",
+          )
+          p.write_text(t)
+          print('sheet Doy', 'Doy un pago' in t)
           PY
       - name: Commit if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add lib/tarjetaDigital.dart lib/mensajes/mensajes_detalle.dart
+          git add lib/tarjetaDigital.dart lib/mensajes/mensajes_detalle.dart lib/mensajes/emitir_recibo_sheet.dart
           if git diff --staged --quiet; then
             echo "No changes"
           else
-            git commit -m "ux: Doy un pago / comprobante en tarjeta y detalle"
+            git commit -m "ux: Doy un pago / comprobante (cliente registra, prestador confirma)"
             git push
           fi
