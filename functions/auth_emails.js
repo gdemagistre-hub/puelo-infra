@@ -1,18 +1,25 @@
 /**
- * Auth emails desde dominio propio (no-reply@puelo.app) vía Resend.
+ * Auth emails desde no-reply@puelo.app vía SMTP IONOS.
  *
- * Setup owner (una vez):
- * 1) Cuenta Resend → verificar dominio puelo.app (SPF/DKIM/DMARC que indique Resend)
- * 2) firebase functions:secrets:set RESEND_API_KEY --project lifewalletpuelo
- * 3) En este archivo, agregar secrets: ["RESEND_API_KEY"] al onCall y redeploy
- *    (sin el binding, process.env.RESEND_API_KEY no llega a runtime)
+ * Setup owner:
+ * 1) Casilla no-reply@puelo.app en IONOS (ya hecha)
+ * 2) firebase functions:secrets:set IONOS_SMTP_PASS --project lifewalletpuelo
+ *    (pegar la contraseña del buzón; no se muestra al tipear)
+ * 3) Redeploy functions
  *
- * Mientras no haya key, el cliente usa el mail default de Firebase Auth.
+ * SMTP IONOS (oficial):
+ *   host: smtp.ionos.com
+ *   port: 587  STARTTLS
+ *   user: no-reply@puelo.app
+ *
+ * Sin IONOS_SMTP_PASS el cliente cae al mail default de Firebase Auth.
  */
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const nodemailer = require("nodemailer");
 
-const FROM = "Puelo <no-reply@puelo.app>";
+const FROM_EMAIL = "no-reply@puelo.app";
+const FROM = `Puelo <${FROM_EMAIL}>`;
 const CONTINUE_URL = "https://lifewalletpuelo.web.app/";
 
 const actionCodeSettings = {
@@ -30,7 +37,7 @@ function htmlVerify(link) {
     </p>
     <p style="font-size:13px;color:#64748b">Si el botón no funciona, copiá este enlace:<br/>
     <a href="${link}" style="color:#28B5CD;word-break:break-all">${link}</a></p>
-    <p style="font-size:12px;color:#94a3b8;margin-top:24px">Puelo · este mail no recibe respuestas (no-reply@puelo.app)</p>
+    <p style="font-size:12px;color:#94a3b8;margin-top:24px">Puelo · este mail no recibe respuestas (${FROM_EMAIL})</p>
   </div></body></html>`;
 }
 
@@ -43,51 +50,47 @@ function htmlReset(link) {
       <a href="${link}" style="background:#734BE4;color:#fff;padding:12px 22px;border-radius:10px;text-decoration:none;font-weight:700">Elegir nueva contraseña</a>
     </p>
     <p style="font-size:13px;color:#64748b">Si no pediste esto, ignorá el mail. El enlace vence en unas horas.</p>
-    <p style="font-size:12px;color:#94a3b8;margin-top:24px">Puelo · no-reply@puelo.app</p>
+    <p style="font-size:12px;color:#94a3b8;margin-top:24px">Puelo · ${FROM_EMAIL}</p>
   </div></body></html>`;
 }
 
-async function sendResend({ to, subject, html }) {
-  const key = process.env.RESEND_API_KEY || "";
-  if (!key) {
-    const err = new Error("RESEND_API_KEY not configured");
-    err.code = "no_resend_key";
+function getTransport() {
+  const pass = process.env.IONOS_SMTP_PASS || "";
+  if (!pass) {
+    const err = new Error("IONOS_SMTP_PASS not configured");
+    err.code = "no_smtp_pass";
     throw err;
   }
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
+  return nodemailer.createTransport({
+    host: "smtp.ionos.com",
+    port: 587,
+    secure: false, // STARTTLS
+    auth: {
+      user: FROM_EMAIL,
+      pass,
     },
-    body: JSON.stringify({
-      from: FROM,
-      to: [to],
-      subject,
-      html,
-    }),
   });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    console.error("Resend error", res.status, body);
-    const err = new Error(body.message || `Resend HTTP ${res.status}`);
-    err.code = "resend_failed";
-    throw err;
-  }
-  return body;
+}
+
+async function sendMail({ to, subject, html }) {
+  const transport = getTransport();
+  const info = await transport.sendMail({
+    from: FROM,
+    to,
+    subject,
+    html,
+  });
+  console.log("auth email sent", { to, messageId: info.messageId });
+  return info;
 }
 
 /**
  * Callable: { type: 'verify' | 'reset', email?: string }
- * - verify: requiere Auth; usa email del token
- * - reset: email obligatorio; no revela si existe la cuenta
- *
- * TEMP: sin secrets:[] para no bloquear deploy. Tras crear RESEND_API_KEY:
- *   secrets: ["RESEND_API_KEY"]  + redeploy.
  */
 exports.sendAuthEmail = onCall(
   {
     region: "us-east1",
+    secrets: ["IONOS_SMTP_PASS"],
     memory: "256MiB",
     timeoutSeconds: 30,
   },
@@ -115,15 +118,14 @@ exports.sendAuthEmail = onCall(
         const link = await admin
           .auth()
           .generateEmailVerificationLink(user.email, actionCodeSettings);
-        await sendResend({
+        await sendMail({
           to: user.email,
           subject: "Confirmá tu email en Puelo",
           html: htmlVerify(link),
         });
-        return { ok: true, via: "resend", from: "no-reply@puelo.app" };
+        return { ok: true, via: "ionos-smtp", from: FROM_EMAIL };
       }
 
-      // reset
       const email = String(request.data?.email || "")
         .trim()
         .toLowerCase();
@@ -134,22 +136,21 @@ exports.sendAuthEmail = onCall(
         const link = await admin
           .auth()
           .generatePasswordResetLink(email, actionCodeSettings);
-        await sendResend({
+        await sendMail({
           to: email,
           subject: "Restablecer contraseña — Puelo",
           html: htmlReset(link),
         });
       } catch (e) {
-        // No filtrar existencia de cuenta (anti-enumeration).
         console.warn("sendAuthEmail reset:", e?.code || e?.message || e);
       }
-      return { ok: true, via: "resend", from: "no-reply@puelo.app" };
+      return { ok: true, via: "ionos-smtp", from: FROM_EMAIL };
     } catch (e) {
       if (e instanceof HttpsError) throw e;
-      if (e?.code === "no_resend_key") {
+      if (e?.code === "no_smtp_pass") {
         throw new HttpsError(
           "failed-precondition",
-          "RESEND_API_KEY no configurada — usar fallback cliente"
+          "IONOS_SMTP_PASS no configurada — usar fallback cliente"
         );
       }
       console.error("sendAuthEmail", e);
