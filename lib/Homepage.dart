@@ -27,6 +27,7 @@ import 'services/fcm_service.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'onboarding/home_tour_service.dart';
 import 'onboarding/home_tour_overlay.dart';
+import 'widgets/dev_auth_banner.dart';
 
 class HomePageWidget extends StatefulWidget {
   final bool? initialModoPrestador;
@@ -429,6 +430,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
       body: Stack(
         fit: StackFit.expand,
         children: [
+          const DevAuthBanner(),
           Positioned.fill(
             child: Padding(
               padding: EdgeInsets.only(bottom: contentBottomPad),
