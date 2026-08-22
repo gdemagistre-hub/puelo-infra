@@ -9,7 +9,12 @@ import 'mensajes_service.dart';
 class _Sugerencia {
   final String uid;
   final String nombre;
-  const _Sugerencia({required this.uid, required this.nombre});
+  final String origen; // conversacion | contacto
+  const _Sugerencia({
+    required this.uid,
+    required this.nombre,
+    this.origen = 'conversacion',
+  });
 }
 
 class EmitirReciboSheet extends StatefulWidget {
@@ -77,44 +82,80 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
     final myUid = UserSession().uid;
     if (myUid == null || myUid.isEmpty) return;
     setState(() => _cargandoSugerencias = true);
+
+    final seen = <String>{};
+    final list = <_Sugerencia>[];
+
     try {
-      final snap = await FirebaseFirestore.instance
-          .collection('conversaciones')
-          .where('participantes', arrayContains: myUid)
-          .orderBy('last_event_at', descending: true)
-          .limit(25)
-          .get();
+      // 1) Conversaciones existentes (recibos / evaluaciones)
+      try {
+        final snap = await FirebaseFirestore.instance
+            .collection('conversaciones')
+            .where('participantes', arrayContains: myUid)
+            .orderBy('last_event_at', descending: true)
+            .limit(25)
+            .get();
 
-      final seen = <String>{};
-      final list = <_Sugerencia>[];
+        for (final doc in snap.docs) {
+          final data = doc.data();
+          final other = MensajesService.otherParticipantUid(
+            myUid: myUid,
+            convId: doc.id,
+            data: data,
+          );
+          if (other == null || other.isEmpty || other == myUid) continue;
+          if (seen.contains(other)) continue;
+          seen.add(other);
 
-      for (final doc in snap.docs) {
-        final data = doc.data();
-        final other = MensajesService.otherParticipantUid(
-          myUid: myUid,
-          convId: doc.id,
-          data: data,
-        );
-        if (other == null || other.isEmpty || other == myUid) continue;
-        if (seen.contains(other)) continue;
-        seen.add(other);
-
-        String? nombre;
-        for (final key in [
-          'other_display_name',
-          'contraparte_nombre',
-          'cliente_nombre',
-          'prestador_nombre',
-        ]) {
-          final v = (data[key] ?? '').toString().trim();
-          if (v.isNotEmpty) {
-            nombre = v;
-            break;
+          String? nombre;
+          for (final key in [
+            'other_display_name',
+            'contraparte_nombre',
+            'cliente_nombre',
+            'prestador_nombre',
+          ]) {
+            final v = (data[key] ?? '').toString().trim();
+            if (v.isNotEmpty) {
+              nombre = v;
+              break;
+            }
           }
+          nombre ??= await MensajesService.instance.resolveDisplayName(other);
+          list.add(_Sugerencia(
+            uid: other,
+            nombre: nombre,
+            origen: 'conversacion',
+          ));
         }
-        nombre ??= await MensajesService.instance.resolveDisplayName(other);
-        list.add(_Sugerencia(uid: other, nombre: nombre));
-        if (list.length >= 20) break;
+      } catch (e) {
+        debugPrint('EmitirReciboSheet conversaciones: $e');
+      }
+
+      // 2) Contactos de la app (WA / llamada hacia mí como prestador)
+      try {
+        final cSnap = await FirebaseFirestore.instance
+            .collection('contactos')
+            .where('prestador_uid', isEqualTo: myUid)
+            .limit(40)
+            .get();
+
+        for (final doc in cSnap.docs) {
+          final data = doc.data();
+          final other = (data['cliente_uid'] ?? '').toString().trim();
+          if (other.isEmpty || other == myUid) continue;
+          if (seen.contains(other)) continue;
+          seen.add(other);
+
+          final nombre =
+              await MensajesService.instance.resolveDisplayName(other);
+          list.add(_Sugerencia(
+            uid: other,
+            nombre: nombre,
+            origen: 'contacto',
+          ));
+        }
+      } catch (e) {
+        debugPrint('EmitirReciboSheet contactos: $e');
       }
 
       if (!mounted) return;
@@ -352,7 +393,7 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
               if (_mostrarLista) ...[
                 const SizedBox(height: 8),
                 Container(
-                  constraints: const BoxConstraints(maxHeight: 200),
+                  constraints: const BoxConstraints(maxHeight: 220),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(12),
@@ -363,9 +404,10 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
                           padding: const EdgeInsets.all(14),
                           child: Text(
                             _todas.isEmpty
-                                ? 'Todavía no tenés conversaciones. '
-                                    'Podés pegar el UID de la otra persona '
-                                    '(está en su tarjeta digital).'
+                                ? 'Todavía no hay contactos ni conversaciones. '
+                                    'Cuando un cliente te escriba por WhatsApp o te llame '
+                                    'desde la app, aparece acá. '
+                                    'También podés pegar el UID (está en su tarjeta).'
                                 : 'Sin coincidencias. Probá otro nombre o pegá el UID.',
                             style: const TextStyle(
                               fontSize: 13,
@@ -387,6 +429,9 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
                             final initial = s.nombre.isNotEmpty
                                 ? s.nombre[0].toUpperCase()
                                 : '?';
+                            final tag = s.origen == 'contacto'
+                                ? 'Contacto app'
+                                : 'Conversación';
                             return ListTile(
                               dense: true,
                               leading: CircleAvatar(
@@ -410,9 +455,7 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
                                 ),
                               ),
                               subtitle: Text(
-                                s.uid.length > 12
-                                    ? '${s.uid.substring(0, 10)}…'
-                                    : s.uid,
+                                tag,
                                 style: const TextStyle(
                                   fontSize: 11,
                                   color: Color(0xFF94A3B8),
@@ -426,8 +469,8 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
               ],
               const SizedBox(height: 8),
               const Text(
-                'Elegí de tu lista o pegá el UID. '
-                'También podés emitir desde la tarjeta digital de la persona.',
+                'Aparecen quienes te contactaron por la app y tus conversaciones. '
+                'También podés pegar un UID.',
                 style: TextStyle(
                   fontSize: 12,
                   color: Color(0xFF94A3B8),
