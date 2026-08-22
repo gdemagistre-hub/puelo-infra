@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'scoring_features.dart';
+import 'stats_negocio.dart';
 
 /// Scoring Puelo v1.2-phase1 — TEMP minimal restore to unblock build.
 /// Full body will be restored from artifacts/scoring_service_PHASE1_web_lock.dart
@@ -356,7 +357,22 @@ class ScoringService {
     }
     return tips;
   }
-  static Future<void> actualizarStatsNegocio({required String uid, int? nMovimientos, int? nCobros, int? nFiadosCobrados, int? nFiadosPendientes, bool? tieneFondoEmergencia}) async {}
+  static Future<void> actualizarStatsNegocio({
+    required String uid,
+    int? nMovimientos,
+    int? nCobros,
+    int? nFiadosCobrados,
+    int? nFiadosPendientes,
+    bool? tieneFondoEmergencia,
+  }) =>
+      StatsNegocioWriter.write(
+        uid: uid,
+        nMovimientos: nMovimientos,
+        nCobros: nCobros,
+        nFiadosCobrados: nFiadosCobrados,
+        nFiadosPendientes: nFiadosPendientes,
+        tieneFondoEmergencia: tieneFondoEmergencia,
+      );
 }
 
 class ScoreResult {
