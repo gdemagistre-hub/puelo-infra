@@ -40,6 +40,12 @@ class UserSession {
 
   bool get isLoggedIn => uid != null && uid!.isNotEmpty;
 
+  /// Token Firebase Auth real (Google, email o mintDevSession).
+  bool get hasRealAuth => FirebaseAuth.instance.currentUser != null;
+
+  /// Dropdown local sin custom token: Storage, CF y rules endurecidas fallan.
+  bool get needsRealAuth => isLoggedIn && isDevImpersonation && !hasRealAuth;
+
   Map<String, dynamic>? get homeCacheIfFresh {
     final at = _homeCacheAt;
     final data = _homeCacheData;
