@@ -1,0 +1,33 @@
+name: Wire sendAuthEmail
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/wire-send-auth-email.yml"
+permissions:
+  contents: write
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Append export
+        run: |
+          if grep -q "auth_emails" functions/index.js; then
+            echo already
+          else
+            printf '\n// Auth emails (no-reply@puelo.app SMTP IONOS)\nconst authEmails = require("./auth_emails");\nexports.sendAuthEmail = authEmails.sendAuthEmail;\n' >> functions/index.js
+            echo wired
+          fi
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add functions/index.js
+          if git diff --cached --quiet; then echo No changes; else
+            git pull --rebase origin main || true
+            git commit -m "etapa3.4: export sendAuthEmail"
+            git push
+          fi
