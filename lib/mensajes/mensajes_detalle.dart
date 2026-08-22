@@ -418,7 +418,7 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
                           ),
                           const SizedBox(height: 8),
                           const Text(
-                            'Escrib\u00ed algo o emit\u00ed un recibo cuando haya un pago o se\u00f1a.',
+                            'Escrib\u00ed algo o registr\u00e1 un comprobante cuando haya un pago o se\u00f1a.',
                             textAlign: TextAlign.center,
                             style: TextStyle(color: Color(0xFF64748B)),
                           ),

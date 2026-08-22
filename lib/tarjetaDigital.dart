@@ -106,7 +106,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
   void _emitirRecibo(String contraparteUid, String nombreMostrar) {
     final my = UserSession().uid;
     if (my == null || my.isEmpty) {
-      _alerta('Iniciá sesión con Google para registrar un pago');
+      _alerta('Entrá con Google (no el menú de prueba) para registrar un pago');
       return;
     }
     if (my == contraparteUid) {

@@ -588,7 +588,7 @@ exports.emitirRecibo = onCall(
       if (pending) {
         throw new HttpsError(
           "failed-precondition",
-          "Ya hay un recibo pendiente en este hilo. Esperá la respuesta o que se resuelva."
+          "Ya hay un comprobante pendiente en este hilo. Esperá la confirmación o que se resuelva."
         );
       }
     }
@@ -639,7 +639,7 @@ exports.emitirRecibo = onCall(
         origen,
         created_at: admin.firestore.FieldValue.serverTimestamp(),
         updated_at: admin.firestore.FieldValue.serverTimestamp(),
-        last_summary: `Recibo $${monto} · Pendiente`,
+        last_summary: `Pago $${monto} · Pendiente`,
         last_event_at: admin.firestore.FieldValue.serverTimestamp(),
         pending_recibo_event_id: eventId,
         pending_recibo_actor_uid: actorUid,
@@ -647,7 +647,7 @@ exports.emitirRecibo = onCall(
     } else {
       batch.update(convRef, {
         updated_at: admin.firestore.FieldValue.serverTimestamp(),
-        last_summary: `Recibo $${monto} · Pendiente`,
+        last_summary: `Pago $${monto} · Pendiente`,
         last_event_at: admin.firestore.FieldValue.serverTimestamp(),
         pending_recibo_event_id: eventId,
         pending_recibo_actor_uid: actorUid,
@@ -703,22 +703,22 @@ exports.responderRecibo = onCall(
     const reciboRef = convRef.collection("eventos").doc(reciboEventId);
     const reciboSnap = await reciboRef.get();
     if (!reciboSnap.exists) {
-      throw new HttpsError("not-found", "Recibo no encontrado");
+      throw new HttpsError("not-found", "Comprobante no encontrado");
     }
     const recibo = reciboSnap.data() || {};
     if (recibo.tipo !== "recibo_emitido") {
-      throw new HttpsError("failed-precondition", "No es un recibo");
+      throw new HttpsError("failed-precondition", "No es un comprobante de pago");
     }
     if (recibo.actor_uid === actorUid) {
       throw new HttpsError(
         "failed-precondition",
-        "No podés responder tu propio recibo"
+        "No podés confirmar tu propio comprobante"
       );
     }
     if (conv.pending_recibo_event_id !== reciboEventId) {
       throw new HttpsError(
         "failed-precondition",
-        "Este recibo ya no está pendiente (fue respondido o no es el activo)"
+        "Este comprobante ya no está pendiente (fue confirmado o no es el activo)"
       );
     }
 
@@ -758,8 +758,8 @@ exports.responderRecibo = onCall(
 
     const label =
       decision === "aceptado"
-        ? `Recibo $${recibo.monto} · Aceptado`
-        : `Recibo $${recibo.monto} · Rechazado`;
+        ? `Pago $${recibo.monto} · Aceptado`
+        : `Pago $${recibo.monto} · Rechazado`;
 
     const batch = db.batch();
     batch.set(respRef, respDoc);
