@@ -17,7 +17,7 @@ import 'theme/app_colors.dart';
 import 'legales/documento_legal_screen.dart';
 import 'legales/textos_legales.dart';
 
-class MenuPerfilOpcionesWidget extends StatelessWidget {
+class MenuPerfilOpcionesWidget extends StatefulWidget {
   final VoidCallback? onClose;
   final bool modoPrestador;
   final VoidCallback? onRolPuedeHaberCambiado;
@@ -31,6 +31,16 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
     this.onRolPuedeHaberCambiado,
     this.onRequestHomeTour,
   });
+
+  @override
+  State<MenuPerfilOpcionesWidget> createState() =>
+      _MenuPerfilOpcionesWidgetState();
+}
+
+class _MenuPerfilOpcionesWidgetState extends State<MenuPerfilOpcionesWidget> {
+  bool _legalesAbierto = false;
+
+  bool get modoPrestador => widget.modoPrestador;
 
   Color get primaryColor =>
       modoPrestador ? AppColors.prestador : AppColors.cliente;
@@ -104,8 +114,8 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
 
   Future<void> _abrirGuiaRapida(BuildContext context) async {
     await HomeTourService.instance.reset(modoPrestador: modoPrestador);
-    onClose?.call();
-    onRequestHomeTour?.call();
+    widget.onClose?.call();
+    widget.onRequestHomeTour?.call();
   }
 
   @override
@@ -124,7 +134,7 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
                 builder: (_) => const RegistroTrabajadorWidget(),
               ),
             );
-            onRolPuedeHaberCambiado?.call();
+            widget.onRolPuedeHaberCambiado?.call();
           },
         ),
       _MenuItem(
@@ -183,7 +193,7 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
         onTap: () =>
             _abrirFlotante(context, const PerfilCompletoFlotanteWidget()),
       ),
-      if (onRequestHomeTour != null)
+      if (widget.onRequestHomeTour != null)
         _MenuItem(
           icon: Icons.help_outline_rounded,
           label: 'Guía rápida de la app',
@@ -217,24 +227,6 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
           },
         ),
       ],
-      _MenuItem(
-        icon: Icons.description_outlined,
-        label: 'Términos y Condiciones',
-        subtitle: 'Uso de la app y gratuidad de esta etapa.',
-        onTap: () => _abrirLegal(context, TipoDocumentoLegal.terminos),
-      ),
-      _MenuItem(
-        icon: Icons.privacy_tip_outlined,
-        label: 'Privacidad e identidad',
-        subtitle: 'Qué datos usamos y qué nunca se publica.',
-        onTap: () => _abrirLegal(context, TipoDocumentoLegal.privacidad),
-      ),
-      _MenuItem(
-        icon: Icons.handshake_outlined,
-        label: 'Buenas prácticas',
-        subtitle: 'Cómo nos tratamos en la red de confianza.',
-        onTap: () => _abrirLegal(context, TipoDocumentoLegal.buenasPracticas),
-      ),
       _MenuItem(
         icon: Icons.logout_rounded,
         label: 'Cerrar sesión',
@@ -277,11 +269,11 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (onClose != null)
+                if (widget.onClose != null)
                   IconButton(
                     icon: const Icon(Icons.close, size: 22),
                     color: Colors.grey.shade600,
-                    onPressed: onClose,
+                    onPressed: widget.onClose,
                   ),
               ],
             ),
@@ -302,15 +294,176 @@ class MenuPerfilOpcionesWidget extends StatelessWidget {
           Expanded(
             child: ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-              itemCount: items.length,
+              itemCount: items.length + 1,
               separatorBuilder: (_, __) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
-                final item = items[index];
-                return _buildCard(item);
+                // Legales va justo antes de Cerrar sesión (último item).
+                if (index == items.length - 1) {
+                  return _buildLegalesCard();
+                }
+                final itemIndex =
+                    index == items.length ? items.length - 1 : index;
+                return _buildCard(items[itemIndex]);
               },
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLegalesCard() {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      elevation: 0,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            InkWell(
+              onTap: () => setState(() => _legalesAbierto = !_legalesAbierto),
+              borderRadius: BorderRadius.circular(16),
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.gavel_outlined,
+                        color: primaryColor,
+                        size: 26,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Legales',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.text,
+                            ),
+                          ),
+                          SizedBox(height: 6),
+                          Text(
+                            'Términos, privacidad y buenas prácticas.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textMuted,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      _legalesAbierto
+                          ? Icons.expand_less_rounded
+                          : Icons.expand_more_rounded,
+                      color: Colors.grey.shade400,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            AnimatedCrossFade(
+              firstChild: const SizedBox(width: double.infinity, height: 0),
+              secondChild: Column(
+                children: [
+                  Divider(height: 1, color: Colors.grey.shade200),
+                  _legalRow(
+                    icon: Icons.description_outlined,
+                    label: 'Términos y Condiciones',
+                    subtitle: 'Uso de la app y gratuidad de esta etapa.',
+                    tipo: TipoDocumentoLegal.terminos,
+                  ),
+                  Divider(height: 1, indent: 62, color: Colors.grey.shade200),
+                  _legalRow(
+                    icon: Icons.privacy_tip_outlined,
+                    label: 'Privacidad e identidad',
+                    subtitle: 'Qué datos usamos y qué nunca se publica.',
+                    tipo: TipoDocumentoLegal.privacidad,
+                  ),
+                  Divider(height: 1, indent: 62, color: Colors.grey.shade200),
+                  _legalRow(
+                    icon: Icons.handshake_outlined,
+                    label: 'Buenas prácticas',
+                    subtitle: 'Cómo nos tratamos en la red de confianza.',
+                    tipo: TipoDocumentoLegal.buenasPracticas,
+                  ),
+                ],
+              ),
+              crossFadeState: _legalesAbierto
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
+              duration: const Duration(milliseconds: 200),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _legalRow({
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required TipoDocumentoLegal tipo,
+  }) {
+    return InkWell(
+      onTap: () => _abrirLegal(context, tipo),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
+        child: Row(
+          children: [
+            Icon(icon, color: primaryColor, size: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.text,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textMuted,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
+          ],
+        ),
       ),
     );
   }
