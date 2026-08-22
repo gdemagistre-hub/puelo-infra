@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:google_sign_in/google_sign_in.dart';
@@ -8,15 +9,38 @@ import 'user_session.dart';
 /// Auth real (Google + email/password; FB/Apple placeholders).
 ///
 /// Flujo email:
-/// 1) registerWithEmail → crea user + manda mail de verificación
+/// 1) registerWithEmail → crea user + mail vía CF (no-reply@puelo.app / IONOS SMTP)
 /// 2) Usuario valida el link del mail
 /// 3) signInWithEmail exige emailVerified → ensureUserProfile + UserSession
+/// Fallback: si falla CF, Firebase Auth envía el mail default.
 class AuthService {
   AuthService._();
   static final AuthService instance = AuthService._();
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  static const String _fnRegion = 'us-east1';
+
+  /// CF sendAuthEmail (SMTP IONOS / no-reply@puelo.app). Fallback = Firebase default.
+  Future<bool> _sendAuthEmailCf({
+    required String type,
+    String? email,
+  }) async {
+    try {
+      final callable = FirebaseFunctions.instanceFor(region: _fnRegion)
+          .httpsCallable('sendAuthEmail');
+      await callable.call(<String, dynamic>{
+        'type': type,
+        if (email != null && email.trim().isNotEmpty)
+          'email': email.trim().toLowerCase(),
+      });
+      return true;
+    } catch (e) {
+      debugPrint('AuthService._sendAuthEmailCf ($type): $e');
+      return false;
+    }
+  }
 
   User? get currentUser => _auth.currentUser;
 
@@ -41,10 +65,6 @@ class AuthService {
           .toList(),
     };
   }
-
-  // ---------------------------------------------------------------------------
-  // Google
-  // ---------------------------------------------------------------------------
 
   Future<void> signInWithGoogle() async {
     UserCredential cred;
@@ -94,14 +114,7 @@ class AuthService {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Email / password
-  // ---------------------------------------------------------------------------
-
   /// Crea cuenta, manda mail de verificación.
-  /// No abre sesión completa de app hasta que el mail esté verificado.
-  ///
-  /// Retorna el [User] recién creado (aún sin emailVerified).
   Future<User> registerWithEmail({
     required String email,
     required String password,
@@ -137,14 +150,16 @@ class AuthService {
         await user.reload();
       }
 
-      await user.sendEmailVerification(
-        ActionCodeSettings(
-          url: 'https://lifewalletpuelo.web.app/',
-          handleCodeInApp: false,
-        ),
-      );
+      final sentCf = await _sendAuthEmailCf(type: 'verify');
+      if (!sentCf) {
+        await user.sendEmailVerification(
+          ActionCodeSettings(
+            url: 'https://lifewalletpuelo.web.app/',
+            handleCodeInApp: false,
+          ),
+        );
+      }
 
-      // Doc mínimo: pendiente hasta verificar.
       final ref = _db.collection('usuarios').doc(user.uid);
       await ref.set({
         'nombre': (nombre ?? '').trim(),
@@ -165,7 +180,6 @@ class AuthService {
     }
   }
 
-  /// Login email/password. Exige email verificado.
   Future<void> signInWithEmail({
     required String email,
     required String password,
@@ -193,7 +207,6 @@ class AuthService {
       }
 
       final data = await ensureUserProfile(refreshed, providerId: 'password');
-      // Marcar verificado en perfil.
       try {
         await _db.collection('usuarios').doc(refreshed.uid).set({
           'email_verified': true,
@@ -217,8 +230,6 @@ class AuthService {
     }
   }
 
-  /// Tras verificar el mail: reload + si ok, abre sesión de app.
-  /// Útil desde la pantalla “Revisá tu email”.
   Future<bool> completeEmailVerificationIfReady() async {
     final user = _auth.currentUser;
     if (user == null) return false;
@@ -253,12 +264,15 @@ class AuthService {
     }
     if (user.emailVerified) return;
     try {
-      await user.sendEmailVerification(
-        ActionCodeSettings(
-          url: 'https://lifewalletpuelo.web.app/',
-          handleCodeInApp: false,
-        ),
-      );
+      final sentCf = await _sendAuthEmailCf(type: 'verify');
+      if (!sentCf) {
+        await user.sendEmailVerification(
+          ActionCodeSettings(
+            url: 'https://lifewalletpuelo.web.app/',
+            handleCodeInApp: false,
+          ),
+        );
+      }
     } on FirebaseAuthException catch (e) {
       throw AuthValidationException(humanizeAuthError(e));
     }
@@ -270,13 +284,16 @@ class AuthService {
       throw AuthValidationException('Ingresá un email válido.');
     }
     try {
-      await _auth.sendPasswordResetEmail(
-        email: e,
-        actionCodeSettings: ActionCodeSettings(
-          url: 'https://lifewalletpuelo.web.app/',
-          handleCodeInApp: false,
-        ),
-      );
+      final sentCf = await _sendAuthEmailCf(type: 'reset', email: e);
+      if (!sentCf) {
+        await _auth.sendPasswordResetEmail(
+          email: e,
+          actionCodeSettings: ActionCodeSettings(
+            url: 'https://lifewalletpuelo.web.app/',
+            handleCodeInApp: false,
+          ),
+        );
+      }
     } on FirebaseAuthException catch (ex) {
       throw AuthValidationException(humanizeAuthError(ex));
     }
@@ -314,15 +331,6 @@ class AuthService {
     return s;
   }
 
-  // ---------------------------------------------------------------------------
-  // Perfil Firestore
-  // ---------------------------------------------------------------------------
-
-  /// Crea o actualiza `usuarios/{uid}` con datos del provider.
-  ///
-  /// Nombre/apellido/email se sincronizan desde Google / Auth.
-  /// Foto: no se pisa una selfie de Storage; si no hay foto se seed-ea
-  /// desde Google (login y restore).
   Future<Map<String, dynamic>> ensureUserProfile(
     User user, {
     required String providerId,
