@@ -1,0 +1,76 @@
+name: Etapa34 finalize IONOS email
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/etapa34-finalize-ionos.yml"
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Wire index + patch auth_service
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          idx = Path("functions/index.js")
+          t = idx.read_text(encoding="utf-8")
+          if "auth_emails" not in t:
+              idx.write_text(t.rstrip() + """
+
+// ---------------------------------------------------------------------------
+// Auth emails (no-reply@puelo.app vía SMTP IONOS)
+// ---------------------------------------------------------------------------
+const authEmails = require("./auth_emails");
+exports.sendAuthEmail = authEmails.sendAuthEmail;
+""", encoding="utf-8")
+              print("index wired")
+          else:
+              print("index ok")
+
+          p = Path("lib/auth_service.dart")
+          auth = p.read_text(encoding="utf-8")
+          if "_sendAuthEmailCf" in auth:
+              print("auth already")
+          else:
+              if "cloud_functions" not in auth:
+                  auth = auth.replace(
+                      "import 'package:cloud_firestore/cloud_firestore.dart';\nimport 'package:firebase_auth/firebase_auth.dart';",
+                      "import 'package:cloud_firestore/cloud_firestore.dart';\nimport 'package:cloud_functions/cloud_functions.dart';\nimport 'package:firebase_auth/firebase_auth.dart';",
+                      1,
+                  )
+              auth = auth.replace(
+                  """  final FirebaseAuth _auth = FirebaseAuth.instance;\n  final FirebaseFirestore _db = FirebaseFirestore.instance;\n\n  User? get currentUser => _auth.currentUser;""",
+                  """  final FirebaseAuth _auth = FirebaseAuth.instance;\n  final FirebaseFirestore _db = FirebaseFirestore.instance;\n\n  static const String _fnRegion = 'us-east1';\n\n  /// CF sendAuthEmail (SMTP IONOS / no-reply@puelo.app). Fallback = Firebase default.\n  Future<bool> _sendAuthEmailCf({\n    required String type,\n    String? email,\n  }) async {\n    try {\n      final callable = FirebaseFunctions.instanceFor(region: _fnRegion)\n          .httpsCallable('sendAuthEmail');\n      await callable.call(<String, dynamic>{\n        'type': type,\n        if (email != null && email.trim().isNotEmpty)\n          'email': email.trim().toLowerCase(),\n      });\n      return true;\n    } catch (e) {\n      debugPrint('AuthService._sendAuthEmailCf ($type): $e');\n      return false;\n    }\n  }\n\n  User? get currentUser => _auth.currentUser;""",
+                  1,
+              )
+              m1 = """      await user.sendEmailVerification(\n        ActionCodeSettings(\n          url: 'https://lifewalletpuelo.web.app/',\n          handleCodeInApp: false,\n        ),\n      );\n\n      // Doc mínimo: pendiente hasta verificar."""
+              r1 = """      final sentCf = await _sendAuthEmailCf(type: 'verify');\n      if (!sentCf) {\n        await user.sendEmailVerification(\n          ActionCodeSettings(\n            url: 'https://lifewalletpuelo.web.app/',\n            handleCodeInApp: false,\n          ),\n        );\n      }\n\n      // Doc mínimo: pendiente hasta verificar."""
+              if m1 not in auth: raise SystemExit("m1")
+              auth = auth.replace(m1, r1, 1)
+              m2 = """    try {\n      await user.sendEmailVerification(\n        ActionCodeSettings(\n          url: 'https://lifewalletpuelo.web.app/',\n          handleCodeInApp: false,\n        ),\n      );\n    } on FirebaseAuthException catch (e) {\n      throw AuthValidationException(humanizeAuthError(e));\n    }\n  }\n\n  Future<void> sendPasswordReset(String email) async {"""
+              r2 = """    try {\n      final sentCf = await _sendAuthEmailCf(type: 'verify');\n      if (!sentCf) {\n        await user.sendEmailVerification(\n          ActionCodeSettings(\n            url: 'https://lifewalletpuelo.web.app/',\n            handleCodeInApp: false,\n          ),\n        );\n      }\n    } on FirebaseAuthException catch (e) {\n      throw AuthValidationException(humanizeAuthError(e));\n    }\n  }\n\n  Future<void> sendPasswordReset(String email) async {"""
+              if m2 not in auth: raise SystemExit("m2")
+              auth = auth.replace(m2, r2, 1)
+              m3 = """    try {\n      await _auth.sendPasswordResetEmail(\n        email: e,\n        actionCodeSettings: ActionCodeSettings(\n          url: 'https://lifewalletpuelo.web.app/',\n          handleCodeInApp: false,\n        ),\n      );\n    } on FirebaseAuthException catch (ex) {"""
+              r3 = """    try {\n      final sentCf = await _sendAuthEmailCf(type: 'reset', email: e);\n      if (!sentCf) {\n        await _auth.sendPasswordResetEmail(\n          email: e,\n          actionCodeSettings: ActionCodeSettings(\n            url: 'https://lifewalletpuelo.web.app/',\n            handleCodeInApp: false,\n          ),\n        );\n      }\n    } on FirebaseAuthException catch (ex) {"""
+              if m3 not in auth: raise SystemExit("m3")
+              auth = auth.replace(m3, r3, 1)
+              p.write_text(auth, encoding="utf-8")
+              print("auth patched")
+          PY
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add functions/index.js lib/auth_service.dart
+          if git diff --cached --quiet; then echo No changes; else
+            git pull --rebase origin main || true
+            git commit -m "etapa3.4: wire sendAuthEmail + AuthService CF IONOS"
+            git push
+          fi
