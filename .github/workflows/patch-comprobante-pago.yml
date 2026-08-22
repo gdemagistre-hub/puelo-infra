@@ -1,0 +1,78 @@
+name: Patch comprobante de pago copy
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Replace recibo copy
+        run: |
+          set -e
+          python3 << 'PY'
+          from pathlib import Path
+
+          # tarjeta
+          p = Path('lib/tarjetaDigital.dart')
+          t = p.read_text()
+          t = t.replace('Iniciá sesión con Google para emitir un recibo',
+                        'Iniciá sesión con Google para registrar un pago')
+          t = t.replace('No podés emitir un recibo a vos mismo',
+                        'No podés registrar un pago a vos mismo')
+          t = t.replace("'Emitir recibo'", "'Doy un pago'")
+          p.write_text(t)
+          print('tarjeta', 'Doy un pago' in t, 'Emitir recibo' in t)
+
+          # detalle — user facing only
+          p = Path('lib/mensajes/mensajes_detalle.dart')
+          t = p.read_text()
+          pairs = [
+            ("tooltip: 'Emitir recibo'", "tooltip: 'Doy un pago'"),
+            ("label: const Text('Emitir recibo')", "label: const Text('Doy un pago')"),
+            ("soyEmisor ? 'Vos emitiste' : 'Te emitieron'",
+             "soyEmisor ? 'Registraste un pago' : 'Te registraron un pago'"),
+            ("'Recibos, evaluaciones y mensajes quedan registrados. '",
+             "'Comprobantes, evaluaciones y mensajes quedan registrados. '"),
+            ("'Los recibos se sellan; las evaluaciones se publican al aceptar.'",
+             "'Los comprobantes se sellan; las evaluaciones se publican al aceptar.'"),
+            ("? 'Recibo aceptado",
+             "? 'Comprobante aceptado"),
+            (": 'Recibo rechazado",
+             ": 'Comprobante rechazado"),
+          ]
+          for a,b in pairs:
+              if a in t:
+                  t = t.replace(a,b)
+                  print('ok', a[:50])
+              else:
+                  print('miss', a[:50])
+          # unicode-escaped empty hint
+          t = t.replace(
+              "o emit\\u00ed un recibo cuando haya un pago o se\\u00f1a.",
+              "o registr\\u00e1 un pago cuando corresponda.",
+          )
+          t = t.replace(
+              'o emití un recibo cuando haya un pago o seña.',
+              'o registrá un pago cuando corresponda.',
+          )
+          p.write_text(t)
+          print('detalle done')
+          PY
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add lib/tarjetaDigital.dart lib/mensajes/mensajes_detalle.dart
+          if git diff --staged --quiet; then
+            echo "No changes"
+          else
+            git commit -m "ux: Doy un pago / comprobante en tarjeta y detalle"
+            git push
+          fi
