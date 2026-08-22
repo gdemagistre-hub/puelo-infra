@@ -1,0 +1,79 @@
+name: Patch Homepage DevAuthBanner
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "lib/widgets/dev_auth_banner.dart"
+      - ".github/workflows/patch-dev-auth-banner.yml"
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inject banner into Homepage
+        run: |
+          set -e
+          FILE=lib/Homepage.dart
+          if grep -q "DevAuthBanner" "$FILE"; then
+            echo "Already patched"
+            exit 0
+          fi
+          # Import
+          if ! grep -q "dev_auth_banner.dart" "$FILE"; then
+            sed -i "s|import 'onboarding/home_tour_overlay.dart';|import 'onboarding/home_tour_overlay.dart';\nimport 'widgets/dev_auth_banner.dart';|" "$FILE"
+          fi
+          # Insert banner in Stack after Positioned.fill block (before bottom nav Positioned)
+          python3 << 'PY'
+          from pathlib import Path
+          p = Path("lib/Homepage.dart")
+          t = p.read_text()
+          if "DevAuthBanner" in t:
+              print("already has banner")
+              raise SystemExit(0)
+          needle = """          Positioned.fill(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: contentBottomPad),
+              child: _buildAnimatedTabBody(),
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _buildBottomNav(),
+          ),"""
+          insert = """          Positioned.fill(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: contentBottomPad),
+              child: _buildAnimatedTabBody(),
+            ),
+          ),
+          const DevAuthBanner(),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _buildBottomNav(),
+          ),"""
+          if needle not in t:
+              raise SystemExit("Stack pattern not found in Homepage.dart")
+          p.write_text(t.replace(needle, insert, 1))
+          print("patched")
+          PY
+          if ! grep -q "DevAuthBanner" "$FILE"; then
+            echo "Patch failed"
+            exit 1
+          fi
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add lib/Homepage.dart
+          if git diff --staged --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Etapa 0: Homepage muestra DevAuthBanner si needsRealAuth"
+            git push
+          fi
