@@ -4,6 +4,8 @@ import 'Homepage.dart';
 import 'auth_service.dart';
 import 'elige_camino.dart';
 import 'theme/app_colors.dart';
+import 'legales/documento_legal_screen.dart';
+import 'legales/textos_legales.dart';
 
 /// Alta de cuenta con email + contraseña (Firebase Auth).
 /// Tras registrarse debe verificar el mail antes de entrar a la app.
@@ -29,6 +31,7 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
   bool _obscure1 = true;
   bool _obscure2 = true;
   bool _pendienteVerificacion = false;
+  bool _aceptoLegales = false;
   String? _emailRegistrado;
 
   @override
@@ -43,6 +46,17 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
 
   Future<void> _registrar() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!_aceptoLegales) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Para crear la cuenta tenés que aceptar los términos, la privacidad y las buenas prácticas.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
 
     setState(() => _isLoading = true);
     try {
@@ -154,6 +168,14 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
     );
   }
 
+  void _abrirLegal(TipoDocumentoLegal tipo) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => DocumentoLegalScreen(tipo: tipo),
+      ),
+    );
+  }
+
   InputDecoration _dec(String label, {Widget? prefix, Widget? suffix}) {
     return InputDecoration(
       labelText: label,
@@ -164,6 +186,21 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide.none,
+      ),
+    );
+  }
+
+  Widget _linkLegal(String label, TipoDocumentoLegal tipo) {
+    return GestureDetector(
+      onTap: () => _abrirLegal(tipo),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: primaryColor,
+          fontWeight: FontWeight.w600,
+          fontSize: 13,
+          decoration: TextDecoration.underline,
+        ),
       ),
     );
   }
@@ -294,7 +331,68 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 28),
+                    const SizedBox(height: 20),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Checkbox(
+                          value: _aceptoLegales,
+                          activeColor: primaryColor,
+                          onChanged: _isLoading
+                              ? null
+                              : (v) => setState(
+                                    () => _aceptoLegales = v ?? false,
+                                  ),
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  TextosLegales.checkboxAcepto,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    height: 1.35,
+                                    color: textColor,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 10,
+                                  runSpacing: 4,
+                                  children: [
+                                    _linkLegal(
+                                      'Términos',
+                                      TipoDocumentoLegal.terminos,
+                                    ),
+                                    _linkLegal(
+                                      'Privacidad',
+                                      TipoDocumentoLegal.privacidad,
+                                    ),
+                                    _linkLegal(
+                                      'Buenas prácticas',
+                                      TipoDocumentoLegal.buenasPracticas,
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  TextosLegales.checkboxMicro,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    height: 1.35,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
                     SizedBox(
                       width: double.infinity,
                       height: 52,
