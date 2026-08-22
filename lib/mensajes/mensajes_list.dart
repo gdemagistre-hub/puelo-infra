@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../loginScreen.dart';
 import '../user_session.dart';
 import 'emitir_recibo_sheet.dart';
 import 'mensajes_detalle.dart';
@@ -21,6 +22,52 @@ class MensajesListScreen extends StatelessWidget {
     if (uid == null || uid.isEmpty) {
       return const Center(
         child: Text('Iniciá sesión para ver mensajes'),
+      );
+    }
+
+    // Sin token Firebase: rules/CF bloquean; guía a login real.
+    if (!UserSession().hasRealAuth) {
+      return ColoredBox(
+        color: const Color(0xFFF8FAFC),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.lock_outline_rounded, size: 48, color: Color(0xFFB45309)),
+                const SizedBox(height: 16),
+                const Text(
+                  'Mensajes requiere Google o Email',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Para ver hilos, registrar un pago o confirmar comprobantes '
+                  'necesitás entrar con una cuenta real.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: Color(0xFF64748B), height: 1.4),
+                ),
+                const SizedBox(height: 24),
+                FilledButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const LoginScreenWidget()),
+                      (_) => false,
+                    );
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _primary,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  ),
+                  icon: const Icon(Icons.login_rounded),
+                  label: const Text('Iniciar sesión', style: TextStyle(fontWeight: FontWeight.w800)),
+                ),
+              ],
+            ),
+          ),
+        ),
       );
     }
 
@@ -103,6 +150,15 @@ class MensajesListScreen extends StatelessWidget {
   }
 
   void _openEmitir(BuildContext context) {
+    if (!UserSession().hasRealAuth) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Entrá con Google o Email para registrar un pago'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
