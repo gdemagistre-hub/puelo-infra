@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 ///
 /// Uso:
 /// - `AppEnv.isProd` → ocultar tools sensibles en builds de release público
-/// - `AppEnv.showDevTools` → dropdown "Modo prueba" (se mantiene para el equipo)
+/// - `AppEnv.showDevTools` → dropdown "Modo prueba" (oculto TEMP 2026-08-22)
 /// - `AppEnv.devLoginSecret` → mintDevSession (solo builds de equipo)
 ///
 /// Staging web:
@@ -45,16 +45,15 @@ class AppEnv {
   static bool get isStaging => current == PueloEnvironment.staging;
   static bool get isDebug => current == PueloEnvironment.debug;
 
-  /// Menú "Modo prueba (equipo)" — se mantiene visible para el equipo.
-  /// En release público (prod) sigue visible por decisión de producto TEMP;
-  /// apagar con --dart-define=PUELLO_ENV=prod + showDevToolsOverride si se desea.
+  /// Menú "Modo prueba (equipo)" — dropdown de usuarios sin clave.
   ///
-  /// Política Sprint 0: **siempre true** para no romper el flujo del equipo.
-  /// Para ocultar en un build: --dart-define=HIDE_DEV_LOGIN=1
+  /// TEMP 2026-08-22: oculto por decisión del owner (smoke test con Auth real).
+  /// Para reactivar en un build local/staging:
+  ///   --dart-define=SHOW_DEV_LOGIN=1
   static bool get showDevTools {
-    const hide = String.fromEnvironment('HIDE_DEV_LOGIN', defaultValue: '');
-    if (hide == '1' || hide.toLowerCase() == 'true') return false;
-    return true;
+    const show = String.fromEnvironment('SHOW_DEV_LOGIN', defaultValue: '');
+    if (show == '1' || show.toLowerCase() == 'true') return true;
+    return false;
   }
 
   static bool get hasDevLoginSecret => devLoginSecret.isNotEmpty;
