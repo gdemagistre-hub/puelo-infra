@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../loginScreen.dart';
 import '../user_session.dart';
 
-/// Banner persistente cuando la sesión es solo dropdown (sin token Firebase).
+/// Banner persistente cuando la sesión no tiene token Firebase Auth.
 class DevAuthBanner extends StatelessWidget {
   const DevAuthBanner({super.key, this.topPadding = 8});
 
@@ -37,7 +37,7 @@ class DevAuthBanner extends StatelessWidget {
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Fotos, mensajes y Mis números requieren Google o Email. Tocá para iniciar sesión real.',
+                    'Sesión sin cuenta real: mensajes, pagos y fotos requieren Google o Email. Tocá para entrar.',
                     style: TextStyle(
                       color: Color(0xFF92400E),
                       fontSize: 12.5,
