@@ -7,11 +7,16 @@ on:
       - "lib/widgets/dev_auth_banner.dart"
       - ".github/workflows/patch-dev-auth-banner.yml"
 
+permissions:
+  contents: write
+
 jobs:
   patch:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       - name: Inject banner into Homepage
         run: |
           set -e
@@ -19,19 +24,6 @@ jobs:
           if grep -q "DevAuthBanner" "$FILE"; then
             echo "Already patched"
             exit 0
-          fi
-          # Import
-          if ! grep -q "dev_auth_banner.dart" "$FILE"; then
-            if grep -q "home_tour_overlay.dart" "$FILE"; then
-              sed -i "s|import 'onboarding/home_tour_overlay.dart';|import 'onboarding/home_tour_overlay.dart';\nimport 'widgets/dev_auth_banner.dart';|" "$FILE"
-            else
-              # fallback: after last import of package/local
-              sed -i "0,/^import /s|^import |import 'widgets/dev_auth_banner.dart';\nimport |" "$FILE" || true
-              if ! grep -q "dev_auth_banner.dart" "$FILE"; then
-                echo "Could not add import"
-                exit 1
-              fi
-            fi
           fi
           python3 << 'PY'
           from pathlib import Path
@@ -42,33 +34,34 @@ jobs:
               print("already has banner")
               raise SystemExit(0)
 
-          # Flexible: insert const DevAuthBanner() as Stack sibling right before
-          # the Positioned that builds the bottom nav (last nav bar).
-          # Match the closing of Positioned.fill(..._buildAnimatedTabBody...) then
-          # the following Positioned( ... _buildBottomNav() ...)
-          pattern = re.compile(
-              r"(Positioned\.fill\s*\(\s*child:\s*Padding\s*\(\s*"
-              r"padding:\s*EdgeInsets\.only\(bottom:\s*contentBottomPad\),\s*"
-              r"child:\s*_buildAnimatedTabBody\(\),\s*\),\s*\),\s*)"
-              r"(Positioned\s*\(\s*left:\s*0,\s*right:\s*0,\s*bottom:\s*0,\s*"
-              r"child:\s*_buildBottomNav\(\),\s*\),)",
-              re.DOTALL,
-          )
-          m = pattern.search(t)
-          if not m:
-              # Broader fallback: any Positioned.fill with _buildAnimatedTabBody followed by Positioned with _buildBottomNav
-              pattern2 = re.compile(
-                  r"(Positioned\.fill\([\s\S]*?_buildAnimatedTabBody\(\)[\s\S]*?\),\s*)"
-                  r"(Positioned\([\s\S]*?_buildBottomNav\(\)[\s\S]*?\),)",
-                  re.DOTALL,
-              )
-              m = pattern2.search(t)
-          if not m:
-              raise SystemExit("Stack pattern not found in Homepage.dart")
+          # 1) Import
+          if "dev_auth_banner.dart" not in t:
+              if "import 'onboarding/home_tour_overlay.dart';" in t:
+                  t = t.replace(
+                      "import 'onboarding/home_tour_overlay.dart';",
+                      "import 'onboarding/home_tour_overlay.dart';\nimport 'widgets/dev_auth_banner.dart';",
+                      1,
+                  )
+              else:
+                  # after first import line
+                  t = re.sub(r"(import .+;\n)", r"\1import 'widgets/dev_auth_banner.dart';\n", t, count=1)
 
-          insert = m.group(1) + "          const DevAuthBanner(),\n          " + m.group(2)
-          t2 = t[: m.start()] + insert + t[m.end():]
-          p.write_text(t2)
+          # 2) Insert as first child of the main body Stack (right after children: [)
+          #    Safer than matching deep Positioned.fill blocks.
+          m = re.search(
+              r"(body:\s*Stack\s*\(\s*fit:\s*StackFit\.expand,\s*children:\s*\[)",
+              t,
+          )
+          if not m:
+              # broader
+              m = re.search(r"(body:\s*Stack\([\s\S]{0,120}?children:\s*\[)", t)
+          if not m:
+              raise SystemExit("body Stack children pattern not found in Homepage.dart")
+
+          insert_at = m.end()
+          banner_line = "\n          const DevAuthBanner(),"
+          t = t[:insert_at] + banner_line + t[insert_at:]
+          p.write_text(t)
           print("patched")
           PY
           if ! grep -q "DevAuthBanner" "$FILE"; then
