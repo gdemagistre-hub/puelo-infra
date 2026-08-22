@@ -431,9 +431,8 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
                           padding: const EdgeInsets.all(14),
                           child: Text(
                             _todas.isEmpty
-                                ? 'Todavía no hay contactos ni conversaciones. '
-                                    'Cuando un cliente te escriba por WhatsApp o te llame '
-                                    'desde la app, aparece acá. '
+                                ? 'Todavía no hay contactos. '
+                                    'Abrí la tarjeta del prestador y tocá WhatsApp o Doy un pago. '
                                     'También podés pegar el UID (está en su tarjeta).'
                                 : 'Sin coincidencias. Probá otro nombre o pegá el UID.',
                             style: const TextStyle(
@@ -496,7 +495,7 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
               ],
               const SizedBox(height: 8),
               const Text(
-                'Aparecen quienes te contactaron por la app y tus conversaciones. '
+                'Aparecen prestadores que contactaste, clientes que te contactaron y conversaciones. '
                 'También podés pegar un UID.',
                 style: TextStyle(
                   fontSize: 12,
