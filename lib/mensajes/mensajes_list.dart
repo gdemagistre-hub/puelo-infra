@@ -190,8 +190,8 @@ class _LeyendaHeader extends StatelessWidget {
           const SizedBox(width: 10),
           const Expanded(
             child: Text(
-              'Registrá un pago desde la tarjeta del prestador o con el botón. '
-              'Acá ves comprobantes para confirmar y evaluaciones.',
+              'Primero contactá al prestador desde su tarjeta (WhatsApp o Doy un pago). '
+              'Acá ves comprobantes pendientes de confirmar y evaluaciones.',
               style: TextStyle(
                 fontSize: 13,
                 height: 1.35,
@@ -232,7 +232,7 @@ class _EmptyState extends StatelessWidget {
         ),
         const SizedBox(height: 24),
         const Text(
-          'Todavía no hay mensajes',
+          'Todavía no hay actividad',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 20,
@@ -242,9 +242,8 @@ class _EmptyState extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         const Text(
-          'Cuando pagues, registrá el comprobante desde la tarjeta del prestador '
-          'o con el botón. Quien recibe el dinero lo confirma acá. '
-          'También aparecen las evaluaciones.',
+          'Acá aparecen los comprobantes de pago y las evaluaciones. '
+          'Para el primer pago, seguí estos pasos:',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 14,
@@ -252,6 +251,12 @@ class _EmptyState extends StatelessWidget {
             color: MensajesListScreen._muted,
           ),
         ),
+        const SizedBox(height: 20),
+        _StepRow(n: '1', text: 'Buscá un prestador en Inicio y abrí su tarjeta'),
+        const SizedBox(height: 10),
+        _StepRow(n: '2', text: 'Tocá WhatsApp o Llamar (queda el contacto)'),
+        const SizedBox(height: 10),
+        _StepRow(n: '3', text: 'Registrá el pago con “Doy un pago”'),
         const SizedBox(height: 28),
         FilledButton.icon(
           onPressed: onEmitir,
@@ -263,6 +268,59 @@ class _EmptyState extends StatelessWidget {
           label: const Text(
             'Doy un pago',
             style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          'Si ya contactaste a alguien desde la app, también podés registrar el pago desde este botón.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 12, height: 1.35, color: Color(0xFF94A3B8)),
+        ),
+      ],
+    );
+  }
+}
+
+class _StepRow extends StatelessWidget {
+  final String n;
+  final String text;
+  const _StepRow({required this.n, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: MensajesListScreen._primary.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            n,
+            style: const TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 13,
+              color: MensajesListScreen._primary,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 14,
+                height: 1.35,
+                color: MensajesListScreen._text,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ),
       ],
