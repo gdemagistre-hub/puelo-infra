@@ -69,6 +69,14 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   /// Tour (showcaseview) — se dispara tras el primer frame.
   bool _tourCheckDone = false;
 
+  void _onProfileRevision() {
+    if (!mounted) return;
+    setState(() {});
+    if (_currentIndex == 0) {
+      _refrescarDatosSesion();
+    }
+  }
+
   Color get primaryColor => _modoPrestador ? _prestadorPrimary : _clientePrimary;
   Color get primaryDark => _modoPrestador ? _prestadorDark : _clienteDark;
 
@@ -86,6 +94,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   @override
   void initState() {
     super.initState();
+    UserSession().profileRevision.addListener(_onProfileRevision);
     _detectarRol();
     var foto = (UserSession().datosCompletos?['url_foto_perfil'] ??
             UserSession().datosCompletos?['foto_perfil'] ??
@@ -104,6 +113,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
   @override
   void dispose() {
+    UserSession().profileRevision.removeListener(_onProfileRevision);
     _searchCtrl.dispose();
     _searchFocus.dispose();
     super.dispose();

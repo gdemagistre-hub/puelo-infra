@@ -59,7 +59,6 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
   /// Copia promedio/n eval al cache de sesion para que Home lo muestre al toque.
   void _syncEstrellasSesion(Map<String, dynamic> result) {
     final session = UserSession();
-    session.invalidateHomeCache();
     final nRaw = result['n_evaluaciones'];
     final pRaw = result['promedio'];
     if (session.datosCompletos == null || nRaw == null) return;
@@ -75,6 +74,7 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
       'cantidad_evaluaciones': n,
       'cantidadEvaluadores': n,
     };
+    session.notifyProfileChanged();
   }
 
   Future<void> _enviarTexto() async {
