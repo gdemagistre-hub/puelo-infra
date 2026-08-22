@@ -1,0 +1,158 @@
+name: Patch Etapa1 Home profileRevision
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/patch-etapa1-home-listen.yml"
+      - "lib/user_session.dart"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Patch mensajes_detalle + Homepage
+        run: |
+          set -e
+          python3 << 'PY'
+          from pathlib import Path
+          import re
+
+          # --- mensajes_detalle: notifyProfileChanged after sync estrellas ---
+          md = Path("lib/mensajes/mensajes_detalle.dart")
+          t = md.read_text()
+          if "notifyProfileChanged" not in t:
+              old = '''  void _syncEstrellasSesion(Map<String, dynamic> result) {
+    final session = UserSession();
+    session.invalidateHomeCache();
+    final nRaw = result['n_evaluaciones'];
+    final pRaw = result['promedio'];
+    if (session.datosCompletos == null || nRaw == null) return;
+    final n = nRaw is num ? nRaw.toInt() : int.tryParse('$nRaw') ?? 0;
+    final p = pRaw is num ? pRaw.toDouble() : double.tryParse('$pRaw') ?? 0.0;
+    session.datosCompletos = {
+      ...session.datosCompletos!,
+      'list_promedio': p,
+      'list_n_evaluaciones': n,
+      'list_n_eval': n,
+      'promedioEstrellas': p,
+      'nEvaluaciones': n,
+      'cantidad_evaluaciones': n,
+      'cantidadEvaluadores': n,
+    };
+  }'''
+              new = '''  void _syncEstrellasSesion(Map<String, dynamic> result) {
+    final session = UserSession();
+    final nRaw = result['n_evaluaciones'];
+    final pRaw = result['promedio'];
+    if (session.datosCompletos == null || nRaw == null) {
+      session.notifyProfileChanged();
+      return;
+    }
+    final n = nRaw is num ? nRaw.toInt() : int.tryParse('$nRaw') ?? 0;
+    final p = pRaw is num ? pRaw.toDouble() : double.tryParse('$pRaw') ?? 0.0;
+    session.datosCompletos = {
+      ...session.datosCompletos!,
+      'list_promedio': p,
+      'list_n_evaluaciones': n,
+      'list_n_eval': n,
+      'promedioEstrellas': p,
+      'nEvaluaciones': n,
+      'cantidad_evaluaciones': n,
+      'cantidadEvaluadores': n,
+    };
+    session.notifyProfileChanged();
+  }'''
+              if old not in t:
+                  # flexible: append notify before closing brace of function
+                  t2, nsub = re.subn(
+                      r"(session\.datosCompletos = \{[\s\S]*?'cantidadEvaluadores': n,\n    \};)\n  \}",
+                      r"\1\n    session.notifyProfileChanged();\n  }",
+                      t,
+                      count=1,
+                  )
+                  if nsub == 0:
+                      raise SystemExit("mensajes_detalle: could not patch _syncEstrellasSesion")
+                  t = t2
+              else:
+                  t = t.replace(old, new, 1)
+              # snackbar copy
+              t = t.replace(
+                  "Evaluaci\\u00f3n publicada con tu respuesta. Volv\\u00e9 a Home para ver las estrellas.",
+                  "Evaluaci\\u00f3n publicada. Las estrellas ya se actualizaron en tu perfil.",
+              )
+              t = t.replace(
+                  "Evaluaci\\u00f3n aceptada. Volv\\u00e9 a Home para ver las estrellas en tu perfil.",
+                  "Evaluaci\\u00f3n aceptada. Las estrellas ya se actualizaron en tu perfil.",
+              )
+              # plain unicode variants
+              t = t.replace(
+                  "Evaluación publicada con tu respuesta. Volvé a Home para ver las estrellas.",
+                  "Evaluación publicada. Las estrellas ya se actualizaron en tu perfil.",
+              )
+              t = t.replace(
+                  "Evaluación aceptada. Volvé a Home para ver las estrellas en tu perfil.",
+                  "Evaluación aceptada. Las estrellas ya se actualizaron en tu perfil.",
+              )
+              md.write_text(t)
+              print("mensajes_detalle patched")
+          else:
+              print("mensajes_detalle already has notify")
+
+          # --- Homepage: listen profileRevision ---
+          hp = Path("lib/Homepage.dart")
+          h = hp.read_text()
+          if "profileRevision" in h and "_onProfileRevision" in h:
+              print("Homepage already listens")
+          else:
+              if "_onProfileRevision" not in h:
+                  # after _tourCheckDone field
+                  marker = "bool _tourCheckDone = false;"
+                  if marker not in h:
+                      raise SystemExit("Homepage: tour flag not found")
+                  h = h.replace(
+                      marker,
+                      marker
+                      + "\n\n  void _onProfileRevision() {\n"
+                      + "    if (!mounted) return;\n"
+                      + "    setState(() {});\n"
+                      + "    if (_currentIndex == 0) {\n"
+                      + "      _refrescarDatosSesion();\n"
+                      + "    }\n"
+                      + "  }",
+                      1,
+                  )
+              # initState: add listener after super.initState();
+              if "profileRevision.addListener" not in h:
+                  h = h.replace(
+                      "super.initState();\n    _detectarRol();",
+                      "super.initState();\n    UserSession().profileRevision.addListener(_onProfileRevision);\n    _detectarRol();",
+                      1,
+                  )
+              # dispose
+              if "profileRevision.removeListener" not in h:
+                  h = h.replace(
+                      "@override\n  void dispose() {\n    _searchCtrl.dispose();",
+                      "@override\n  void dispose() {\n    UserSession().profileRevision.removeListener(_onProfileRevision);\n    _searchCtrl.dispose();",
+                      1,
+                  )
+              hp.write_text(h)
+              print("Homepage patched")
+          PY
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add lib/Homepage.dart lib/mensajes/mensajes_detalle.dart
+          if git diff --staged --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Etapa 1: Home escucha profileRevision; estrellas al aceptar eval"
+            git push
+          fi
