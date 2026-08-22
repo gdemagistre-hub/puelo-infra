@@ -1,7 +1,7 @@
 {
   "name": "puelo-functions",
   "description": "Puelo Cloud Functions — scoring batch diario",
-  "engines": { "node": "20" },
+  "engines": { "node": "22" },
   "main": "index.js",
   "scripts": {
     "serve": "firebase emulators:start --only functions",
