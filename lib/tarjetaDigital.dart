@@ -8,6 +8,7 @@ import 'scoring_service.dart';
 import 'theme/app_colors.dart';
 import 'user_session.dart';
 import 'contacto_service.dart';
+import 'contacto/post_contacto_sheet.dart';
 import 'mensajes/emitir_recibo_sheet.dart';
 
 /// Tarjeta UX v2 — mismo diseño para cliente y prestador (hero trust).
@@ -81,6 +82,14 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
     final url = Uri.parse('https://wa.me/$tel?text=${Uri.encodeComponent('Hola $nombre, vi tu tarjeta en Puelo y me gustaría hacerte una consulta.')}');
     if (await canLaunchUrl(url)) await launchUrl(url, mode: LaunchMode.externalApplication);
     else _alerta('No se pudo abrir WhatsApp');
+    if (!mounted) return;
+    await PostContactoSheet.show(
+      context,
+      prestadorUid: prestadorUid,
+      prestadorNombre: nombre.isEmpty ? null : nombre,
+      desdeTarjeta: true,
+      onPrimary: () => _emitirRecibo(prestadorUid, nombre),
+    );
   }
 
   Future<void> _realizarLlamada(String telefono, {required String prestadorUid, String? prestadorNombre}) async {
@@ -88,6 +97,14 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
     final url = Uri.parse('tel:${telefono.replaceAll(RegExp(r'[^\d+]'), '')}');
     if (await canLaunchUrl(url)) await launchUrl(url);
     else _alerta('No se pudo iniciar la llamada');
+    if (!mounted) return;
+    await PostContactoSheet.show(
+      context,
+      prestadorUid: prestadorUid,
+      prestadorNombre: prestadorNombre,
+      desdeTarjeta: true,
+      onPrimary: () => _emitirRecibo(prestadorUid, prestadorNombre ?? ''),
+    );
   }
 
   Future<void> _compartirPorWhatsApp(String nombre, String idDocumento) async {

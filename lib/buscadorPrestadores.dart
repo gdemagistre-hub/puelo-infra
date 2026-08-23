@@ -10,10 +10,11 @@ import 'user_session.dart';
 import 'catalogo_geo_cache.dart';
 import 'catalogo_oficios.dart';
 import 'contacto_service.dart';
+import 'contacto/post_contacto_sheet.dart';
 import 'prestador_list_fields.dart';
 
 /// Buscador optimizado para pico laboral.
-/// UX 5.2 + 5.7: foto en fila, chip Cerca, empty state con salida.
+/// UX 5.2 + 5.7 + 5.8: post-WhatsApp explica comprobante.
 class BuscadorPrestadoresWidget extends StatefulWidget {
   final String? initialQuery;
 
@@ -406,6 +407,23 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     }
+    if (!mounted) return;
+    await PostContactoSheet.show(
+      context,
+      prestadorUid: prestadorUid,
+      prestadorNombre: nombreLog.isEmpty ? null : nombreLog,
+      desdeTarjeta: false,
+      onPrimary: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TarjetaDigitalWidget(
+              usuarioRef: db.collection('usuarios').doc(prestadorUid),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   List<QueryDocumentSnapshot> get _filtrados {
