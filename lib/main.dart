@@ -72,7 +72,9 @@ class MyApp extends StatelessWidget {
       routes: {
         SplashScreenWidget.routePath: (context) => const SplashScreenWidget(),
         LoginScreenWidget.routePath: (context) => const LoginScreenWidget(),
-        HomePageWidget.routePath: (context) => const HomePageWidget(),
+        HomePageWidget.routePath: (context) => HomePageWidget(
+          initialModoPrestador: UserSession().preferredHomeModoPrestador,
+        ),
         EligeCaminoWidget.routePath: (context) => const EligeCaminoWidget(),
         EligeOficioWidget.routePath: (context) => const EligeOficioWidget(),
         RegistroTrabajadorWidget.routePath: (context) =>

@@ -18,6 +18,7 @@ class UserSession {
 
   static const String _prefsUidKey = 'puelo_session_uid';
   static const String _prefsDevKey = 'puelo_session_dev';
+  static const String _prefsHomeModoKey = 'puelo_home_modo_prestador';
 
   String? uid;
   String? nombre;
@@ -42,6 +43,48 @@ class UserSession {
   final ValueNotifier<int> profileRevision = ValueNotifier<int>(0);
 
   bool get isLoggedIn => uid != null && uid!.isNotEmpty;
+
+  /// Último modo Home elegido en este dispositivo (null = nunca guardado).
+  bool? _homeModoPrestadorPref;
+
+  /// Prestador si hay señal en el doc (flag, rol, camino u oficios).
+  bool get esPrestador {
+    final d = datosCompletos;
+    if (d == null) return false;
+    if (d['es_trabajador'] == true) return true;
+    final rol = (d['rol'] ?? '').toString().trim().toLowerCase();
+    if (rol == 'trabajador' || rol == 'prestador') return true;
+    final camino = (d['camino_elegido'] ?? '').toString().trim().toLowerCase();
+    if (camino == 'ofrezo' || camino == 'ofrezco') return true;
+    final prof = d['profesiones'];
+    if (prof is List && prof.isNotEmpty) return true;
+    return false;
+  }
+
+  /// Modo Home al entrar: último toggle si existe, si no el rol detectado.
+  bool get preferredHomeModoPrestador =>
+      _homeModoPrestadorPref ?? esPrestador;
+
+  Future<void> persistHomeModoPrestador(bool modoPrestador) async {
+    _homeModoPrestadorPref = modoPrestador;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_prefsHomeModoKey, modoPrestador);
+    } catch (e) {
+      debugPrint('UserSession.persistHomeModoPrestador: $e');
+    }
+  }
+
+  Future<void> _loadHomeModoPref() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.containsKey(_prefsHomeModoKey)) {
+        _homeModoPrestadorPref = prefs.getBool(_prefsHomeModoKey);
+      }
+    } catch (e) {
+      debugPrint('UserSession._loadHomeModoPref: $e');
+    }
+  }
 
   /// Token Firebase Auth real (Google, email o mintDevSession).
   bool get hasRealAuth => FirebaseAuth.instance.currentUser != null;
@@ -89,6 +132,7 @@ class UserSession {
         (isDevImpersonation ? 'dev' : null);
     this.isDevImpersonation = isDevImpersonation;
     _persistUid(id, isDev: isDevImpersonation);
+    _loadHomeModoPref();
   }
 
   /// Admin de consola Prox.
@@ -195,6 +239,7 @@ class UserSession {
             role: esPrestador ? 'prestador' : 'cliente',
           );
         } catch (_) {}
+        await _loadHomeModoPref();
         return true;
       }
 
@@ -237,6 +282,7 @@ class UserSession {
           role: esPrestador ? 'prestador' : 'cliente',
         );
       } catch (_) {}
+      await _loadHomeModoPref();
 
       return true;
     } catch (e) {
@@ -267,6 +313,7 @@ class UserSession {
     pendingValidacionToken = null;
     authProvider = null;
     isDevImpersonation = false;
+    _homeModoPrestadorPref = null;
     invalidateHomeCache();
     profileRevision.value = 0;
     CatalogoGeoCache.instance.clear();
@@ -274,6 +321,7 @@ class UserSession {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_prefsUidKey);
       await prefs.remove(_prefsDevKey);
+      await prefs.remove(_prefsHomeModoKey);
     } catch (e) {
       debugPrint('UserSession.cerrarSesion prefs error: $e');
     }

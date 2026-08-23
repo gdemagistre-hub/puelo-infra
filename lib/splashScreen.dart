@@ -73,7 +73,14 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
         if (EligeCaminoWidget.necesitaElegir()) {
           Navigator.pushReplacementNamed(context, EligeCaminoWidget.routePath);
         } else {
-          Navigator.pushReplacementNamed(context, HomePageWidget.routePath);
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => HomePageWidget(
+                initialModoPrestador: UserSession().preferredHomeModoPrestador,
+              ),
+            ),
+          );
         }
       } else {
         Navigator.pushReplacementNamed(context, LoginScreenWidget.routePath);
