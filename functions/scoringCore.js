@@ -207,4 +207,105 @@ async function runScoringBatch({ trigger = "scheduler", force = false } = {}) {
   };
 }
 
-module.exports = { runScoringBatch, MODEL_VERSION };
+const DEFAULT_OFICIOS = [
+  "electricidad",
+  "plomeria",
+  "gasista",
+  "carpinteria",
+  "pintura",
+  "albanileria",
+  "jardineria",
+  "limpieza",
+];
+
+const OFICIO_LABEL = {
+  electricidad: "Electricista",
+  plomeria: "Plomería",
+  gasista: "Gasista",
+  carpinteria: "Carpintería",
+  pintura: "Pintura",
+  albanileria: "Construcción",
+  jardineria: "Jardinería",
+  limpieza: "Limpieza",
+};
+
+function ymdArt(date) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function startOfArtDay(ymd) {
+  return new Date(`${ymd}T00:00:00-03:00`);
+}
+
+async function runTopServiciosAyer() {
+  const today = ymdArt(new Date());
+  const yesterday = ymdArt(new Date(Date.now() - 24 * 60 * 60 * 1000));
+  const start = startOfArtDay(yesterday);
+  const end = startOfArtDay(today);
+  const counts = {};
+  let scanned = 0;
+  let last = null;
+  while (true) {
+    let q = db
+      .collection("demanda_eventos")
+      .where("created_at", ">=", start)
+      .where("created_at", "<", end)
+      .orderBy("created_at")
+      .limit(500);
+    if (last) q = q.startAfter(last);
+    const snap = await q.get();
+    if (snap.empty) break;
+    for (const doc of snap.docs) {
+      scanned += 1;
+      const id = String((doc.data() || {}).oficio_id || "")
+        .trim()
+        .toLowerCase();
+      if (!id) continue;
+      counts[id] = (counts[id] || 0) + 1;
+    }
+    last = snap.docs[snap.docs.length - 1];
+    if (snap.size < 500) break;
+  }
+
+  const ranked = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+  const ids = [];
+  for (const id of ranked) {
+    if (!ids.includes(id)) ids.push(id);
+    if (ids.length >= 8) break;
+  }
+  for (const id of DEFAULT_OFICIOS) {
+    if (ids.length >= 8) break;
+    if (!ids.includes(id)) ids.push(id);
+  }
+
+  const items = ids.slice(0, 8).map((id) => ({
+    id,
+    label: OFICIO_LABEL[id] || id.replace(/_/g, " "),
+    n: counts[id] || 0,
+  }));
+
+  const payload = {
+    fecha_fuente: yesterday,
+    actualizado_en: admin.firestore.FieldValue.serverTimestamp(),
+    items,
+    counts,
+    eventos_ayer: scanned,
+    fuente: scanned > 0 ? "demanda" : "fallback",
+  };
+  await db.collection("stats").doc("top_servicios").set(payload, { merge: true });
+  return {
+    status: "ok",
+    fecha_fuente: yesterday,
+    fuente: payload.fuente,
+    eventos: scanned,
+    items,
+  };
+}
+
+module.exports = { runScoringBatch, runTopServiciosAyer, MODEL_VERSION };
+

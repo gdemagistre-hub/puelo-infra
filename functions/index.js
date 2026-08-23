@@ -8,7 +8,7 @@ const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const admin = require("firebase-admin");
 const crypto = require("crypto");
-const { runScoringBatch } = require("./scoringCore");
+const { runScoringBatch, runTopServiciosAyer } = require("./scoringCore");
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -111,9 +111,16 @@ exports.scoringBatchDaily = onSchedule(
     timeZone: "America/Argentina/Buenos_Aires",
   },
   async () => {
+    let top = { status: "skipped" };
+    try {
+      top = await runTopServiciosAyer();
+      console.log("topServiciosAyer", top);
+    } catch (e) {
+      console.error("topServiciosAyer", e);
+    }
     const result = await runScoringBatch({ trigger: "scheduler" });
     console.log("scoringBatchDaily", result);
-    return result;
+    return { scoring: result, topServicios: top };
   }
 );
 

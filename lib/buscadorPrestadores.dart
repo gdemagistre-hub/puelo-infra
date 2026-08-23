@@ -9,6 +9,7 @@ import 'theme/app_copy.dart';
 import 'user_session.dart';
 import 'catalogo_geo_cache.dart';
 import 'catalogo_oficios.dart';
+import 'demanda/demanda_oficios_service.dart';
 import 'contacto_service.dart';
 import 'contacto/post_contacto_sheet.dart';
 import 'prestador_list_fields.dart';
@@ -135,6 +136,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
   void _onRubroSelected(String rubro) {
     if (_selectedRubro == rubro) return;
     setState(() => _selectedRubro = rubro);
+    DemandaOficiosService.registrar(rubro, fuente: 'buscador_chip');
     _cargarPrestadores(reset: true);
   }
 

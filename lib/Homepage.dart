@@ -13,6 +13,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:typed_data';
 import 'platform_capabilities.dart';
 import 'catalogo_oficios.dart';
+import 'demanda/demanda_oficios_service.dart';
 import 'scoring_service.dart';
 import 'datosPersonalesflotante.dart';
 import 'Domicilioflotante.dart';
@@ -84,7 +85,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   Color get primaryColor => _modoPrestador ? _prestadorPrimary : _clientePrimary;
   Color get primaryDark => _modoPrestador ? _prestadorDark : _clienteDark;
 
-  static const List<Map<String, dynamic>> _categorias = [
+  static const List<Map<String, dynamic>> _categoriasDefault = [
     {'id': 'electricidad', 'label': 'Electricista', 'icon': Icons.electrical_services_rounded, 'color': Color(0xFF734BE4)},
     {'id': 'plomeria', 'label': 'Plomería', 'icon': Icons.plumbing_rounded, 'color': Color(0xFF4A90E2)},
     {'id': 'gasista', 'label': 'Gasista', 'icon': Icons.local_fire_department_rounded, 'color': Color(0xFFF75A6D)},
@@ -94,6 +95,9 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     {'id': 'jardineria', 'label': 'Jardinería', 'icon': Icons.grass_rounded, 'color': Color(0xFF16A34A)},
     {'id': 'limpieza', 'label': 'Limpieza', 'icon': Icons.cleaning_services_rounded, 'color': Color(0xFF8B5CF6)},
   ];
+
+  List<Map<String, dynamic>> _categorias =
+      List<Map<String, dynamic>>.from(_categoriasDefault);
 
   @override
   void initState() {
@@ -112,6 +116,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
     if (foto.isNotEmpty) _urlFotoPerfil = foto;
     // FCM: registra token si hay Auth real (Google). Dev dropdown no tiene token Auth → no-op seguro.
     FcmService.instance.ensureStarted();
+    _cargarTopOficios();
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeStartHomeTour());
   }
 
@@ -200,7 +205,14 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   }
 
   void _abrirBuscador({String? oficio}) {
+    DemandaOficiosService.registrar(oficio, fuente: 'home');
     Navigator.push(context, MaterialPageRoute(builder: (_) => BuscadorPrestadoresWidget(initialQuery: oficio)));
+  }
+
+  Future<void> _cargarTopOficios() async {
+    final next = await DemandaOficiosService.iconosHome();
+    if (!mounted || next.isEmpty) return;
+    setState(() => _categorias = next);
   }
 
   void _onSearchChanged(String value) {

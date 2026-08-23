@@ -93,14 +93,26 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    // stats: scoring_job lock/runs + agregados — solo admin
+    // stats: scoring_job admin; top_servicios lo lee el Home cliente
     match /stats/{doc} {
-      allow read: if isAdmin();
+      allow read: if isAdmin() || doc == 'top_servicios';
       allow write: if isAdmin();
       match /{document=**} {
         allow read: if isAdmin();
         allow write: if isAdmin();
       }
+    }
+
+    match /demanda_eventos/{id} {
+      allow create: if request.resource.data.keys().hasOnly(
+          ['oficio_id', 'fuente', 'created_at'])
+        && request.resource.data.oficio_id is string
+        && request.resource.data.oficio_id.size() > 0
+        && request.resource.data.oficio_id.size() < 48
+        && request.resource.data.fuente is string
+        && request.resource.data.fuente.size() < 32;
+      allow read: if isAdmin();
+      allow update, delete: if false;
     }
 
     match /cat_paises/{doc} {
