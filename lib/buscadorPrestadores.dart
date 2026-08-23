@@ -13,7 +13,7 @@ import 'contacto_service.dart';
 import 'prestador_list_fields.dart';
 
 /// Buscador optimizado para pico laboral.
-/// UX 5.2: búsqueda, chips de oficio, ranking zona→confianza Phase0, badge, WhatsApp.
+/// UX 5.2 + 5.7: foto en fila, chip Cerca, empty state con salida.
 class BuscadorPrestadoresWidget extends StatefulWidget {
   final String? initialQuery;
 
@@ -327,6 +327,15 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     return true;
   }
 
+  String? _fotoUrl(Map<String, dynamic> data) {
+    final raw = (data['url_foto_perfil'] ?? data['foto_perfil'] ?? '')
+        .toString()
+        .trim();
+    if (raw.isEmpty) return null;
+    if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+    return null;
+  }
+
   String _initials(Map<String, dynamic> data) {
     final n = (data['nombre'] ?? data['list_nombre'] ?? '').toString().trim();
     final a = (data['apellido'] ?? '').toString().trim();
@@ -598,23 +607,8 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                                     physics:
                                         const AlwaysScrollableScrollPhysics(),
                                     children: [
-                                      const SizedBox(height: 80),
-                                      Icon(
-                                        Icons.search_off_rounded,
-                                        size: 48,
-                                        color: Colors.grey.shade400,
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Padding(
-                                        padding: const EdgeInsets.all(24),
-                                        child: Text(
-                                          AppCopy.sinPrestadoresZona,
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            color: Colors.grey.shade600,
-                                          ),
-                                        ),
-                                      ),
+                                      const SizedBox(height: 56),
+                                      _emptyState(),
                                     ],
                                   )
                                 : ListView.builder(
@@ -750,20 +744,9 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                                               ),
                                               child: Row(
                                                 children: [
-                                                  CircleAvatar(
-                                                    radius: 26,
-                                                    backgroundColor:
-                                                        _clientePrimary
-                                                            .withOpacity(0.14),
-                                                    child: Text(
-                                                      _initials(data),
-                                                      style: const TextStyle(
-                                                        color: _clientePrimary,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        fontSize: 15,
-                                                      ),
-                                                    ),
+                                                  _avatarFila(
+                                                    foto: _fotoUrl(data),
+                                                    initials: _initials(data),
                                                   ),
                                                   const SizedBox(width: 12),
                                                   Expanded(
@@ -800,18 +783,57 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                                                           overflow: TextOverflow
                                                               .ellipsis,
                                                         ),
-                                                        if (zona.isNotEmpty)
-                                                          Text(
-                                                            zona,
-                                                            style: TextStyle(
-                                                              color: Colors.grey
-                                                                  .shade500,
-                                                              fontSize: 11,
+                                                        if (zona.isNotEmpty ||
+                                                            cerca)
+                                                          Padding(
+                                                            padding:
+                                                                const EdgeInsets.only(
+                                                              top: 2,
                                                             ),
-                                                            maxLines: 1,
-                                                            overflow:
-                                                                TextOverflow
-                                                                    .ellipsis,
+                                                            child: Row(
+                                                              children: [
+                                                                if (cerca) ...[
+                                                                  Container(
+                                                                    padding:
+                                                                        const EdgeInsets.symmetric(
+                                                                      horizontal: 6,
+                                                                      vertical: 1,
+                                                                    ),
+                                                                    decoration:
+                                                                        BoxDecoration(
+                                                                      color: _clientePrimary
+                                                                          .withOpacity(0.10),
+                                                                      borderRadius:
+                                                                          BorderRadius.circular(8),
+                                                                    ),
+                                                                    child: const Text(
+                                                                      'Cerca',
+                                                                      style: TextStyle(
+                                                                        fontSize: 10,
+                                                                        fontWeight:
+                                                                            FontWeight.w800,
+                                                                        color: _clientePrimary,
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                  const SizedBox(width: 6),
+                                                                ],
+                                                                if (zona.isNotEmpty)
+                                                                  Expanded(
+                                                                    child: Text(
+                                                                      zona,
+                                                                      style: TextStyle(
+                                                                        color: Colors
+                                                                            .grey.shade500,
+                                                                        fontSize: 11,
+                                                                      ),
+                                                                      maxLines: 1,
+                                                                      overflow:
+                                                                          TextOverflow.ellipsis,
+                                                                    ),
+                                                                  ),
+                                                              ],
+                                                            ),
                                                           ),
                                                       ],
                                                     ),
@@ -977,6 +999,131 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _limpiarFiltros() {
+    _searchController.clear();
+    setState(() {
+      _searchQuery = '';
+      _selectedRubro = 'Todos';
+    });
+    _cargarPrestadores(reset: true);
+  }
+
+  Widget _avatarFila({required String? foto, required String initials}) {
+    final fallback = Text(
+      initials,
+      style: const TextStyle(
+        color: _clientePrimary,
+        fontWeight: FontWeight.bold,
+        fontSize: 15,
+      ),
+    );
+    return CircleAvatar(
+      radius: 26,
+      backgroundColor: _clientePrimary.withOpacity(0.14),
+      child: foto == null
+          ? fallback
+          : ClipOval(
+              child: Image.network(
+                foto,
+                width: 52,
+                height: 52,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Center(child: fallback),
+              ),
+            ),
+    );
+  }
+
+  Widget _emptyState() {
+    final hayFiltro = _selectedRubro != 'Todos' || _searchQuery.isNotEmpty;
+    final titulo = hayFiltro
+        ? 'Nadie con ese filtro ahora'
+        : 'Todavía no hay prestadores acá';
+    final sub = hayFiltro
+        ? 'Probá otro oficio o sacá el filtro para ver a todos.'
+        : AppCopy.sinPrestadoresZona;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 28),
+      child: Column(
+        children: [
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: _clientePrimary.withOpacity(0.08),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.search_rounded,
+              size: 34,
+              color: _clientePrimary,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            titulo,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: _textColor,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            sub,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.35,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 20),
+          if (hayFiltro)
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: ElevatedButton(
+                onPressed: _limpiarFiltros,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _clientePrimary,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'Ver todos',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            )
+          else
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: OutlinedButton(
+                onPressed: () => _cargarPrestadores(reset: true),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _clientePrimary,
+                  side: const BorderSide(color: _clientePrimary),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'Actualizar',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
