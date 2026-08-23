@@ -2,13 +2,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import 'Homepage.dart';
+import 'registroTrabajador.dart';
 import 'catalogo_oficios.dart';
 import 'prestador_list_fields.dart';
 import 'user_session.dart';
 
-/// Tras "Quiero trabajar": oficio principal desde el catálogo.
-/// Typeahead sobre CatalogoOficios (ids + labels + sinónimos).
-/// Texto libre solo como excepción, con aviso de riesgo de no aparecer en buscador.
+/// Tras "Quiero presentar mis servicios": oficio desde el catálogo.
+/// Luego continúa al hub de onboarding (zona + tarjeta).
 class EligeOficioWidget extends StatefulWidget {
   static const String routeName = 'EligeOficio';
   static const String routePath = '/elige-oficio';
@@ -22,7 +22,6 @@ class EligeOficioWidget extends StatefulWidget {
 class _EligeOficioWidgetState extends State<EligeOficioWidget> {
   static const Color _teal = Color(0xFF28B5CD);
 
-  /// Atajos frecuentes (mismo catálogo; solo UX rápida).
   static const List<Map<String, dynamic>> _atajos = [
     {'id': 'electricidad', 'label': 'Electricista', 'icon': Icons.electrical_services_rounded, 'color': Color(0xFF734BE4)},
     {'id': 'plomeria', 'label': 'Plomería', 'icon': Icons.plumbing_rounded, 'color': Color(0xFF4A90E2)},
@@ -133,10 +132,11 @@ class _EligeOficioWidgetState extends State<EligeOficioWidget> {
     }
 
     if (!mounted) return;
+    // Continuar onboarding: zona + tarjeta (hub 3 pasos).
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (_) => const HomePageWidget(initialModoPrestador: true),
+        builder: (_) => const RegistroTrabajadorWidget(),
       ),
     );
   }
@@ -540,7 +540,7 @@ class _EligeOficioWidgetState extends State<EligeOficioWidget> {
         Expanded(
           child: GridView.builder(
             physics: const BouncingScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            gridDelegate: const Sli verGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 3,
               mainAxisSpacing: 10,
               crossAxisSpacing: 10,
