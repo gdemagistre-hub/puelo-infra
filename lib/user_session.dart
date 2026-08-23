@@ -47,6 +47,11 @@ class UserSession {
   /// Último modo Home elegido en este dispositivo (null = nunca guardado).
   bool? _homeModoPrestadorPref;
 
+  String _homeModoKeyFor(String? id) {
+    if (id == null || id.isEmpty) return _prefsHomeModoKey;
+    return '${_prefsHomeModoKey}_$id';
+  }
+
   /// Prestador si hay señal en el doc (flag, rol, camino u oficios).
   bool get esPrestador {
     final d = datosCompletos;
@@ -61,25 +66,43 @@ class UserSession {
     return false;
   }
 
-  /// Modo Home al entrar: último toggle si existe, si no el rol detectado.
-  bool get preferredHomeModoPrestador =>
-      _homeModoPrestadorPref ?? esPrestador;
+  /// Modo Home al entrar.
+  /// Cliente-only → siempre Busco.
+  /// Prestador / dual → último toggle; si nunca eligió, Ofrezco.
+  bool get preferredHomeModoPrestador {
+    if (!esPrestador) return false;
+    return _homeModoPrestadorPref ?? true;
+  }
 
   Future<void> persistHomeModoPrestador(bool modoPrestador) async {
+    if (!esPrestador && modoPrestador) return;
     _homeModoPrestadorPref = modoPrestador;
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_prefsHomeModoKey, modoPrestador);
+      await prefs.setBool(_homeModoKeyFor(uid), modoPrestador);
     } catch (e) {
       debugPrint('UserSession.persistHomeModoPrestador: $e');
     }
   }
 
+  /// Login / splash deben await esto antes de abrir Home.
+  Future<void> ensureHomeModoPrefLoaded() => _loadHomeModoPref();
+
   Future<void> _loadHomeModoPref() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      final uidKey = _homeModoKeyFor(uid);
+      if (prefs.containsKey(uidKey)) {
+        _homeModoPrestadorPref = prefs.getBool(uidKey);
+        return;
+      }
       if (prefs.containsKey(_prefsHomeModoKey)) {
         _homeModoPrestadorPref = prefs.getBool(_prefsHomeModoKey);
+        if (uid != null &&
+            uid!.isNotEmpty &&
+            _homeModoPrestadorPref != null) {
+          await prefs.setBool(uidKey, _homeModoPrestadorPref!);
+        }
       }
     } catch (e) {
       debugPrint('UserSession._loadHomeModoPref: $e');
@@ -232,8 +255,6 @@ class UserSession {
         isDevImpersonation = false;
         await _persistUid(user.uid, isDev: false);
 
-        final esPrestador =
-            data['es_trabajador'] == true || data['rol'] == 'trabajador';
         try {
           ProxAnalytics.instance.startSession(
             role: esPrestador ? 'prestador' : 'cliente',
@@ -275,8 +296,6 @@ class UserSession {
       authProvider = 'dev';
       isDevImpersonation = true;
 
-      final esPrestador =
-          data['es_trabajador'] == true || data['rol'] == 'trabajador';
       try {
         ProxAnalytics.instance.startSession(
           role: esPrestador ? 'prestador' : 'cliente',
@@ -301,7 +320,8 @@ class UserSession {
     }
   }
 
-  /// Solo limpia memoria + prefs. Para Auth real usar AuthService.signOut().
+  /// Solo limpia memoria + prefs de sesión. El último Busco/Ofrezco
+  /// queda guardado por uid para el próximo login de esa cuenta.
   Future<void> cerrarSesion() async {
     try {
       ProxAnalytics.instance.endSession(reason: 'logout');
@@ -321,7 +341,6 @@ class UserSession {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_prefsUidKey);
       await prefs.remove(_prefsDevKey);
-      await prefs.remove(_prefsHomeModoKey);
     } catch (e) {
       debugPrint('UserSession.cerrarSesion prefs error: $e');
     }
