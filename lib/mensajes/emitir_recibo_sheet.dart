@@ -292,16 +292,17 @@ class _EmitirReciboSheetState extends State<EmitirReciboSheet> {
       );
       if (!mounted) return;
       ProxSounds.playConfirm();
-      Navigator.pop(context, res);
-      final hash = (res['content_hash'] as String?) ?? '';
+      // Snackbar antes del pop: el context del sheet se invalida al cerrar.
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text(
-            'Comprobante registrado · sellado ${hash.length >= 8 ? hash.substring(0, 8) : hash}…',
+            'Comprobante enviado · esperando confirmación de la otra parte',
           ),
           behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 3),
         ),
       );
+      Navigator.pop(context, res);
     } catch (e) {
       setState(() {
         _error = e
