@@ -540,7 +540,7 @@ class _EligeOficioWidgetState extends State<EligeOficioWidget> {
         Expanded(
           child: GridView.builder(
             physics: const BouncingScrollPhysics(),
-            gridDelegate: const Sli verGridDelegateWithFixedCrossAxisCount(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 3,
               mainAxisSpacing: 10,
               crossAxisSpacing: 10,
