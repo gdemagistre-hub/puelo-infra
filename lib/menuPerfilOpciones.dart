@@ -136,15 +136,43 @@ class _MenuPerfilOpcionesWidgetState extends State<MenuPerfilOpcionesWidget> {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 12, 12),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: Text(
-                    modoPrestador ? 'Prestador' : 'Cliente',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.text,
-                    ),
+                  child: Builder(
+                    builder: (_) {
+                      final full = UserSession().nombreCompleto.trim();
+                      final first = full.isEmpty
+                          ? ''
+                          : full.split(RegExp(r'\s+')).first;
+                      final rol = modoPrestador ? 'Prestador' : 'Cliente';
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (first.isNotEmpty)
+                            Text(
+                              first,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.text,
+                              ),
+                            ),
+                          Text(
+                            rol,
+                            style: TextStyle(
+                              fontSize: first.isEmpty ? 18 : 13,
+                              fontWeight: first.isEmpty
+                                  ? FontWeight.w800
+                                  : FontWeight.w600,
+                              color: first.isEmpty
+                                  ? AppColors.text
+                                  : AppColors.textMuted,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ),
                 if (widget.onClose != null)
@@ -184,21 +212,7 @@ class _MenuPerfilOpcionesWidgetState extends State<MenuPerfilOpcionesWidget> {
                 if (!modoPrestador) ...[
                   const SizedBox(height: 16),
                   _sectionLabel('Prestador'),
-                  _sectionCard([
-                    _row(
-                      icon: Icons.handyman_outlined,
-                      label: 'Ofrecer servicios',
-                      destacado: true,
-                      onTap: () async {
-                        await Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const RegistroTrabajadorWidget(),
-                          ),
-                        );
-                        widget.onRolPuedeHaberCambiado?.call();
-                      },
-                    ),
-                  ]),
+                  _ctaOfrecerServicios(context),
                 ],
                 if (modoPrestador) ...[
                   const SizedBox(height: 16),
@@ -272,7 +286,7 @@ class _MenuPerfilOpcionesWidgetState extends State<MenuPerfilOpcionesWidget> {
                     ),
                   ]),
                 ],
-                const SizedBox(height: 20),
+                const SizedBox(height: 32),
                 _sectionCard([
                   _row(
                     icon: Icons.logout_rounded,
@@ -285,6 +299,67 @@ class _MenuPerfilOpcionesWidgetState extends State<MenuPerfilOpcionesWidget> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _ctaOfrecerServicios(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () async {
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const RegistroTrabajadorWidget(),
+            ),
+          );
+          widget.onRolPuedeHaberCambiado?.call();
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: AppColors.prestador.withOpacity(0.55),
+              width: 1.5,
+            ),
+            color: AppColors.prestador.withOpacity(0.06),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.prestador.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.handyman_outlined,
+                  color: AppColors.prestador,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Ofrecer servicios',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.prestador,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_rounded,
+                color: AppColors.prestador.withOpacity(0.8),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
