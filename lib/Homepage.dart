@@ -29,6 +29,7 @@ import 'package:showcaseview/showcaseview.dart';
 import 'onboarding/home_tour_service.dart';
 import 'onboarding/home_tour_overlay.dart';
 import 'widgets/dev_auth_banner.dart';
+import 'contacto/contactos_prestador_card.dart';
 
 class HomePageWidget extends StatefulWidget {
   final bool? initialModoPrestador;
@@ -1305,6 +1306,9 @@ Widget _navAcademiaShowcase() {
             ),
           ),
         ),
+        ),
+        ContactosPrestadorCard(
+          onIrMensajes: () => _selectTab(3),
         ),
         Builder(
           builder: (context) {
