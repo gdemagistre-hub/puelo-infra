@@ -21,6 +21,13 @@ setGlobalOptions({
   timeoutSeconds: 540,
 });
 
+/** Constant-time compare for shared secrets (mitigates timing attacks). */
+function timingSafeEqualString(a, b) {
+  const left = crypto.createHash("sha256").update(String(a ?? ""), "utf8").digest();
+  const right = crypto.createHash("sha256").update(String(b ?? ""), "utf8").digest();
+  return crypto.timingSafeEqual(left, right);
+}
+
 const ALLOWED_ORIGINS = [
   "https://lifewalletpuelo.web.app",
   "https://lifewalletpuelo.firebaseapp.com",
@@ -88,7 +95,7 @@ exports.scoringBatchHttp = onRequest(
       res.status(503).json({ error: "batch_secret_not_configured" });
       return;
     }
-    if (provided !== secret) {
+    if (!timingSafeEqualString(provided, secret)) {
       res.status(401).json({ error: "unauthorized" });
       return;
     }
@@ -150,7 +157,7 @@ exports.mintDevSession = onRequest(
       }
       const provided =
         req.get("X-Dev-Login-Secret") || (req.body && req.body.secret) || "";
-      if (provided !== expected) {
+      if (!timingSafeEqualString(provided, expected)) {
         res.status(401).json({ error: "unauthorized" });
         return;
       }
@@ -865,7 +872,7 @@ exports.fiadosVtoHttp = onRequest(
       res.status(503).json({ error: "batch_secret_not_configured" });
       return;
     }
-    if (provided !== secret) {
+    if (!timingSafeEqualString(provided, secret)) {
       res.status(401).json({ error: "unauthorized" });
       return;
     }
