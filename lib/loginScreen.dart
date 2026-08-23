@@ -42,7 +42,6 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
 
-  /// One-shot (sin snapshots de colección completa).
   late final Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>>
       _usuariosDevFuture;
 
@@ -50,7 +49,6 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
   static const Color textColor = AppColors.text;
   static const Color subTextColor = AppColors.textMuted;
 
-  /// Firma sonora de ingreso: una vez, con gesto del usuario (web autoplay).
   void _onFirstGesture() => ProxSounds.playOpenOnce();
 
   @override
@@ -136,10 +134,8 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
         isDevImpersonation: true,
       );
 
-      final esPrestador = _selectedUserData!['es_trabajador'] == true ||
-          _selectedUserData!['rol'] == 'trabajador';
       ProxAnalytics.instance.startSession(
-        role: esPrestador ? 'prestador' : 'cliente',
+        role: UserSession().esPrestador ? 'prestador' : 'cliente',
       );
       ProxAnalytics.instance.action(
         usedCustomToken ? 'login_dev_token' : 'login_dev_dropdown',
@@ -158,7 +154,7 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
           ),
         );
       }
-      _navegarPostLogin();
+      await _navegarPostLogin();
     } finally {
       if (mounted) setState(() => _loadingDev = false);
     }
@@ -170,7 +166,7 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
     try {
       await AuthService.instance.signInWithGoogle();
       if (!mounted) return;
-      _navegarPostLogin();
+      await _navegarPostLogin();
     } on AuthCancelledException {
     } catch (e) {
       if (!mounted) return;
@@ -210,7 +206,7 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
       );
       if (!mounted) return;
       ProxAnalytics.instance.action('login_email', screen: '/login');
-      _navegarPostLogin();
+      await _navegarPostLogin();
     } on EmailNotVerifiedException catch (e) {
       if (!mounted) return;
       _mostrarDialogoNoVerificado(e.email);
@@ -334,7 +330,9 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
     );
   }
 
-  void _navegarPostLogin() {
+  Future<void> _navegarPostLogin() async {
+    await UserSession().ensureHomeModoPrefLoaded();
+    if (!mounted) return;
     if (UserSession().pendingValidacionToken != null) {
       Navigator.pushReplacement(
         context,
