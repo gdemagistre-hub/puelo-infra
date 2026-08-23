@@ -13,6 +13,9 @@ import 'theme/app_colors.dart';
 ///
 /// Las pantallas de detalle son las flotantes ya alineadas al look prestador.
 /// Este archivo solo orquesta el progreso (no duplica formularios).
+///
+/// Etapa 5.5: salir del hub siempre a Home en modo prestador
+/// (tips / siguiente paso visibles). Tras ver la tarjeta: snackbar + CTA.
 class RegistroTrabajadorWidget extends StatefulWidget {
   const RegistroTrabajadorWidget({super.key});
 
@@ -30,6 +33,7 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
   bool _loading = true;
   bool _paso1Ok = false; // profesiones
   bool _paso2Ok = false; // zonas
+  bool _paso3Visto = false; // volvió de la tarjeta en esta sesión
 
   @override
   void initState() {
@@ -65,6 +69,45 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
       debugPrint('Error estado onboarding: $e');
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Future<void> _marcarPrestadorEnSesion({bool persist = true}) async {
+    final session = UserSession();
+    final uid = session.uid;
+    final mem = <String, dynamic>{
+      ...(session.datosCompletos ?? {}),
+      'es_trabajador': true,
+      'rol': 'trabajador',
+      'camino_elegido': 'ofrezo',
+    };
+    session.datosCompletos = mem;
+    session.invalidateHomeCache();
+    if (!persist || uid == null || uid.isEmpty) return;
+    try {
+      await FirebaseFirestore.instance.collection('usuarios').doc(uid).set(
+        {
+          'es_trabajador': true,
+          'rol': 'trabajador',
+          'camino_elegido': 'ofrezo',
+          'updated_at': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+    } catch (e) {
+      debugPrint('marcarPrestador persist error: $e');
+    }
+  }
+
+  void _irAlInicio() {
+    _marcarPrestadorEnSesion();
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const HomePageWidget(initialModoPrestador: true),
+      ),
+      (route) => false,
+    );
   }
 
   Future<void> _abrirPaso1() async {
@@ -113,6 +156,7 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
       final patch = <String, dynamic>{
         'es_trabajador': true,
         'rol': 'trabajador',
+        'camino_elegido': 'ofrezo',
         'updated_at': FieldValue.serverTimestamp(),
       };
       final base = {...(session.datosCompletos ?? {}), ...patch};
@@ -132,6 +176,22 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
         builder: (_) => TarjetaDigitalWidget(
           usuarioRef:
               FirebaseFirestore.instance.collection('usuarios').doc(uid),
+        ),
+      ),
+    );
+    if (!mounted) return;
+    setState(() => _paso3Visto = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 5),
+        content: const Text(
+          'Tarjeta lista. En el inicio vas a ver el siguiente paso para que te elijan.',
+        ),
+        action: SnackBarAction(
+          label: 'Ir al inicio',
+          textColor: Colors.white,
+          onPressed: _irAlInicio,
         ),
       ),
     );
@@ -166,14 +226,9 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
         surfaceTintColor: Colors.transparent,
         actions: [
           IconButton(
+            tooltip: 'Ir al inicio',
             icon: const Icon(Icons.home_rounded),
-            onPressed: () {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const HomePageWidget()),
-                (route) => false,
-              );
-            },
+            onPressed: _irAlInicio,
           ),
         ],
       ),
@@ -247,16 +302,53 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
                   numero: 3,
                   titulo: 'Tu tarjeta',
                   subtitulo: (_paso1Ok && _paso2Ok)
-                      ? 'Compartila por WhatsApp'
+                      ? (_paso3Visto
+                          ? 'Ya la viste — podés compartirla'
+                          : 'Compartila por WhatsApp')
                       : 'Se habilita al completar 1 y 2',
-                  completo: _paso1Ok && _paso2Ok,
+                  completo: _paso1Ok && _paso2Ok && _paso3Visto,
                   bloqueado: !(_paso1Ok && _paso2Ok),
                   onTap: _abrirPaso3,
-                  destacado: _paso1Ok && _paso2Ok,
+                  destacado: _paso1Ok && _paso2Ok && !_paso3Visto,
                 ),
 
                 const SizedBox(height: 28),
-                if (_paso1Ok && _paso2Ok)
+                if (_paso1Ok && _paso2Ok && _paso3Visto) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton.icon(
+                      onPressed: _irAlInicio,
+                      icon: const Icon(Icons.home_rounded),
+                      label: const Text('Ir al inicio'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton.icon(
+                      onPressed: _abrirPaso3,
+                      icon: const Icon(Icons.badge_outlined),
+                      label: const Text('Ver tarjeta de nuevo'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _primary,
+                        side: const BorderSide(color: _primary),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                ] else if (_paso1Ok && _paso2Ok)
                   SizedBox(
                     width: double.infinity,
                     height: 50,
@@ -281,6 +373,18 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
                       fontSize: 13,
                       color: Colors.grey.shade600,
                       height: 1.35,
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                if (!(_paso1Ok && _paso2Ok && _paso3Visto))
+                  TextButton(
+                    onPressed: _irAlInicio,
+                    child: const Text(
+                      'Ir al inicio',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: _primary,
+                      ),
                     ),
                   ),
               ],
