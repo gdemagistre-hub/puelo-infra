@@ -16,7 +16,8 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/apply_home_54.py
-          rm -f .github/workflows/apply-home-54.yml scripts/apply_home_54.py
+          grep -q 'SIGUIENTE PASO' lib/Homepage.dart
+          rm -f .github/workflows/apply-home-54.yml scripts/apply_home_54.py scripts/home54_tips_snippet.dart
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
