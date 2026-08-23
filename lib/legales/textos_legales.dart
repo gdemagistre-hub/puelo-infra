@@ -1,5 +1,4 @@
 /// Textos legales PUELO — versión producto 2026-08-22.
-/// Confianza / calidad de servicio / red. Sin scoring ni cesión externa.
 class TextosLegales {
   static const String vigencia = '22 de agosto de 2026';
 
@@ -9,7 +8,7 @@ class TextosLegales {
 
   static const String privacidadTitulo = 'Privacidad e identidad';
   static const String privacidadBajada =
-      'Qué datos usamos, qué ve la comunidad y qué nunca sale de PUELO.';
+      'Qué datos usamos, qué ve la comunidad y cómo cuidamos tu identidad.';
 
   static const String buenasTitulo = 'Buenas prácticas';
   static const String buenasBajada =
@@ -21,7 +20,7 @@ class TextosLegales {
 
   static const String checkboxMicro =
       'Hoy el acceso es gratis. Tu documento y tu domicilio exacto no se '
-      'publican. La confianza que construís se usa solo dentro de PUELO.';
+      'publican en la comunidad.';
 
   /// Cuerpo completo de Términos (secciones).
   static const List<LegalSection> terminos = [
@@ -109,34 +108,27 @@ class TextosLegales {
       body:
           'El tratamiento de tu información personal se rige por la Ley de '
           'Protección de los Datos Personales (Ley 25.326) y normas complementarias '
-          'de la República Argentina. Recogemos solo lo necesario para operar la '
-          'app, validar que sos una persona real y sostener una red de confianza '
-          'entre quienes buscan y quienes ofrecen un servicio.',
-    ),
-    LegalSection(
-      title: 'Compromiso de finalidad',
-      body:
-          'Lo que registramos sobre tu identidad y sobre cómo te relacionás en '
-          'PUELO se usa dentro de PUELO. No lo entregamos a terceros para que te '
-          'evalúen, no lo usamos para armar un perfil fuera de esta comunidad y no '
-          'lo comercializamos. La confianza que construís acá se queda acá.',
+          'de la República Argentina. Recogemos lo necesario para operar la app, '
+          'validar que sos una persona real, sostener una red de confianza entre '
+          'quien busca y quien ofrece un servicio, y prestar las funciones y '
+          'servicios vinculados al ecosistema PUELO.',
     ),
     LegalSection(
       title: 'Para qué pedimos datos',
       body:
-          'Usamos tu información para estas finalidades, y no para otras '
-          'incompatibles:\n\n'
+          'Usamos tu información para operar y mejorar PUELO y los servicios '
+          'vinculados al ecosistema:\n\n'
           '• Crear y mantener tu cuenta.\n'
           '• Mostrar tu perfil profesional a quien busca un servicio (nombre, '
           'oficio, zona de trabajo, foto que vos elijas, trabajos que vos '
           'publiques, distintivos de confianza y recomendaciones).\n'
-          '• Validar internamente que tu identidad es real, para cuidar a la '
-          'comunidad de perfiles falsos y respaldar los distintivos de confianza.\n'
+          '• Validar que tu identidad es real, para cuidar a la comunidad de '
+          'perfiles falsos y respaldar los distintivos de confianza.\n'
           '• Permitir que te contacten por los canales que habilites y registrar '
           'que ese contacto existió.\n'
           '• Mostrar comprobantes y mensajes entre vos y otra persona de la red.\n'
-          '• Mejorar la calidad del servicio de la app (errores, seguridad, '
-          'prevención de abuso).\n'
+          '• Mejorar la calidad del servicio (errores, seguridad, prevención de '
+          'abuso) y desarrollar funciones nuevas del ecosistema.\n'
           '• Cumplir obligaciones legales si una autoridad competente lo requiere.',
     ),
     LegalSection(
@@ -147,40 +139,37 @@ class TextosLegales {
           '• Distintivos de confianza, recomendaciones y fotos de trabajos que '
           'subís: sí.\n'
           '• Teléfono / WhatsApp: solo si vos lo habilitás para contacto.\n'
-          '• Domicilio personal exacto (calle y número): no.\n'
-          '• Número de DNI y fotos del documento: no. Jamás se publican ni se '
-          'comparten con otros usuarios.\n'
-          '• Notas internas de validación: no como expediente; solo se refleja lo '
-          'que la app muestra (distintivo, recomendaciones).',
+          '• Domicilio personal exacto (calle y número): no se publica en la '
+          'comunidad.\n'
+          '• Número de DNI y fotos del documento: no se publican en la tarjeta, '
+          'en el buscador ni en el perfil visible para otros usuarios.\n'
+          '• Notas internas de validación: no se muestran como expediente; la '
+          'comunidad ve lo que la app refleja (distintivo, recomendaciones).',
     ),
     LegalSection(
       title: 'Validación de identidad',
       body:
           'Te podemos pedir DNI, fotos del documento y domicilio para confirmar '
           'que el perfil corresponde a una persona real. Esa información sensible '
-          'queda aislada. No se publica en la tarjeta, no se lista en el buscador '
-          'y no se entrega a otros usuarios ni a otras aplicaciones, estén o no '
-          'ligadas al mismo grupo.\n\n'
-          'La pedimos solo para respaldar tu reputación dentro de PUELO, emitir '
-          'distintivos de confianza y proteger a la comunidad de perfiles falsos.',
+          'tiene acceso restringido. No se publica en la tarjeta ni se lista en '
+          'el buscador.\n\n'
+          'La pedimos para respaldar tu reputación, emitir distintivos de '
+          'confianza y proteger a la comunidad de perfiles falsos.',
     ),
     LegalSection(
       title: 'Qué no hacemos',
       body:
           '• No vendemos tu información personal.\n'
-          '• No entregamos tu DNI, tus fotos de documento ni tu domicilio exacto '
-          'a otras personas ni a otras plataformas.\n'
-          '• No usamos tu actividad en PUELO para armarte un perfil de confianza '
-          'fuera de esta app.\n'
-          '• No cedemos tu reputación de la red para que un tercero decida sobre vos.',
+          '• No publicamos tu DNI, las fotos de tu documento ni tu domicilio '
+          'exacto en la comunidad ni en tu perfil visible.',
     ),
     LegalSection(
       title: 'Proveedores técnicos',
       body:
-          'Para que la app funcione usamos infraestructura tecnológica '
-          '(alojamiento, autenticación, almacenamiento de fotos). Esos proveedores '
-          'tratan datos como encargados, para operar el servicio, no para usarlos '
-          'con una finalidad propia sobre tu reputación.',
+          'Para que la app y los servicios vinculados funcionen usamos '
+          'infraestructura tecnológica (alojamiento, autenticación, '
+          'almacenamiento de fotos y operación del servicio). Esos proveedores '
+          'tratan datos como encargados, para operar lo que les encomendamos.',
     ),
     LegalSection(
       title: 'Tus derechos',
@@ -190,7 +179,7 @@ class TextosLegales {
           '25.326. Escribí a privacidad@puelo.cloud (canal provisorio de producto). '
           'También podés plantear un reclamo ante la Agencia de Acceso a la '
           'Información Pública.\n\n'
-          'Si pedís la baja de la cuenta, dejamos de usar tu perfil en la '
+          'Si pedís la baja de la cuenta, dejamos de mostrar tu perfil en la '
           'comunidad. Podemos conservar el mínimo indispensable si una ley o un '
           'reclamo en curso lo exige, y solo por el tiempo necesario.',
     ),
@@ -236,10 +225,9 @@ class TextosLegales {
           'perfil completo, identidad validada, servicios publicados, '
           'recomendaciones de quienes realmente trabajaron con vos y el trato que '
           'sostenés. Eso se refleja en distintivos y en cómo te encuentran otras '
-          'personas dentro de PUELO.\n\n'
-          'Esa confianza no se exporta. No es una calificación para afuera ni un '
-          'antecedente que entreguemos a nadie. Es el modo en que esta comunidad '
-          'reconoce un buen servicio.',
+          'personas.\n\n'
+          'Esa confianza es el modo en que esta comunidad reconoce un buen '
+          'servicio. Tu comportamiento define tus oportunidades.',
     ),
     LegalSection(
       title: 'Qué no se tolera',
