@@ -452,8 +452,9 @@ class _MenuPerfilOpcionesWidgetState extends State<MenuPerfilOpcionesWidget> {
   }
 
   Widget _legalesBlock() {
+    final muted = Colors.grey.shade600;
     return Material(
-      color: Colors.white,
+      color: const Color(0xFFF8FAFC),
       borderRadius: BorderRadius.circular(14),
       clipBehavior: Clip.antiAlias,
       child: Container(
@@ -467,30 +468,30 @@ class _MenuPerfilOpcionesWidgetState extends State<MenuPerfilOpcionesWidget> {
               onTap: () => setState(() => _legalesAbierto = !_legalesAbierto),
               child: Padding(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 child: Row(
                   children: [
                     Container(
-                      width: 36,
-                      height: 36,
+                      width: 32,
+                      height: 32,
                       decoration: BoxDecoration(
-                        color: primaryColor.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(10),
+                        color: Colors.grey.shade200.withOpacity(0.8),
+                        borderRadius: BorderRadius.circular(9),
                       ),
                       child: Icon(
                         Icons.gavel_outlined,
-                        color: primaryColor,
-                        size: 20,
+                        color: muted,
+                        size: 18,
                       ),
                     ),
                     const SizedBox(width: 12),
-                    const Expanded(
+                    Expanded(
                       child: Text(
                         'Documentos legales',
                         style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.text,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: muted,
                         ),
                       ),
                     ),
@@ -499,6 +500,7 @@ class _MenuPerfilOpcionesWidgetState extends State<MenuPerfilOpcionesWidget> {
                           ? Icons.expand_less_rounded
                           : Icons.expand_more_rounded,
                       color: Colors.grey.shade400,
+                      size: 20,
                     ),
                   ],
                 ),
@@ -514,13 +516,13 @@ class _MenuPerfilOpcionesWidgetState extends State<MenuPerfilOpcionesWidget> {
                     TipoDocumentoLegal.terminos,
                   ),
                   Divider(
-                      height: 1, indent: 56, color: Colors.grey.shade200),
+                      height: 1, indent: 48, color: Colors.grey.shade200),
                   _legalRow(
                     'Privacidad',
                     TipoDocumentoLegal.privacidad,
                   ),
                   Divider(
-                      height: 1, indent: 56, color: Colors.grey.shade200),
+                      height: 1, indent: 48, color: Colors.grey.shade200),
                   _legalRow(
                     'Buenas prácticas',
                     TipoDocumentoLegal.buenasPracticas,
@@ -542,21 +544,22 @@ class _MenuPerfilOpcionesWidgetState extends State<MenuPerfilOpcionesWidget> {
     return InkWell(
       onTap: () => _abrirLegal(context, tipo),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
         child: Row(
           children: [
-            const SizedBox(width: 48),
+            const SizedBox(width: 44),
             Expanded(
               child: Text(
                 label,
-                style: const TextStyle(
-                  fontSize: 14,
+                style: TextStyle(
+                  fontSize: 13,
                   fontWeight: FontWeight.w500,
-                  color: AppColors.text,
+                  color: Colors.grey.shade600,
                 ),
               ),
             ),
-            Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
+            Icon(Icons.chevron_right_rounded,
+                color: Colors.grey.shade400, size: 18),
           ],
         ),
       ),
