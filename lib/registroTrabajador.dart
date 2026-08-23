@@ -82,6 +82,7 @@ class _RegistroTrabajadorWidgetState extends State<RegistroTrabajadorWidget> {
     };
     session.datosCompletos = mem;
     session.invalidateHomeCache();
+    session.persistHomeModoPrestador(true);
     if (!persist || uid == null || uid.isEmpty) return;
     try {
       await FirebaseFirestore.instance.collection('usuarios').doc(uid).set(

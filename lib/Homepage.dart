@@ -56,6 +56,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   int _currentIndex = 0;
   bool _modoPrestador = false;
   bool _puedeSerAmbos = false;
+  bool _landingRolAplicado = false;
 
   final TextEditingController _searchCtrl = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
@@ -121,11 +122,19 @@ class _HomePageWidgetState extends State<HomePageWidget> {
   }
 
   void _detectarRol() {
-    final data = UserSession().datosCompletos;
-    final esPrestador = data?['es_trabajador'] == true || data?['rol'] == 'trabajador';
+    final session = UserSession();
+    final esPrestador = session.esPrestador;
     setState(() {
       _puedeSerAmbos = esPrestador;
-      _modoPrestador = widget.initialModoPrestador ?? esPrestador;
+      if (!esPrestador) {
+        _modoPrestador = false;
+      } else if (!_landingRolAplicado && widget.initialModoPrestador != null) {
+        _modoPrestador = widget.initialModoPrestador!;
+        _landingRolAplicado = true;
+      } else {
+        _modoPrestador = session.preferredHomeModoPrestador;
+        _landingRolAplicado = true;
+      }
     });
   }
 
@@ -168,6 +177,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
 
   void _toggleModoPrestador() {
     setState(() => _modoPrestador = !_modoPrestador);
+    UserSession().persistHomeModoPrestador(_modoPrestador);
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeStartHomeTour());
   }
 
