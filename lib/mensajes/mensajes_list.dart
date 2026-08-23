@@ -96,6 +96,11 @@ class MensajesListScreen extends StatelessWidget {
                     if (docs.isEmpty) {
                       return _EmptyState(
                         onEmitir: () => _openEmitir(context),
+                        onEmitirA: (cUid, cNombre) => _openEmitir(
+                          context,
+                          contraparteUid: cUid,
+                          contraparteNombre: cNombre,
+                        ),
                       );
                     }
                     return ListView.separated(
@@ -149,7 +154,11 @@ class MensajesListScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _openEmitir(BuildContext context) async {
+  Future<void> _openEmitir(
+    BuildContext context, {
+    String? contraparteUid,
+    String? contraparteNombre,
+  }) async {
     if (!UserSession().hasRealAuth) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -159,13 +168,17 @@ class MensajesListScreen extends StatelessWidget {
       );
       return;
     }
+    final fijo = (contraparteUid ?? '').trim();
     final res = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => const EmitirReciboSheet(),
+      builder: (ctx) => EmitirReciboSheet(
+        contraparteUidFijo: fijo.isEmpty ? null : fijo,
+        contraparteNombre: contraparteNombre,
+      ),
     );
     if (res == null || !context.mounted) return;
 
@@ -210,8 +223,9 @@ class _LeyendaHeader extends StatelessWidget {
           const SizedBox(width: 10),
           const Expanded(
             child: Text(
-              'Primero contactá al prestador desde su tarjeta (WhatsApp o Doy un pago). '
-              'Acá ves comprobantes pendientes de confirmar y evaluaciones.',
+              'Acá ves comprobantes y evaluaciones. '
+              'El pago se registra desde la tarjeta (Doy un pago). '
+              'Quien recibe lo confirma.',
               style: TextStyle(
                 fontSize: 13,
                 height: 1.35,
@@ -226,9 +240,254 @@ class _LeyendaHeader extends StatelessWidget {
   }
 }
 
-class _EmptyState extends StatelessWidget {
+class _HintContacto {
+  final String uid;
+  final String nombre;
+  final bool entrante;
+  final String tipo;
+  _HintContacto({
+    required this.uid,
+    required this.nombre,
+    required this.entrante,
+    required this.tipo,
+  });
+}
+
+class _EmptyState extends StatefulWidget {
   final VoidCallback onEmitir;
-  const _EmptyState({required this.onEmitir});
+  final void Function(String uid, String nombre) onEmitirA;
+  const _EmptyState({required this.onEmitir, required this.onEmitirA});
+
+  @override
+  State<_EmptyState> createState() => _EmptyStateState();
+}
+
+class _EmptyStateState extends State<_EmptyState> {
+  List<_HintContacto> _hints = const [];
+  bool _ready = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargar();
+  }
+
+  Future<void> _cargar() async {
+    final me = UserSession().uid;
+    if (me == null || me.isEmpty) {
+      if (mounted) setState(() => _ready = true);
+      return;
+    }
+    try {
+      final db = FirebaseFirestore.instance.collection('contactos');
+      final yoCliente = await db.where('cliente_uid', isEqualTo: me).limit(30).get();
+      final yoPrestador = await db.where('prestador_uid', isEqualTo: me).limit(30).get();
+
+      DateTime when(Map<String, dynamic> d) {
+        final t = d['created_at'];
+        return t is Timestamp ? t.toDate() : DateTime.fromMillisecondsSinceEpoch(0);
+      }
+
+      final scored = <_HintContacto, DateTime>{};
+      final seen = <String>{};
+
+      void add(QueryDocumentSnapshot<Map<String, dynamic>> doc, {required bool entrante}) {
+        final d = doc.data();
+        final other = (entrante ? d['cliente_uid'] : d['prestador_uid'])
+            .toString()
+            .trim();
+        if (other.isEmpty || other == me || !seen.add(other)) return;
+        final hint = (entrante
+                ? (d['cliente_nombre'] ?? '')
+                : (d['prestador_nombre'] ?? ''))
+            .toString()
+            .trim();
+        scored[_HintContacto(
+          uid: other,
+          nombre: hint,
+          entrante: entrante,
+          tipo: (d['tipo'] ?? 'whatsapp').toString(),
+        )] = when(d);
+      }
+
+      for (final d in yoPrestador.docs) {
+        add(d, entrante: true);
+      }
+      for (final d in yoCliente.docs) {
+        add(d, entrante: false);
+      }
+
+      final list = scored.keys.toList()
+        ..sort((a, b) => scored[b]!.compareTo(scored[a]!));
+
+      final missing = list.where((h) => h.nombre.isEmpty).take(5);
+      await Future.wait(missing.map((h) async {
+        try {
+          final u = await FirebaseFirestore.instance
+              .collection('usuarios')
+              .doc(h.uid)
+              .get();
+          final data = u.data() ?? {};
+          final comercial = (data['nombre_comercial'] ?? '').toString().trim();
+          final n = (data['nombre'] ?? '').toString().trim();
+          final a = (data['apellido'] ?? '').toString().trim();
+          final label = comercial.isNotEmpty ? comercial : '$n $a'.trim();
+          if (label.isEmpty) return;
+          final i = list.indexWhere((x) => x.uid == h.uid);
+          if (i >= 0) {
+            list[i] = _HintContacto(
+              uid: h.uid,
+              nombre: label,
+              entrante: h.entrante,
+              tipo: h.tipo,
+            );
+          }
+        } catch (_) {}
+      }));
+
+      if (!mounted) return;
+      setState(() {
+        _hints = list.take(5).toList();
+        _ready = true;
+      });
+    } catch (e) {
+      debugPrint('Mensajes empty contactos: $e');
+      if (mounted) setState(() => _ready = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_ready) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_hints.isNotEmpty) {
+      return _ContactosPendientes(
+        hints: _hints,
+        onEmitir: widget.onEmitir,
+        onEmitirA: widget.onEmitirA,
+      );
+    }
+    return _EmptyPasos(onEmitir: widget.onEmitir);
+  }
+}
+
+class _ContactosPendientes extends StatelessWidget {
+  final List<_HintContacto> hints;
+  final VoidCallback onEmitir;
+  final void Function(String uid, String nombre) onEmitirA;
+  const _ContactosPendientes({
+    required this.hints,
+    required this.onEmitir,
+    required this.onEmitirA,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hayEntrante = hints.any((h) => h.entrante);
+    final haySaliente = hints.any((h) => !h.entrante);
+
+    String blurb;
+    if (haySaliente && !hayEntrante) {
+      blurb =
+          'Ya escribiste por WhatsApp. Cuando cierren el trabajo, registrá el comprobante.';
+    } else if (hayEntrante && !haySaliente) {
+      blurb =
+          'Te contactaron. Cuando el cliente registre el pago, el comprobante aparece acá para confirmar.';
+    } else {
+      blurb =
+          'Hay contactos en PROX. El comprobante se registra con Doy un pago; quien recibe lo confirma.';
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 96),
+      children: [
+        const Text(
+          'Todavía no hay comprobantes',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            color: MensajesListScreen._text,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          blurb,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 14,
+            height: 1.4,
+            color: MensajesListScreen._muted,
+          ),
+        ),
+        const SizedBox(height: 18),
+        ...hints.map((h) {
+          final label = h.nombre.isEmpty ? 'Contacto' : h.nombre;
+          final tag = h.entrante ? 'Te contactó' : 'Lo contactaste';
+          final tipo = h.tipo == 'llamada' ? 'Llamada' : 'WhatsApp';
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Material(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              elevation: 1,
+              child: ListTile(
+                contentPadding: const EdgeInsets.fromLTRB(12, 4, 8, 4),
+                leading: CircleAvatar(
+                  backgroundColor: MensajesListScreen._primary.withOpacity(0.15),
+                  child: Text(
+                    label[0].toUpperCase(),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: MensajesListScreen._primary,
+                    ),
+                  ),
+                ),
+                title: Text(
+                  label,
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                ),
+                subtitle: Text(
+                  '$tag · $tipo',
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                ),
+                trailing: h.entrante
+                    ? const SizedBox.shrink()
+                    : TextButton(
+                        onPressed: () => onEmitirA(h.uid, label),
+                        child: const Text(
+                          'Doy un pago',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+              ),
+            ),
+          );
+        }),
+        if (haySaliente) ...[
+          const SizedBox(height: 8),
+          FilledButton.icon(
+            onPressed: onEmitir,
+            style: FilledButton.styleFrom(
+              backgroundColor: MensajesListScreen._primary,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            icon: const Icon(Icons.receipt_long_rounded),
+            label: const Text(
+              'Doy un pago',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _EmptyPasos extends StatelessWidget {
+  final VoidCallback onEmitir;
+  const _EmptyPasos({required this.onEmitir});
 
   @override
   Widget build(BuildContext context) {
@@ -290,12 +549,6 @@ class _EmptyState extends StatelessWidget {
             style: TextStyle(fontWeight: FontWeight.w800),
           ),
         ),
-        const SizedBox(height: 12),
-        const Text(
-          'Si ya contactaste a alguien desde la app, también podés registrar el pago desde este botón.',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 12, height: 1.35, color: Color(0xFF94A3B8)),
-        ),
       ],
     );
   }
@@ -347,6 +600,7 @@ class _StepRow extends StatelessWidget {
     );
   }
 }
+
 
 class _ErrorBox extends StatelessWidget {
   final String message;
