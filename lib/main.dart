@@ -27,7 +27,8 @@ final ProxRouteObserver proxRouteObserver = ProxRouteObserver();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Web: options explícitas. Android/iOS: appId nativo (evita crash al abrir APK).
+  // Web: HTTP-referrer restricted key.
+  // Android: separate key restricted to package + SHA-1 (GCP Credentials).
   if (kIsWeb) {
     await Firebase.initializeApp(
       options: const FirebaseOptions(
@@ -42,7 +43,7 @@ void main() async {
   } else {
     await Firebase.initializeApp(
       options: const FirebaseOptions(
-        apiKey: 'AIzaSyAr6iPh8NaDBD4qwo3LvfpE4j9k7RfKTwQ',
+        apiKey: 'AIzaSyDKc6kq20nYMFg0gUscUI-n4uIDpr__94Q',
         appId: '1:74624927314:android:8e3376cf776fd40285818b',
         messagingSenderId: '74624927314',
         projectId: 'lifewalletpuelo',
