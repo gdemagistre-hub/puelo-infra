@@ -437,7 +437,34 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
                   );
                 }
 
-                return ListView.builder(
+                Map<String, dynamic>? pendingPago;
+                String? pendingPagoId;
+                for (final e in events.reversed) {
+                  final dd = e.data();
+                  if ((dd['tipo'] as String? ?? '') != 'recibo_emitido') {
+                    continue;
+                  }
+                  if (dd['actor_uid'] == myUid) continue;
+                  if (respuestasRecibo.containsKey(e.id)) continue;
+                  pendingPago = dd;
+                  pendingPagoId = e.id;
+                  break;
+                }
+
+                return Column(
+                  children: [
+                    if (pendingPago != null && pendingPagoId != null)
+                      _BannerConfirmar(
+                        monto: MensajesService.formatMonto(pendingPago['monto']),
+                        busy: _busy,
+                        onAceptar: () => _responderRecibo(
+                          reciboEventId: pendingPagoId!,
+                          decision: 'aceptado',
+                        ),
+                        onRechazar: () => _confirmReject(pendingPagoId!),
+                      ),
+                    Expanded(
+                      child: ListView.builder(
                   controller: _scrollCtrl,
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                   itemCount: timeline.length,
@@ -495,6 +522,9 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
                       onRechazar: () => _confirmReject(doc.id),
                     );
                   },
+                ),
+                    ),
+                  ],
                 );
               },
             ),
@@ -558,6 +588,74 @@ class _MensajesDetalleScreenState extends State<MensajesDetalleScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+
+class _BannerConfirmar extends StatelessWidget {
+  final String monto;
+  final bool busy;
+  final VoidCallback onAceptar;
+  final VoidCallback onRechazar;
+  const _BannerConfirmar({
+    required this.monto,
+    required this.busy,
+    required this.onAceptar,
+    required this.onRechazar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xFFFFFBEB),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Te registraron un pago de $monto',
+              style: const TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
+                color: Color(0xFF92400E),
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Confirmá si lo recibiste. Queda sellado en PROX.',
+              style: TextStyle(fontSize: 12, color: Color(0xFFB45309)),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton(
+                    onPressed: busy ? null : onAceptar,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF16A34A),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: const Text(
+                      'Sí, lo recibí',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: busy ? null : onRechazar,
+                  child: const Text(
+                    'Revisar',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -893,6 +991,9 @@ class _ReciboCard extends StatelessWidget {
     final quien = otherName ?? 'la otra parte';
 
     Color border = const Color(0xFFE2E8F0);
+    if (decision == null) {
+      border = const Color(0xFFF59E0B);
+    }
     String estadoLabel = soyEmisor
         ? 'Esperando a $quien'
         : 'Pendiente de tu confirmaci\u00f3n';
@@ -1079,7 +1180,7 @@ class _ReciboCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
                         child: const Text(
-                          'S\u00ed, gracias',
+                          'S\u00ed, lo recib\u00ed',
                           style: TextStyle(fontWeight: FontWeight.w800),
                         ),
                       ),

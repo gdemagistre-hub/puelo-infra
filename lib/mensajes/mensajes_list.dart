@@ -676,10 +676,29 @@ class _HiloTileState extends State<_HiloTile> {
   @override
   Widget build(BuildContext context) {
     final summary = (widget.data['last_summary'] as String?) ?? 'Conversación';
-    final pending = widget.data['pending_recibo_event_id'] != null ||
-        widget.data['pending_calificacion_event_id'] != null;
+    final pendingRecibo = widget.data['pending_recibo_event_id'] != null;
+    final pendingCalif = widget.data['pending_calificacion_event_id'] != null;
+    final reciboActor =
+        (widget.data['pending_recibo_actor_uid'] ?? '').toString();
+    final califActor =
+        (widget.data['pending_calificacion_actor_uid'] ?? '').toString();
+    final deboPago = pendingRecibo &&
+        reciboActor.isNotEmpty &&
+        reciboActor != widget.myUid;
+    final deboEval = pendingCalif &&
+        califActor.isNotEmpty &&
+        califActor != widget.myUid;
+    final pending = pendingRecibo || pendingCalif;
     final name = _otherName ?? '…';
     final initial = name.isNotEmpty && name != '…' ? name[0].toUpperCase() : '?';
+    final badge = deboPago
+        ? 'Confirmá el pago'
+        : (deboEval
+            ? 'Confirmá eval.'
+            : (pending ? 'Esperando' : null));
+    final badgeColor = (deboPago || deboEval)
+        ? const Color(0xFFF59E0B)
+        : const Color(0xFF94A3B8);
 
     return Material(
       color: Colors.white,
@@ -739,17 +758,17 @@ class _HiloTileState extends State<_HiloTile> {
                   ],
                 ),
               ),
-              if (pending)
+              if (badge != null)
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF59E0B),
+                    color: badgeColor,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Text(
-                    'Pendiente',
-                    style: TextStyle(
+                  child: Text(
+                    badge,
+                    style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
                       color: Colors.white,
