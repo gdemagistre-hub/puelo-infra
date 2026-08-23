@@ -1,9 +1,10 @@
 name: apply-home-56
 on:
+  workflow_dispatch:
   push:
     paths:
+      - 'tooling/apply_home_56.py'
       - '.github/workflows/apply-home-56.yml'
-  workflow_dispatch:
 
 permissions:
   contents: write
@@ -13,125 +14,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Patch Homepage + registroTrabajador (5.6 toggle persist)
-        run: |
-          python3 <<'PY'
-          from pathlib import Path
-
-          hp = Path('lib/Homepage.dart')
-          t = hp.read_text(encoding='utf-8')
-          if 'PLACEHOLDER' in t or 'SEE_FILE' in t:
-              raise SystemExit('Homepage is PLACEHOLDER — abort')
-
-          if 'bool _landingRolAplicado' not in t:
-              old = '  bool _puedeSerAmbos = false;\n'
-              new = '  bool _puedeSerAmbos = false;\n  bool _landingRolAplicado = false;\n'
-              if old not in t:
-                  raise SystemExit('anchor _puedeSerAmbos missing')
-              t = t.replace(old, new, 1)
-
-          old_det = '''  void _detectarRol() {
-    final data = UserSession().datosCompletos;
-    final esPrestador = data?['es_trabajador'] == true || data?['rol'] == 'trabajador';
-    setState(() {
-      _puedeSerAmbos = esPrestador;
-      _modoPrestador = widget.initialModoPrestador ?? esPrestador;
-    });
-  }'''
-          old_det2 = '''  void _detectarRol() {
-    final session = UserSession();
-    final esPrestador = session.esPrestador;
-    setState(() {
-      _puedeSerAmbos = esPrestador;
-      _modoPrestador =
-          widget.initialModoPrestador ?? session.preferredHomeModoPrestador;
-    });
-  }'''
-          new_det = '''  void _detectarRol() {
-    final session = UserSession();
-    final esPrestador = session.esPrestador;
-    setState(() {
-      _puedeSerAmbos = esPrestador;
-      if (!esPrestador) {
-        _modoPrestador = false;
-      } else if (!_landingRolAplicado && widget.initialModoPrestador != null) {
-        _modoPrestador = widget.initialModoPrestador!;
-        _landingRolAplicado = true;
-      } else {
-        _modoPrestador = session.preferredHomeModoPrestador;
-        _landingRolAplicado = true;
-      }
-    });
-  }'''
-          if 'if (!esPrestador)' in t and '_landingRolAplicado' in t and 'preferredHomeModoPrestador' in t[t.find('void _detectarRol'):t.find('void _detectarRol')+700]:
-              print('Homepage _detectarRol already patched')
-          elif old_det in t:
-              t = t.replace(old_det, new_det, 1)
-              print('Homepage _detectarRol patched from GH original')
-          elif old_det2 in t:
-              t = t.replace(old_det2, new_det, 1)
-              print('Homepage _detectarRol patched from partial 5.6')
-          else:
-              raise SystemExit('Homepage _detectarRol block not found')
-
-          old_tog = '''  void _toggleModoPrestador() {
-    setState(() => _modoPrestador = !_modoPrestador);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeStartHomeTour());
-  }'''
-          new_tog = '''  void _toggleModoPrestador() {
-    setState(() => _modoPrestador = !_modoPrestador);
-    UserSession().persistHomeModoPrestador(_modoPrestador);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeStartHomeTour());
-  }'''
-          if 'persistHomeModoPrestador(_modoPrestador)' in t:
-              print('Homepage toggle already persists')
-          elif old_tog in t:
-              t = t.replace(old_tog, new_tog, 1)
-              print('Homepage toggle patched')
-          else:
-              raise SystemExit('Homepage _toggleModoPrestador block not found')
-
-          if 'Sli ver' in t or 'ofiver' in t:
-              raise SystemExit('typo detected')
-          if t.count('{') != t.count('}'):
-              raise SystemExit('brace mismatch Homepage')
-          hp.write_text(t, encoding='utf-8')
-          print('Homepage ok', hp.stat().st_size)
-
-          rt = Path('lib/registroTrabajador.dart')
-          r = rt.read_text(encoding='utf-8')
-          if 'PLACEHOLDER' in r or 'SEE_FILE' in r:
-              raise SystemExit('registroTrabajador is PLACEHOLDER — abort')
-          needle = '    session.invalidateHomeCache();\n    if (!persist || uid == null || uid.isEmpty) return;'
-          repl = '    session.invalidateHomeCache();\n    session.persistHomeModoPrestador(true);\n    if (!persist || uid == null || uid.isEmpty) return;'
-          if 'persistHomeModoPrestador(true)' in r:
-              print('registro already persists home modo')
-          elif needle in r:
-              r = r.replace(needle, repl, 1)
-              rt.write_text(r, encoding='utf-8')
-              print('registro persist patched')
-          else:
-              raise SystemExit('registro anchor missing')
-          print('registro ok', rt.stat().st_size)
-          PY
-      - name: Commit and self-delete workflow
+      - name: Apply 5.6 patch
+        run: python3 tooling/apply_home_56.py
+      - name: Commit result and remove one-shot
         run: |
           rm -f .github/workflows/apply-home-56.yml
+          rm -f tooling/apply_home_56.py
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add lib/Homepage.dart lib/registroTrabajador.dart
-          git add -u .github/workflows/apply-home-56.yml
+          git add -A lib/Homepage.dart lib/registroTrabajador.dart
+          git add -u .github/workflows/apply-home-56.yml tooling/apply_home_56.py || true
           if git diff --cached --quiet; then
             echo "No changes"
             exit 0
           fi
-          git commit -m "$(cat <<'EOF'
-          feat(home): 5.6 remember Busco/Ofrezco across sessions
-
-          Persist Home mode on role toggle and when leaving the prestador hub.
-          Dual-role users reopen in the last mode; cliente-only Home unchanged.
-          EOF
-          )"
+          git commit -m "feat(home): 5.6 remember Busco/Ofrezco across sessions"
           git push origin HEAD:main
