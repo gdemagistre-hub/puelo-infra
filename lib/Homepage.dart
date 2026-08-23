@@ -30,6 +30,7 @@ import 'onboarding/home_tour_service.dart';
 import 'onboarding/home_tour_overlay.dart';
 import 'widgets/dev_auth_banner.dart';
 import 'contacto/contactos_prestador_card.dart';
+import 'mensajes/confirmar_pago_home_card.dart';
 
 class HomePageWidget extends StatefulWidget {
   final bool? initialModoPrestador;
@@ -1261,7 +1262,11 @@ Widget _navAcademiaShowcase() {
           ),
         ),
         ),
-        Padding(
+          const ConfirmarPagoHomeCard(),
+        ContactosPrestadorCard(
+          onIrMensajes: () => _selectTab(3),
+        ),
+      Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: homeShowcase(
             key: HomeTourKeys.primaryBlock,
@@ -1306,9 +1311,6 @@ Widget _navAcademiaShowcase() {
             ),
           ),
         ),
-        ),
-        ContactosPrestadorCard(
-          onIrMensajes: () => _selectTab(3),
         ),
         Builder(
           builder: (context) {
