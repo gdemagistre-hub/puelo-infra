@@ -1,0 +1,30 @@
+name: apply-post-contacto-58
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-post-contacto-58.yml'
+      - 'tools/apply_post_contacto_58.py'
+      - 'lib/contacto/post_contacto_sheet.dart'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch buscador + tarjeta 5.8
+        run: python3 tools/apply_post_contacto_58.py
+      - name: Commit and cleanup
+        run: |
+          rm -f .github/workflows/apply-post-contacto-58.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/buscadorPrestadores.dart lib/tarjetaDigital.dart lib/contacto/post_contacto_sheet.dart tools/apply_post_contacto_58.py
+          git add -u .github/workflows/apply-post-contacto-58.yml || true
+          if git diff --cached --quiet; then
+            echo no changes
+            exit 0
+          fi
+          git commit -m "feat(contacto): 5.8 post-WhatsApp sheet hacia comprobante"
+          git push
