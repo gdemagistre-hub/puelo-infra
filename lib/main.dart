@@ -33,7 +33,7 @@ void main() async {
     await Firebase.initializeApp(
       options: const FirebaseOptions(
         apiKey: 'AIzaSyAr6iPh8NaDBD4qwo3LvfpE4j9k7RfKTwQ',
-        authDomain: 'lifewalletpuelo.firebaseapp.com',
+        authDomain: 'lifewalletpuelo.web.app',
         projectId: 'lifewalletpuelo',
         storageBucket: 'lifewalletpuelo.firebasestorage.app',
         messagingSenderId: '74624927314',
