@@ -1,7 +1,5 @@
 rules_version = '2';
-// Sprint 0: writes requieren Auth y path bajo usuarios/{uid}/.
-// Lectura pública de imágenes de perfil/portfolio (URLs en tarjeta pública).
-// 2026-08-24: tokens con claim dev_impersonation no pueden escribir.
+// 2026-08-24: claim ausente no rompe isOwnerPath.
 service firebase.storage {
   match /b/{bucket}/o {
     function isImage() {
@@ -11,7 +9,8 @@ service firebase.storage {
       return request.resource.size < 5 * 1024 * 1024;
     }
     function isDevImpersonation() {
-      return request.auth != null && request.auth.token.dev_impersonation == true;
+      return request.auth != null
+        && request.auth.token.get('dev_impersonation', false) == true;
     }
     function isOwnerPath(userId) {
       return request.auth != null
@@ -25,7 +24,6 @@ service firebase.storage {
         && (request.resource == null || (underLimit() && isImage()));
     }
 
-    // Deny-by-default resto del bucket
     match /{allPaths=**} {
       allow read, write: if false;
     }

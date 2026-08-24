@@ -1,13 +1,5 @@
 rules_version = '2';
-// Sprint 0 (2026-08-06): cierre de superficie privilegiada.
-// 2026-08-14: Mis números DB única.
-// 2026-08-14: Mensajes M1 conversaciones/eventos append-only (write CF only).
-// 2026-08-14: fiados (Me deben) subcolección owner-only.
-// 2026-08-18: Phase 1 scoring_features (Vertex export, admin only).
-// 2026-08-18: stats write admin (batch lock scoring_job + runs).
-// 2026-08-22: Etapa 0 — contactos/trabajos/calificaciones ya no son create:true.
-// 2026-08-22: contactos read propio (prestador/cliente) para typeahead recibo.
-// 2026-08-24: tokens con claim dev_impersonation no son owner ni admin.
+// 2026-08-24: claim dev_impersonation con get() default false (tokens Google).
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -16,7 +8,8 @@ service cloud.firestore {
     }
 
     function isDevImpersonation() {
-      return request.auth != null && request.auth.token.dev_impersonation == true;
+      return request.auth != null
+        && request.auth.token.get('dev_impersonation', false) == true;
     }
 
     function isAdmin() {
