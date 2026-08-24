@@ -33,8 +33,7 @@ class _PantallaGraciasValidacionWidgetState
 
   Future<void> _procesarYMostrar() async {
     final token = UserSession().pendingValidacionToken;
-    final validadorId = UserSession().uid;
-    if (token == null || validadorId == null) {
+    if (token == null) {
       if (mounted) setState(() => _procesando = false);
       return;
     }
@@ -47,7 +46,6 @@ class _PantallaGraciasValidacionWidgetState
       final headers = <String, String>{
         'Content-Type': 'application/json',
       };
-      // Preferente: Auth real (Google o mintDevSession)
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         try {
@@ -60,15 +58,27 @@ class _PantallaGraciasValidacionWidgetState
         }
       }
 
+      if (!headers.containsKey('Authorization')) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Iniciá sesión con Google o email para aplicar la validación.',
+              ),
+              duration: Duration(seconds: 6),
+            ),
+          );
+        }
+        UserSession().clearPendingValidacion();
+        if (mounted) setState(() => _procesando = false);
+        return;
+      }
+
       final resp = await http
           .post(
             uri,
             headers: headers,
-            body: jsonEncode({
-              'token': token,
-              // Fallback TEMP si ALLOW_DEV_VALIDACION=1 y no hay Bearer
-              'validadorId': validadorId,
-            }),
+            body: jsonEncode({'token': token}),
           )
           .timeout(const Duration(seconds: 25));
 
@@ -83,8 +93,7 @@ class _PantallaGraciasValidacionWidgetState
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
-                'Necesitás iniciar sesión (Google o modo prueba con token) '
-                'para aplicar la validación.',
+                'Iniciá sesión con Google o email para aplicar la validación.',
               ),
               duration: Duration(seconds: 6),
             ),
