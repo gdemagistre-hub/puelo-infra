@@ -159,3 +159,463 @@ class _EligeOficioWidgetState extends State<EligeOficioWidget> {
       ),
     );
   }
+
+  Future<void> _abrirExcepcionLibre() async {
+    if (_saving) return;
+    final controller = TextEditingController();
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            top: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                '¿No está en la lista?',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF7ED),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFFDBA74)),
+                ),
+                child: const Text(
+                  'Si lo escribís vos, puede que no te encuentren '
+                  'cuando alguien busque ese trabajo.\n'
+                  'Mejor elegí el más parecido de la lista.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.35,
+                    color: Color(0xFF9A3412),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: InputDecoration(
+                  hintText: 'Tu oficio (solo si no hay parecido)',
+                  filled: true,
+                  fillColor: const Color(0xFFF1F5F9),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              FilledButton(
+                onPressed: () {
+                  final t = controller.text.trim();
+                  if (t.isEmpty) return;
+                  Navigator.pop(ctx, t);
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFEA580C),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: const Text(
+                  'Guardar igual (puede no aparecer en búsquedas)',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text(
+                  'Volver a la lista',
+                  style: TextStyle(
+                    color: _teal,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (result == null || result.trim().isEmpty) return;
+    final label = result.trim();
+    await _guardarYSeguir(_slugOficio(label), labelLibre: label);
+  }
+
+  static String _slugOficio(String raw) {
+    var s = raw.toLowerCase().trim();
+    const map = {
+      'á': 'a',
+      'é': 'e',
+      'í': 'i',
+      'ó': 'o',
+      'ú': 'u',
+      'ü': 'u',
+      'ñ': 'n',
+    };
+    map.forEach((k, v) => s = s.replaceAll(k, v));
+    s = s.replaceAll(RegExp(r'[^a-z0-9]+'), '_');
+    s = s.replaceAll(RegExp(r'_+'), '_');
+    s = s.replaceAll(RegExp(r'^_|_$'), '');
+    if (s.isEmpty) s = 'otro';
+    if (s.length > 40) s = s.substring(0, 40);
+    return s;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final buscando = _searchCtrl.text.trim().isNotEmpty;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 4),
+              const Text(
+                '¿A qué te dedicás?',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Escribí y elegí de la lista.\nAsí te encuentran cuando busquen ese trabajo.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF64748B),
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _searchCtrl,
+                focusNode: _searchFocus,
+                enabled: !_saving,
+                textInputAction: TextInputAction.search,
+                onChanged: _onSearchChanged,
+                decoration: InputDecoration(
+                  hintText: 'Ej: plomería, cerámicos, mudanzas…',
+                  prefixIcon: const Icon(Icons.search_rounded, color: _teal),
+                  suffixIcon: _searchCtrl.text.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            _onSearchChanged('');
+                          },
+                        ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 14,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: _teal.withOpacity(0.35)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: _teal.withOpacity(0.3)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: _teal, width: 2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: buscando ? _buildSugerencias() : _buildAtajos(),
+              ),
+              if (_saving)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 6),
+                  child: Center(child: CircularProgressIndicator(color: _teal)),
+                ),
+              TextButton(
+                onPressed: _saving ? null : _abrirExcepcionLibre,
+                child: const Text(
+                  'No está en la lista',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF94A3B8),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: _saving ? null : _saltar,
+                child: const Text(
+                  'Seguir sin elegir',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFFCBD5E1),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSugerencias() {
+    if (_sugerencias.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.search_off_rounded,
+                  size: 40, color: Color(0xFF94A3B8)),
+              const SizedBox(height: 12),
+              const Text(
+                'No encontramos eso en el catálogo.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF475569),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Probá con otras palabras o tocá un atajo.\n'
+                'Si no aparece, usá “No está en la lista”.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 13, color: Color(0xFF94A3B8), height: 1.35),
+              ),
+              const SizedBox(height: 16),
+              TextButton(
+                onPressed: () {
+                  _searchCtrl.clear();
+                  _onSearchChanged('');
+                  _searchFocus.unfocus();
+                },
+                child: const Text(
+                  'Ver atajos',
+                  style: TextStyle(
+                    color: _teal,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      itemCount: _sugerencias.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, i) {
+        final esp = _sugerencias[i];
+        final selected = _seleccionado == esp.id;
+        final icon = CatalogoOficios.iconFor(esp.id);
+        return Material(
+          color: Colors.white,
+          elevation: selected ? 2 : 0.5,
+          borderRadius: BorderRadius.circular(14),
+          child: InkWell(
+            onTap: _saving ? null : () => _guardarYSeguir(esp.id),
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: selected ? _teal : const Color(0xFFE2E8F0),
+                  width: selected ? 2 : 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: _teal.withOpacity(0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, color: _teal, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          esp.label,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        if (esp.sinonimos.isNotEmpty)
+                          Text(
+                            esp.sinonimos.take(3).join(' · '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF94A3B8),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right_rounded,
+                      color: Color(0xFF94A3B8)),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAtajos() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Atajos frecuentes',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF64748B),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Expanded(
+          child: GridView.builder(
+            physics: const BouncingScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 0.95,
+            ),
+            itemCount: _atajos.length,
+            itemBuilder: (context, i) {
+              final o = _atajos[i];
+              final id = o['id'] as String;
+              final color = o['color'] as Color;
+              final selected = _seleccionado == id;
+              return Material(
+                color: Colors.white,
+                elevation: selected ? 3 : 1,
+                shadowColor: color.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(16),
+                child: InkWell(
+                  onTap: _saving ? null : () => _guardarYSeguir(id),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: selected ? color : color.withOpacity(0.22),
+                        width: selected ? 2 : 1,
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: color.withOpacity(0.14),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            o['icon'] as IconData,
+                            size: 22,
+                            color: color,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Text(
+                            o['label'] as String,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: color,
+                              height: 1.15,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
