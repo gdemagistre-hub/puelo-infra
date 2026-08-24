@@ -27,12 +27,22 @@ final ProxRouteObserver proxRouteObserver = ProxRouteObserver();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Web: HTTP-referrer restricted key.
-  // Android: separate key restricted to package + SHA-1 (GCP Credentials).
+  // Keys inyectadas en compile-time. Nunca en el repo.
+  // Local:  --dart-define=FIREBASE_API_KEY_WEB=... --dart-define=FIREBASE_API_KEY_ANDROID=...
+  // CI:     secrets FIREBASE_API_KEY_WEB / FIREBASE_API_KEY_ANDROID
+  const webKey = String.fromEnvironment('FIREBASE_API_KEY_WEB');
+  const androidKey = String.fromEnvironment('FIREBASE_API_KEY_ANDROID');
+
   if (kIsWeb) {
+    if (webKey.isEmpty) {
+      debugPrint(
+        'Falta FIREBASE_API_KEY_WEB. Correr con '
+        '--dart-define=FIREBASE_API_KEY_WEB=...',
+      );
+    }
     await Firebase.initializeApp(
       options: const FirebaseOptions(
-        apiKey: 'AIzaSyAr6iPh8NaDBD4qwo3LvfpE4j9k7RfKTwQ',
+        apiKey: webKey,
         authDomain: 'lifewalletpuelo.web.app',
         projectId: 'lifewalletpuelo',
         storageBucket: 'lifewalletpuelo.firebasestorage.app',
@@ -41,9 +51,15 @@ void main() async {
       ),
     );
   } else {
+    if (androidKey.isEmpty) {
+      debugPrint(
+        'Falta FIREBASE_API_KEY_ANDROID. Correr con '
+        '--dart-define=FIREBASE_API_KEY_ANDROID=...',
+      );
+    }
     await Firebase.initializeApp(
       options: const FirebaseOptions(
-        apiKey: 'AIzaSyDKc6kq20nYMFg0gUscUI-n4uIDpr__94Q',
+        apiKey: androidKey,
         appId: '1:74624927314:android:8e3376cf776fd40285818b',
         messagingSenderId: '74624927314',
         projectId: 'lifewalletpuelo',

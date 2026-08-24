@@ -24,10 +24,31 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Check Firebase API key secrets
+        env:
+          WEB_KEY: ${{ secrets.FIREBASE_API_KEY_WEB }}
+          ANDROID_KEY: ${{ secrets.FIREBASE_API_KEY_ANDROID }}
+        run: |
+          if [ -z "$WEB_KEY" ]; then
+            echo "Falta secret FIREBASE_API_KEY_WEB"
+            exit 1
+          fi
+          if [ -z "$ANDROID_KEY" ]; then
+            echo "Falta secret FIREBASE_API_KEY_ANDROID"
+            exit 1
+          fi
+          echo "Secrets de API key presentes (no se imprimen)"
+
       - name: Build Web App
+        env:
+          FIREBASE_API_KEY_WEB: ${{ secrets.FIREBASE_API_KEY_WEB }}
+          FIREBASE_API_KEY_ANDROID: ${{ secrets.FIREBASE_API_KEY_ANDROID }}
         run: |
           flutter pub get
-          flutter build web --release --dart-define=PUELLO_ENV=prod
+          flutter build web --release \
+            --dart-define=PUELLO_ENV=prod \
+            --dart-define=FIREBASE_API_KEY_WEB="$FIREBASE_API_KEY_WEB" \
+            --dart-define=FIREBASE_API_KEY_ANDROID="$FIREBASE_API_KEY_ANDROID"
 
       # Copia content/academia (MP3 + lo que haya) desde el propio repo.
       # Self-contained: no depende de puelo-finanzas ni de curl externo.
