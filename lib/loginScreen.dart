@@ -26,6 +26,9 @@ class LoginScreenWidget extends StatefulWidget {
   static const String _mintDevUrl =
       'https://us-east1-lifewalletpuelo.cloudfunctions.net/mintDevSession';
 
+  /// Facebook Login oculto en beta (Meta OAuth inestable).
+  static const bool showFacebookLogin = false;
+
   @override
   State<LoginScreenWidget> createState() => _LoginScreenWidgetState();
 }
@@ -734,27 +737,29 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                       backgroundColor: Colors.black,
                       textColor: Colors.white,
                     ),
-                    const SizedBox(height: 14),
-                    _buildLoginButton(
-                      onPressed: busy ? null : _entrarConFacebook,
-                      icon: _buildIconCircle(
-                        backgroundColor: Colors.white.withOpacity(0.2),
-                        child: const Text(
-                          'f',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
+                    if (LoginScreenWidget.showFacebookLogin) ...[
+                      const SizedBox(height: 14),
+                      _buildLoginButton(
+                        onPressed: busy ? null : _entrarConFacebook,
+                        icon: _buildIconCircle(
+                          backgroundColor: Colors.white.withOpacity(0.2),
+                          child: const Text(
+                            'f',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
                           ),
                         ),
+                        label: _loadingFacebook
+                            ? 'Conectando con Facebook…'
+                            : 'Continuar con Facebook',
+                        backgroundColor: const Color(0xFF1877F2),
+                        textColor: Colors.white,
+                        loading: _loadingFacebook,
                       ),
-                      label: _loadingFacebook
-                          ? 'Conectando con Facebook…'
-                          : 'Continuar con Facebook',
-                      backgroundColor: const Color(0xFF1877F2),
-                      textColor: Colors.white,
-                      loading: _loadingFacebook,
-                    ),
+                    ],
                     const SizedBox(height: 32),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
