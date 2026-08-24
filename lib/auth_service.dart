@@ -7,12 +7,6 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'user_session.dart';
 
 /// Auth real (Google + Facebook web + email/password; Apple placeholder).
-///
-/// Flujo email:
-/// 1) registerWithEmail → crea user + mail vía CF (no-reply@puelo.app / IONOS SMTP)
-/// 2) Usuario valida el link del mail
-/// 3) signInWithEmail exige emailVerified → ensureUserProfile + UserSession
-/// Fallback: si falla CF, Firebase Auth envía el mail default.
 class AuthService {
   AuthService._();
   static final AuthService instance = AuthService._();
@@ -22,7 +16,6 @@ class AuthService {
 
   static const String _fnRegion = 'us-east1';
 
-  /// CF sendAuthEmail (SMTP IONOS / no-reply@puelo.app). Fallback = Firebase default.
   Future<bool> _sendAuthEmailCf({
     required String type,
     String? email,
@@ -101,8 +94,8 @@ class AuthService {
     );
   }
 
-  /// Facebook Login vía Firebase Auth (web popup).
-  /// El App Secret vive solo en Firebase Console — nunca en el cliente.
+  /// Facebook en web: redirect (popup falla mucho en móvil).
+  /// Al volver, Splash + UserSession.restaurarSesion / getRedirectResult cierran el flujo.
   Future<void> signInWithFacebook() async {
     if (!kIsWeb) {
       throw AuthValidationException(
@@ -110,33 +103,10 @@ class AuthService {
       );
     }
 
-    try {
-      final provider = FacebookAuthProvider();
-      provider.addScope('email');
-      provider.addScope('public_profile');
-      provider.setCustomParameters({'display': 'popup'});
-      final cred = await _auth.signInWithPopup(provider);
-      final user = cred.user;
-      if (user == null) {
-        throw StateError('Facebook sign-in sin user');
-      }
-
-      final data = await ensureUserProfile(user, providerId: 'facebook');
-      UserSession().iniciarSesion(
-        user.uid,
-        data,
-        authProvider: 'facebook',
-        isDevImpersonation: false,
-      );
-    } on AuthCancelledException {
-      rethrow;
-    } on FirebaseAuthException catch (e) {
-      if (e.code == 'popup-closed-by-user' ||
-          e.code == 'cancelled-popup-request') {
-        throw AuthCancelledException();
-      }
-      throw AuthValidationException(humanizeAuthError(e));
-    }
+    final provider = FacebookAuthProvider();
+    provider.addScope('email');
+    provider.addScope('public_profile');
+    await _auth.signInWithRedirect(provider);
   }
 
   Future<void> signInWithApple() async {
@@ -452,7 +422,7 @@ class AuthService {
       patch['url_foto_perfil'] = photo;
       patch['foto_perfil_origen'] = fotoOrigen;
     } else if (esSelfiePropia) {
-      // Conservar selfie; no tocar url_foto_perfil.
+      // Conservar selfie.
     }
 
     final estado = (existing['estado'] ?? '').toString();
