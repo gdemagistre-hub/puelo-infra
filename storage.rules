@@ -1,7 +1,7 @@
 rules_version = '2';
 // Sprint 0: writes requieren Auth y path bajo usuarios/{uid}/.
 // Lectura pública de imágenes de perfil/portfolio (URLs en tarjeta pública).
-// Nota: impersonación sin Auth no puede subir archivos (usar Google o mintDevSession).
+// 2026-08-24: tokens con claim dev_impersonation no pueden escribir.
 service firebase.storage {
   match /b/{bucket}/o {
     function isImage() {
@@ -10,8 +10,13 @@ service firebase.storage {
     function underLimit() {
       return request.resource.size < 5 * 1024 * 1024;
     }
+    function isDevImpersonation() {
+      return request.auth != null && request.auth.token.dev_impersonation == true;
+    }
     function isOwnerPath(userId) {
-      return request.auth != null && request.auth.uid == userId;
+      return request.auth != null
+        && !isDevImpersonation()
+        && request.auth.uid == userId;
     }
 
     match /usuarios/{userId}/{allPaths=**} {

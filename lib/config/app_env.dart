@@ -5,10 +5,9 @@ import 'package:flutter/foundation.dart';
 /// Uso:
 /// - `AppEnv.isProd` → ocultar tools sensibles en builds de release público
 /// - `AppEnv.showDevTools` → dropdown "Modo prueba" (oculto TEMP 2026-08-22)
-/// - `AppEnv.devLoginSecret` → mintDevSession (solo builds de equipo)
 ///
 /// Staging web:
-///   flutter build web --dart-define=PUELLO_ENV=staging --dart-define=DEV_LOGIN_SECRET=...
+///   flutter build web --dart-define=PUELLO_ENV=staging
 enum PueloEnvironment { debug, staging, prod }
 
 class AppEnv {
@@ -19,11 +18,8 @@ class AppEnv {
     defaultValue: '',
   );
 
-  /// Secreto de equipo para mintDevSession. Vacío en builds públicos.
-  static const String devLoginSecret = String.fromEnvironment(
-    'DEV_LOGIN_SECRET',
-    defaultValue: '',
-  );
+  /// mintDevSession ya no existe. El getter queda en false para no romper calls.
+  static const String devLoginSecret = '';
 
   static PueloEnvironment get current {
     switch (_envFromDefine.toLowerCase()) {
@@ -45,7 +41,7 @@ class AppEnv {
   static bool get isStaging => current == PueloEnvironment.staging;
   static bool get isDebug => current == PueloEnvironment.debug;
 
-  /// Menú "Modo prueba (equipo)" — dropdown de usuarios sin clave.
+  /// Menú "Modo prueba (equipo)" — dropdown de usuarios sin Auth.
   ///
   /// TEMP 2026-08-22: oculto por decisión del owner (smoke test con Auth real).
   /// Para reactivar en un build local/staging:
@@ -56,7 +52,7 @@ class AppEnv {
     return false;
   }
 
-  static bool get hasDevLoginSecret => devLoginSecret.isNotEmpty;
+  static bool get hasDevLoginSecret => false;
 
   /// Logs verbosos en consola
   static bool get verboseLogging => isDebug || isStaging;
