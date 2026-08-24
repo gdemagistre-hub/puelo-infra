@@ -34,6 +34,7 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
   String? _selectedUserId;
   Map<String, dynamic>? _selectedUserData;
   bool _loadingGoogle = false;
+  bool _loadingFacebook = false;
   bool _loadingDev = false;
   bool _loadingEmail = false;
   bool _showEmailForm = false;
@@ -157,6 +158,41 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
       await _navegarPostLogin();
     } finally {
       if (mounted) setState(() => _loadingDev = false);
+    }
+  }
+
+  Future<void> _entrarConFacebook() async {
+    ProxSounds.playOpenOnce();
+    setState(() => _loadingFacebook = true);
+    try {
+      await AuthService.instance.signInWithFacebook();
+      if (!mounted) return;
+      ProxAnalytics.instance.action('login_facebook', screen: '/login');
+      await _navegarPostLogin();
+    } on AuthCancelledException {
+    } on AuthValidationException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 6),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'No se pudo iniciar con Facebook. '
+            '${AuthService.humanizeAuthError(e)}',
+          ),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 6),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _loadingFacebook = false);
     }
   }
 
@@ -561,7 +597,7 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final busy = _loadingGoogle || _loadingDev || _loadingEmail;
+    final busy = _loadingGoogle || _loadingFacebook || _loadingDev || _loadingEmail;
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -700,7 +736,7 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                     ),
                     const SizedBox(height: 14),
                     _buildLoginButton(
-                      onPressed: busy ? null : () => _proximamente('Facebook'),
+                      onPressed: busy ? null : _entrarConFacebook,
                       icon: _buildIconCircle(
                         backgroundColor: Colors.white.withOpacity(0.2),
                         child: const Text(
@@ -712,9 +748,12 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                           ),
                         ),
                       ),
-                      label: 'Continuar con Facebook',
+                      label: _loadingFacebook
+                          ? 'Conectando con Facebook…'
+                          : 'Continuar con Facebook',
                       backgroundColor: const Color(0xFF1877F2),
                       textColor: Colors.white,
+                      loading: _loadingFacebook,
                     ),
                     const SizedBox(height: 32),
                     Row(
