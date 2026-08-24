@@ -9,7 +9,7 @@ import 'analytics/prox_analytics.dart';
 /// Sesión en memoria + persistencia.
 ///
 /// Prioridad al restaurar:
-/// 1) Firebase Auth (Google / futuros providers)
+/// 1) Firebase Auth (Google / Facebook / email)
 /// 2) SharedPreferences uid del dropdown de prueba (impersonación)
 class UserSession {
   static final UserSession _instance = UserSession._internal();
@@ -34,17 +34,14 @@ class UserSession {
   /// Token de una validación de domicilio pendiente
   String? pendingValidacionToken;
 
-  /// Cache liviano Home prestador (evita re-fetch al volver a la pestaña).
   DateTime? _homeCacheAt;
   Map<String, dynamic>? _homeCacheData;
   static const Duration homeCacheTtl = Duration(seconds: 45);
 
-  /// Incrementa cuando cambian estrellas/badge/score en sesión (Home escucha).
   final ValueNotifier<int> profileRevision = ValueNotifier<int>(0);
 
   bool get isLoggedIn => uid != null && uid!.isNotEmpty;
 
-  /// Último modo Home elegido en este dispositivo (null = nunca guardado).
   bool? _homeModoPrestadorPref;
 
   String _homeModoKeyFor(String? id) {
@@ -52,7 +49,6 @@ class UserSession {
     return '${_prefsHomeModoKey}_$id';
   }
 
-  /// Prestador si hay señal en el doc (flag, rol, camino u oficios).
   bool get esPrestador {
     final d = datosCompletos;
     if (d == null) return false;
@@ -66,9 +62,6 @@ class UserSession {
     return false;
   }
 
-  /// Modo Home al entrar.
-  /// Cliente-only → siempre Busco.
-  /// Prestador / dual → último toggle; si nunca eligió, Ofrezco.
   bool get preferredHomeModoPrestador {
     if (!esPrestador) return false;
     return _homeModoPrestadorPref ?? true;
@@ -85,7 +78,6 @@ class UserSession {
     }
   }
 
-  /// Login / splash deben await esto antes de abrir Home.
   Future<void> ensureHomeModoPrefLoaded() => _loadHomeModoPref();
 
   Future<void> _loadHomeModoPref() async {
@@ -109,11 +101,8 @@ class UserSession {
     }
   }
 
-  /// Token Firebase Auth real (Google, email o mintDevSession).
   bool get hasRealAuth => FirebaseAuth.instance.currentUser != null;
 
-  /// Sesión sin token Firebase (ex-dropdown, prefs viejas, etc.): Storage/CF/rules fallan.
-  /// TEMP: con dropdown oculto sigue sirviendo para sesiones residuales de prueba.
   bool get needsRealAuth => isLoggedIn && !hasRealAuth;
 
   Map<String, dynamic>? get homeCacheIfFresh {
@@ -134,7 +123,6 @@ class UserSession {
     _homeCacheAt = null;
   }
 
-  /// Avisa a Home (y quien escuche) que datosCompletos cambió de forma relevante.
   void notifyProfileChanged() {
     invalidateHomeCache();
     profileRevision.value = profileRevision.value + 1;
@@ -158,9 +146,6 @@ class UserSession {
     _loadHomeModoPref();
   }
 
-  /// Admin de consola Prox.
-  /// Preferir custom claim `admin` (Auth). Fallback a campo Firestore
-  /// (solo confiable si rules bloquean write de es_admin — Sprint 0).
   bool get isAdmin {
     final d = datosCompletos;
     if (d == null) return false;
@@ -168,7 +153,6 @@ class UserSession {
     return false;
   }
 
-  /// Refresca claim admin desde Firebase Auth (si hay sesión real).
   Future<bool> refreshAdminFromClaims() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -185,11 +169,21 @@ class UserSession {
     }
   }
 
-  /// Restaura: Auth real primero, luego prefs del dropdown.
   Future<bool> restaurarSesion() async {
     try {
-      // 1) Firebase Auth
-      final user = FirebaseAuth.instance.currentUser;
+      User? user = FirebaseAuth.instance.currentUser;
+      if (user == null && kIsWeb) {
+        try {
+          final cred = await FirebaseAuth.instance.getRedirectResult();
+          user = cred.user;
+        } catch (e) {
+          debugPrint('UserSession.getRedirectResult: $e');
+        }
+      }
+      if (user == null) {
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+        user = FirebaseAuth.instance.currentUser;
+      }
       if (user != null) {
         final doc = await FirebaseFirestore.instance
             .collection('usuarios')
@@ -199,26 +193,25 @@ class UserSession {
         Map<String, dynamic> data;
         if (doc.exists && doc.data() != null) {
           data = Map<String, dynamic>.from(doc.data()!);
-          // Si el doc no tiene foto, usar la de Google Auth (no pisar selfie).
           final fp = (data['url_foto_perfil'] ?? data['foto_perfil'] ?? '')
               .toString()
               .trim();
           if (fp.isEmpty && (user.photoURL ?? '').trim().isNotEmpty) {
             data['url_foto_perfil'] = user.photoURL!.trim();
-            data['foto_perfil_origen'] = data['foto_perfil_origen'] ?? 'google';
+            data['foto_perfil_origen'] =
+                data['foto_perfil_origen'] ?? 'facebook';
             try {
               await FirebaseFirestore.instance
                   .collection('usuarios')
                   .doc(user.uid)
                   .set({
                 'url_foto_perfil': user.photoURL!.trim(),
-                'foto_perfil_origen': 'google',
+                'foto_perfil_origen': data['foto_perfil_origen'],
                 'updated_at': FieldValue.serverTimestamp(),
               }, SetOptions(merge: true));
             } catch (_) {}
           }
         } else {
-          // Perfil mínimo si Auth existe pero falta el doc (race / borrado).
           final display = (user.displayName ?? '').trim();
           String nombre = '';
           String apellido = '';
@@ -227,20 +220,24 @@ class UserSession {
             nombre = parts.first;
             if (parts.length > 1) apellido = parts.sublist(1).join(' ');
           }
+          final provider = user.providerData.any((p) => p.providerId == 'facebook.com')
+              ? 'facebook'
+              : (user.providerData.any((p) => p.providerId == 'google.com')
+                  ? 'google'
+                  : (user.providerData.any((p) => p.providerId == 'password')
+                      ? 'password'
+                      : 'auth'));
           data = {
             'nombre': nombre,
             'apellido': apellido,
             'email': user.email ?? '',
             if (user.photoURL != null) 'url_foto_perfil': user.photoURL,
-            'auth_provider': 'google',
+            'auth_provider': provider,
             'auth_uid': user.uid,
             'es_trabajador': false,
             'estado': 'activo',
           };
-          await FirebaseFirestore.instance
-              .collection('usuarios')
-              .doc(user.uid)
-              .set({
+          await FirebaseFirestore.instance.collection('usuarios').doc(user.uid).set({
             ...data,
             'creado_en': FieldValue.serverTimestamp(),
             'updated_at': FieldValue.serverTimestamp(),
@@ -264,13 +261,11 @@ class UserSession {
         return true;
       }
 
-      // 2) Impersonación dev (dropdown)
       final prefs = await SharedPreferences.getInstance();
       final savedUid = prefs.getString(_prefsUidKey);
       final wasDev = prefs.getBool(_prefsDevKey) ?? true;
       if (savedUid == null || savedUid.isEmpty) return false;
 
-      // Si no era dev y no hay Auth, limpiar (sesión inconsistente).
       if (!wasDev) {
         await prefs.remove(_prefsUidKey);
         await prefs.remove(_prefsDevKey);
@@ -302,7 +297,6 @@ class UserSession {
         );
       } catch (_) {}
       await _loadHomeModoPref();
-
       return true;
     } catch (e) {
       debugPrint('UserSession.restaurarSesion error: $e');
@@ -320,8 +314,6 @@ class UserSession {
     }
   }
 
-  /// Solo limpia memoria + prefs de sesión. El último Busco/Ofrezco
-  /// queda guardado por uid para el próximo login de esa cuenta.
   Future<void> cerrarSesion() async {
     try {
       ProxAnalytics.instance.endSession(reason: 'logout');
