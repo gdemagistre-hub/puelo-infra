@@ -1,8 +1,6 @@
 /**
  * Cloud Functions — Puelo (lifewalletpuelo)
- * Scoring, validación domicilio, vault recovery (Mis números), mensajes recibos.
- * 2026-08-20: aviso calificación prestador (push + inbox).
- * 2026-08-24: mintDevSession eliminado (impersonación).
+ * 2026-08-24: mintDevSession eliminado; validación exige Auth real.
  */
 const { onRequest, onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
@@ -59,12 +57,6 @@ async function verifyBearer(req) {
   const m = h.match(/^Bearer\s+(.+)$/i);
   if (!m) return null;
   return admin.auth().verifyIdToken(m[1]);
-}
-
-function envFlag(name, defaultValue = "0") {
-  const v = process.env[name];
-  if (v === undefined || v === null || v === "") return defaultValue;
-  return String(v);
 }
 
 exports.scoringBatchHttp = onRequest(
@@ -209,16 +201,8 @@ exports.aplicarValidacionPendiente = onRequest(
         console.warn("aplicarValidacion token invalid", authErr.message || authErr);
       }
       if (!validadorId) {
-        const allowDev = envFlag("ALLOW_DEV_VALIDACION", "1") === "1";
-        const bodyId = String(b.validadorId || "").trim();
-        if (allowDev && bodyId) {
-          validadorId = bodyId;
-          via = "dev_impersonation";
-          console.warn("aplicarValidacionPendiente via dev_impersonation", bodyId);
-        } else {
-          res.status(401).json({ error: "unauthenticated" });
-          return;
-        }
+        res.status(401).json({ error: "unauthenticated" });
+        return;
       }
       let pendRef = db.collection("validaciones").doc(token);
       let pendSnap = await pendRef.get();
