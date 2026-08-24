@@ -1,9 +1,5 @@
-import 'dart:convert';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 
 import 'Homepage.dart';
 import 'elige_camino.dart';
@@ -22,9 +18,6 @@ class LoginScreenWidget extends StatefulWidget {
 
   static const String routeName = 'LoginScreen';
   static const String routePath = '/login';
-
-  static const String _mintDevUrl =
-      'https://us-east1-lifewalletpuelo.cloudfunctions.net/mintDevSession';
 
   /// Facebook Login oculto en beta (Meta OAuth inestable).
   static const bool showFacebookLogin = false;
@@ -102,39 +95,10 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
 
     setState(() => _loadingDev = true);
     try {
-      var usedCustomToken = false;
-
-      if (AppEnv.hasDevLoginSecret) {
-        try {
-          final resp = await http
-              .post(
-                Uri.parse(LoginScreenWidget._mintDevUrl),
-                headers: {
-                  'Content-Type': 'application/json',
-                  'X-Dev-Login-Secret': AppEnv.devLoginSecret,
-                },
-                body: jsonEncode({'uid': _selectedUserId}),
-              )
-              .timeout(const Duration(seconds: 15));
-          if (resp.statusCode >= 200 && resp.statusCode < 300) {
-            final body = jsonDecode(resp.body) as Map<String, dynamic>;
-            final custom = body['token'] as String?;
-            if (custom != null && custom.isNotEmpty) {
-              await FirebaseAuth.instance.signInWithCustomToken(custom);
-              usedCustomToken = true;
-            }
-          } else {
-            debugPrint('mintDevSession HTTP ${resp.statusCode}: ${resp.body}');
-          }
-        } catch (e) {
-          debugPrint('mintDevSession error: $e');
-        }
-      }
-
       UserSession().iniciarSesion(
         _selectedUserId!,
         _selectedUserData!,
-        authProvider: usedCustomToken ? 'dev_token' : 'dev',
+        authProvider: 'dev',
         isDevImpersonation: true,
       );
 
@@ -142,22 +106,19 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
         role: UserSession().esPrestador ? 'prestador' : 'cliente',
       );
       ProxAnalytics.instance.action(
-        usedCustomToken ? 'login_dev_token' : 'login_dev_dropdown',
+        'login_dev_dropdown',
         screen: '/login',
       );
 
       if (!mounted) return;
-      if (!usedCustomToken) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Modo prueba sin Auth. Fotos, mensajes y Mis números requieren Google o Email. '
-              'Configurá DEV_LOGIN_SECRET para impersonar con token real.',
-            ),
-            duration: Duration(seconds: 6),
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Modo prueba sin Auth. Fotos, mensajes y Mis números requieren Google o Email.',
           ),
-        );
-      }
+          duration: Duration(seconds: 6),
+        ),
+      );
       await _navegarPostLogin();
     } finally {
       if (mounted) setState(() => _loadingDev = false);
@@ -419,9 +380,7 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
           ),
           const SizedBox(height: 4),
           Text(
-            AppEnv.hasDevLoginSecret
-                ? 'Impersoná un usuario con Auth real (custom token).'
-                : 'Impersoná un usuario de Firestore. Sin DEV_LOGIN_SECRET la sesión es local.',
+            'Sesión local sin Firebase Auth. Para fotos, mensajes y Mis números usá Google o Email.',
             style: TextStyle(
               color: Colors.grey.shade600,
               fontSize: 11,
