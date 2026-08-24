@@ -10,7 +10,7 @@ import 'analytics/prox_analytics.dart';
 ///
 /// Prioridad al restaurar:
 /// 1) Firebase Auth (Google / Facebook / email)
-/// 2) SharedPreferences uid del dropdown de prueba (impersonación)
+/// 2) SharedPreferences uid legado (ya no hay dropdown)
 class UserSession {
   static final UserSession _instance = UserSession._internal();
   factory UserSession() => _instance;
@@ -25,13 +25,10 @@ class UserSession {
   String? apellido;
   Map<String, dynamic>? datosCompletos;
 
-  /// google | facebook | apple | email | dev | null
   String? authProvider;
 
-  /// true = entró por pulldown (sin Firebase Auth)
   bool isDevImpersonation = false;
 
-  /// Token de una validación de domicilio pendiente
   String? pendingValidacionToken;
 
   DateTime? _homeCacheAt;
@@ -47,6 +44,16 @@ class UserSession {
   String _homeModoKeyFor(String? id) {
     if (id == null || id.isEmpty) return _prefsHomeModoKey;
     return '${_prefsHomeModoKey}_$id';
+  }
+
+  bool? _boolFrom(dynamic v) {
+    if (v is bool) return v;
+    if (v is String) {
+      final s = v.trim().toLowerCase();
+      if (s == 'true' || s == '1') return true;
+      if (s == 'false' || s == '0') return false;
+    }
+    return null;
   }
 
   bool get esPrestador {
@@ -74,11 +81,34 @@ class UserSession {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_homeModoKeyFor(uid), modoPrestador);
     } catch (e) {
-      debugPrint('UserSession.persistHomeModoPrestador: $e');
+      debugPrint('UserSession.persistHomeModoPrestador prefs: $e');
+    }
+    final id = uid;
+    if (id == null || id.isEmpty) return;
+    try {
+      await FirebaseFirestore.instance.collection('usuarios').doc(id).set({
+        'home_modo_prestador': modoPrestador,
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      if (datosCompletos != null) {
+        datosCompletos = {
+          ...datosCompletos!,
+          'home_modo_prestador': modoPrestador,
+        };
+      }
+    } catch (e) {
+      debugPrint('UserSession.persistHomeModoPrestador firestore: $e');
     }
   }
 
   Future<void> ensureHomeModoPrefLoaded() => _loadHomeModoPref();
+
+  void _applyHomeModoFromProfile() {
+    final fromDoc = _boolFrom(datosCompletos?['home_modo_prestador']);
+    if (fromDoc != null) {
+      _homeModoPrestadorPref ??= fromDoc;
+    }
+  }
 
   Future<void> _loadHomeModoPref() async {
     try {
@@ -95,9 +125,12 @@ class UserSession {
             _homeModoPrestadorPref != null) {
           await prefs.setBool(uidKey, _homeModoPrestadorPref!);
         }
+        return;
       }
+      _applyHomeModoFromProfile();
     } catch (e) {
       debugPrint('UserSession._loadHomeModoPref: $e');
+      _applyHomeModoFromProfile();
     }
   }
 
@@ -142,6 +175,7 @@ class UserSession {
         (data['auth_provider'] as String?) ??
         (isDevImpersonation ? 'dev' : null);
     this.isDevImpersonation = isDevImpersonation;
+    _applyHomeModoFromProfile();
     _persistUid(id, isDev: isDevImpersonation);
     _loadHomeModoPref();
   }
@@ -272,32 +306,10 @@ class UserSession {
         return false;
       }
 
-      final doc = await FirebaseFirestore.instance
-          .collection('usuarios')
-          .doc(savedUid)
-          .get();
-
-      if (!doc.exists || doc.data() == null) {
-        await prefs.remove(_prefsUidKey);
-        await prefs.remove(_prefsDevKey);
-        return false;
-      }
-
-      uid = savedUid;
-      final data = doc.data()!;
-      nombre = data['nombre'] ?? '';
-      apellido = data['apellido'] ?? '';
-      datosCompletos = data;
-      authProvider = 'dev';
-      isDevImpersonation = true;
-
-      try {
-        ProxAnalytics.instance.startSession(
-          role: esPrestador ? 'prestador' : 'cliente',
-        );
-      } catch (_) {}
-      await _loadHomeModoPref();
-      return true;
+      // Dropdown de prueba retirado: no restaurar sesión local sin Auth.
+      await prefs.remove(_prefsUidKey);
+      await prefs.remove(_prefsDevKey);
+      return false;
     } catch (e) {
       debugPrint('UserSession.restaurarSesion error: $e');
       return false;
