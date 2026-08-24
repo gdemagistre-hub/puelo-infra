@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 ///
 /// Uso:
 /// - `AppEnv.isProd` → ocultar tools sensibles en builds de release público
-/// - `AppEnv.showDevTools` → dropdown "Modo prueba" (oculto TEMP 2026-08-22)
+/// - `AppEnv.showDevTools` → siempre false (dropdown Modo prueba retirado 2026-08-24)
 ///
 /// Staging web:
 ///   flutter build web --dart-define=PUELLO_ENV=staging
@@ -18,7 +18,6 @@ class AppEnv {
     defaultValue: '',
   );
 
-  /// mintDevSession ya no existe. El getter queda en false para no romper calls.
   static const String devLoginSecret = '';
 
   static PueloEnvironment get current {
@@ -32,7 +31,6 @@ class AppEnv {
       case 'debug':
         return PueloEnvironment.debug;
       default:
-        // Sin dart-define: debug en desarrollo, prod en release.
         return kReleaseMode ? PueloEnvironment.prod : PueloEnvironment.debug;
     }
   }
@@ -41,20 +39,11 @@ class AppEnv {
   static bool get isStaging => current == PueloEnvironment.staging;
   static bool get isDebug => current == PueloEnvironment.debug;
 
-  /// Menú "Modo prueba (equipo)" — dropdown de usuarios sin Auth.
-  ///
-  /// TEMP 2026-08-22: oculto por decisión del owner (smoke test con Auth real).
-  /// Para reactivar en un build local/staging:
-  ///   --dart-define=SHOW_DEV_LOGIN=1
-  static bool get showDevTools {
-    const show = String.fromEnvironment('SHOW_DEV_LOGIN', defaultValue: '');
-    if (show == '1' || show.toLowerCase() == 'true') return true;
-    return false;
-  }
+  /// Dropdown "Modo prueba" retirado. El flag SHOW_DEV_LOGIN ya no hace nada.
+  static bool get showDevTools => false;
 
   static bool get hasDevLoginSecret => false;
 
-  /// Logs verbosos en consola
   static bool get verboseLogging => isDebug || isStaging;
 
   static String get label {
