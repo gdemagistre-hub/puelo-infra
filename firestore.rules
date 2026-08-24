@@ -7,6 +7,7 @@ rules_version = '2';
 // 2026-08-18: stats write admin (batch lock scoring_job + runs).
 // 2026-08-22: Etapa 0 — contactos/trabajos/calificaciones ya no son create:true.
 // 2026-08-22: contactos read propio (prestador/cliente) para typeahead recibo.
+// 2026-08-24: tokens con claim dev_impersonation no son owner ni admin.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -14,15 +15,19 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isDevImpersonation() {
+      return request.auth != null && request.auth.token.dev_impersonation == true;
+    }
+
     function isAdmin() {
-      return isSignedIn() && (
+      return isSignedIn() && !isDevImpersonation() && (
         request.auth.token.admin == true ||
         get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.es_admin == true
       );
     }
 
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return isSignedIn() && !isDevImpersonation() && request.auth.uid == userId;
     }
 
     function isFlutterFlow() {
@@ -76,7 +81,6 @@ service cloud.firestore {
     }
 
     match /contactos/{id} {
-      // Create: cliente autenticado registra intento de contacto.
       allow create: if isSignedIn()
         && request.resource.data.cliente_uid == request.auth.uid
         && request.resource.data.prestador_uid is string
@@ -84,7 +88,6 @@ service cloud.firestore {
         && request.resource.data.cliente_uid != request.resource.data.prestador_uid
         && request.resource.data.tipo in ['whatsapp', 'llamada']
         && request.resource.data.origen in ['buscador', 'tarjeta'];
-      // Read: dueño del lado (prestador o cliente) o admin.
       allow read: if isAdmin()
         || (isSignedIn() && (
           resource.data.prestador_uid == request.auth.uid
@@ -93,7 +96,6 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    // stats: scoring_job admin; top_servicios lo lee el Home cliente
     match /stats/{doc} {
       allow read: if isAdmin() || doc == 'top_servicios';
       allow write: if isAdmin();
