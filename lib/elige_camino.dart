@@ -6,7 +6,6 @@ import 'elige_oficio.dart';
 import 'user_session.dart';
 
 /// Primera decisión post-login: ¿busca o ofrece servicios?
-/// Lenguaje simple (oficio/barrio), sin tono LinkedIn / "profesional".
 class EligeCaminoWidget extends StatefulWidget {
   static const String routeName = 'EligeCamino';
   static const String routePath = '/elige-camino';
@@ -71,6 +70,8 @@ class _EligeCaminoWidgetState extends State<EligeCaminoWidget> {
       if (quiereOfrecer) data['rol'] = 'trabajador';
       UserSession().datosCompletos = data;
     }
+
+    await UserSession().persistHomeModoPrestador(quiereOfrecer);
 
     if (!mounted) return;
 
