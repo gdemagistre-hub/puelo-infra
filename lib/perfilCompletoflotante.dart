@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'user_session.dart';
 import 'scoring_service.dart';
+import 'identidad_pii.dart';
 import 'theme/app_colors.dart';
 
 class PerfilCompletoFlotanteWidget extends StatefulWidget {
@@ -39,7 +40,7 @@ class _PerfilCompletoFlotanteWidgetState
       final doc =
           await FirebaseFirestore.instance.collection('usuarios').doc(uid).get();
       if (doc.exists) {
-        _data = doc.data()!;
+        _data = await IdentidadPii.mezclar(uid, doc.data()!);
       }
     } catch (e) {
       debugPrint('Error cargando perfil completo: $e');

@@ -1,7 +1,8 @@
 rules_version = '2';
 // 2026-08-24: usuarios sin write anónimo.
-// 2026-08-24 etapa 5 Aikido: list de usuarios exige sesión (cierra enumeración masiva de PII).
-// get queda abierto para el enlace /validarDomicilio?id= (vecino sin cuenta).
+// 2026-08-24 etapa 5 Aikido: list de usuarios exige sesión (cierra enumeración masiva).
+// 2026-08-24 etapa 1 PII: DNI/email/calle en usuarios/{uid}/privado (dueño/admin).
+// get del padre queda abierto: proyección pública (nombre, badge, zona, foto, tel).
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -130,6 +131,7 @@ service cloud.firestore {
     }
 
     match /usuarios/{userId} {
+      // Proyección pública (nombre, badge, zona, foto, tel). PII en /privado.
       allow get: if true;
       allow list: if isSignedIn();
 
@@ -140,6 +142,10 @@ service cloud.firestore {
         || (isOwner(userId) && updateTouchesNoPrivileged());
 
       allow delete: if isAdmin();
+
+      match /privado/{docId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
 
       match /movimientos/{docId} {
         allow read, write: if isOwner(userId);

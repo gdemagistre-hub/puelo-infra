@@ -1,6 +1,7 @@
 /**
  * Cloud Functions — Puelo (lifewalletpuelo)
  * 2026-08-24: mintDevSession eliminado; submit+aplicar validación exigen Auth real.
+ * 2026-08-24 etapa 1 PII: previewValidacion + esCorrecto calculado en servidor.
  */
 const { onRequest, onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
@@ -8,6 +9,12 @@ const { setGlobalOptions } = require("firebase-functions/v2");
 const admin = require("firebase-admin");
 const crypto = require("crypto");
 const { runScoringBatch, runTopServiciosAyer } = require("./scoringCore");
+const {
+  loadMerged,
+  domicilioRealDe,
+  opcionesQuiz,
+  nombreDe,
+} = require("./pii");
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -119,6 +126,64 @@ exports.scoringBatchDaily = onSchedule(
   }
 );
 
+exports.previewValidacionPendiente = onRequest(
+  { invoker: "public", cors: ALLOWED_ORIGINS, memory: "256MiB", timeoutSeconds: 60 },
+  async (req, res) => {
+    applyCors(req, res);
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+    if (req.method !== "POST" && req.method !== "GET") {
+      res.status(405).json({ error: "method_not_allowed" });
+      return;
+    }
+    try {
+      let validadorId = "";
+      try {
+        const decoded = await verifyBearer(req);
+        if (decoded && decoded.uid) validadorId = decoded.uid;
+      } catch (authErr) {
+        console.warn("previewValidacion token invalid", authErr.message || authErr);
+      }
+      if (!validadorId) {
+        res.status(401).json({ error: "unauthenticated" });
+        return;
+      }
+      const b = req.body || {};
+      const targetUserId = String(
+        b.targetUserId || req.query.targetUserId || ""
+      ).trim();
+      if (!targetUserId) {
+        res.status(400).json({ error: "targetUserId_required" });
+        return;
+      }
+      if (targetUserId === validadorId) {
+        res.status(400).json({ error: "no_self_validate" });
+        return;
+      }
+      const loaded = await loadMerged(targetUserId);
+      if (!loaded.merged) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      const real = domicilioRealDe(loaded.merged);
+      if (!real) {
+        res.status(400).json({ error: "no_domicilio" });
+        return;
+      }
+      res.status(200).json({
+        ok: true,
+        nombre: nombreDe(loaded.merged),
+        opciones: opcionesQuiz(real),
+      });
+    } catch (e) {
+      console.error("previewValidacionPendiente", e);
+      res.status(500).json({ error: String(e.message || e) });
+    }
+  }
+);
+
 exports.submitValidacionPendiente = onRequest(
   { invoker: "public", cors: ALLOWED_ORIGINS, memory: "256MiB", timeoutSeconds: 60 },
   async (req, res) => {
@@ -153,16 +218,28 @@ exports.submitValidacionPendiente = onRequest(
         res.status(400).json({ error: "no_self_validate" });
         return;
       }
+      const loaded = await loadMerged(targetUserId);
+      if (!loaded.merged) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      const domicilioReal = domicilioRealDe(loaded.merged);
+      if (!domicilioReal) {
+        res.status(400).json({ error: "no_domicilio" });
+        return;
+      }
+      const domicilioSeleccionado = String(b.domicilioSeleccionado || "").slice(0, 300);
+      const esCorrecto = domicilioSeleccionado === domicilioReal;
       const token = String(b.token || "").trim() || db.collection("_").doc().id;
       const doc = {
         tipo: "validacion_pendiente",
         targetUserId,
         validadorId,
-        targetNombre: String(b.targetNombre || "").slice(0, 120),
+        targetNombre: nombreDe(loaded.merged).slice(0, 120),
         conoce: !!b.conoce,
-        domicilioSeleccionado: String(b.domicilioSeleccionado || "").slice(0, 300),
-        domicilioReal: String(b.domicilioReal || "").slice(0, 300),
-        esCorrecto: !!b.esCorrecto,
+        domicilioSeleccionado,
+        domicilioReal,
+        esCorrecto,
         tiempoViviendo: String(b.tiempoViviendo || "").slice(0, 80),
         estado: "pendiente",
         creado_en: admin.firestore.FieldValue.serverTimestamp(),

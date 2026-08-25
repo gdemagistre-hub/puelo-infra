@@ -5,6 +5,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'platform_capabilities.dart';
 import 'usuario_list_sync.dart';
+import 'identidad_pii.dart';
 import 'package:intl/intl.dart';
 import 'user_session.dart';
 import 'theme/app_colors.dart';
@@ -128,7 +129,7 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
     final doc = await db.collection('usuarios').doc(_selectedUsuarioId).get();
 
     if (doc.exists) {
-      final data = doc.data()!;
+      final data = await IdentidadPii.mezclar(_selectedUsuarioId!, doc.data()!);
       _calleController.text = data['calle'] ?? '';
       _numeroController.text = data['numero'] ?? '';
       _pisoDeptoController.text = data['piso_depto'] ?? '';

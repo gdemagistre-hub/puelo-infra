@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_session.dart';
 import 'usuario_list_sync.dart';
+import 'identidad_pii.dart';
 import 'widgets/searchable_picker.dart';
 import 'catalogo_geo_cache.dart';
 import 'theme/app_colors.dart';
@@ -100,7 +101,7 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
 
       final doc = await db.collection('usuarios').doc(uid).get();
       if (doc.exists) {
-        final data = doc.data()!;
+        final data = await IdentidadPii.mezclar(uid, doc.data()!);
         _calleController.text = (data['calle'] ?? '').toString();
         _numeroController.text = (data['numero'] ?? '').toString();
         _pisoController.text =

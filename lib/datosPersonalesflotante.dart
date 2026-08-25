@@ -12,6 +12,7 @@ import 'dni_ocr_scan.dart';
 import 'telefono_ar.dart';
 import 'user_session.dart';
 import 'usuario_list_sync.dart';
+import 'identidad_pii.dart';
 import 'theme/app_colors.dart';
 
 class DatosPersonalesFlotanteWidget extends StatefulWidget {
@@ -100,7 +101,7 @@ class _DatosPersonalesFlotanteWidgetState
       final doc =
           await FirebaseFirestore.instance.collection('usuarios').doc(uid).get();
       if (doc.exists) {
-        final data = doc.data()!;
+        final data = await IdentidadPii.mezclar(uid, doc.data()!);
         _nombreController.text = (data['nombre'] ?? '').toString();
         _apellidoController.text = (data['apellido'] ?? '').toString();
         _telefonoController.text = (data['telefono'] ?? '').toString();

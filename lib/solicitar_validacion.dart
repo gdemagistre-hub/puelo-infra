@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'user_session.dart';
 import 'Domicilioflotante.dart';
+import 'identidad_pii.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_copy.dart';
 
@@ -43,7 +44,7 @@ class _SolicitarValidacionWidgetState extends State<SolicitarValidacionWidget> {
       final doc =
           await FirebaseFirestore.instance.collection('usuarios').doc(uid).get();
       if (doc.exists) {
-        final data = doc.data()!;
+        final data = await IdentidadPii.mezclar(uid, doc.data()!);
         final calle = (data['calle'] ?? '').toString().trim();
         final numero = (data['numero'] ?? '').toString().trim();
         final geo = data['direccion_geo'] as Map<String, dynamic>?;

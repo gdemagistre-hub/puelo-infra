@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'identidad_pii.dart';
 import 'scoring_features.dart';
 import 'stats_negocio.dart';
 
@@ -87,7 +88,7 @@ class ScoringService {
       int enBatch = 0;
       final users = await _db.collection('usuarios').limit(pageSize * 5).get();
       for (final doc in users.docs) {
-        final d = doc.data();
+        final d = await IdentidadPii.mezclar(doc.id, doc.data());
         final id = calcularScoreIdentidad(d);
         final badge = calcularBadgePrestador(
           d,

@@ -80,37 +80,57 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
       return;
     }
 
+    final me = FirebaseAuth.instance.currentUser?.uid;
+    if (me != null && me == widget.usuarioId) {
+      setState(() {
+        _loading = false;
+        _error =
+            'No podés validarte a vos mismo. Pedile el enlace a alguien que te conozca.';
+      });
+      return;
+    }
+
+    if (me == null) {
+      setState(() {
+        _loading = false;
+        _nombreTarget = 'un vecino';
+      });
+      return;
+    }
+
     try {
-      final doc = await db.collection('usuarios').doc(widget.usuarioId).get();
-      if (!doc.exists) {
+      final user = FirebaseAuth.instance.currentUser;
+      final idToken = await user?.getIdToken();
+      if (idToken == null || idToken.isEmpty) {
         setState(() {
           _loading = false;
-          _error = 'La persona no existe o el enlace ya no es válido.';
+          _nombreTarget = 'un vecino';
         });
         return;
       }
 
-      final data = doc.data()!;
-      final calle = (data['calle'] ?? '').toString().trim();
-      final numero = (data['numero'] ?? '').toString().trim();
-      final geo = data['direccion_geo'] as Map<String, dynamic>?;
+      final uri = Uri.parse(
+        'https://us-east1-lifewalletpuelo.cloudfunctions.net/previewValidacionPendiente',
+      );
+      final resp = await http
+          .post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $idToken',
+            },
+            body: jsonEncode({'targetUserId': widget.usuarioId}),
+          )
+          .timeout(const Duration(seconds: 15));
 
-      if (calle.isEmpty || numero.isEmpty || geo == null || geo['localidad_id'] == null) {
+      if (resp.statusCode == 401) {
         setState(() {
           _loading = false;
-          _error = 'Esta persona todavía no tiene un domicilio completo cargado.';
+          _nombreTarget = 'un vecino';
         });
         return;
       }
-
-      final localidadNombre = await _resolverLocalidadNombre(geo['localidad_id']?.toString());
-      _domicilioReal = '$calle $numero, $localidadNombre';
-
-      _nombreTarget = '${data['nombre'] ?? ''} ${data['apellido'] ?? ''}'.trim();
-      if (_nombreTarget.isEmpty) _nombreTarget = 'esta persona';
-
-      final me = FirebaseAuth.instance.currentUser?.uid;
-      if (me != null && me == widget.usuarioId) {
+      if (resp.statusCode == 400 && resp.body.contains('no_self_validate')) {
         setState(() {
           _loading = false;
           _error =
@@ -118,11 +138,35 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
         });
         return;
       }
-
-      if (me != null) {
-        UserSession().clearPendingValidacionTarget();
+      if (resp.statusCode == 400 && resp.body.contains('no_domicilio')) {
+        setState(() {
+          _loading = false;
+          _error = 'Esta persona todavía no tiene un domicilio completo cargado.';
+        });
+        return;
+      }
+      if (resp.statusCode == 404) {
+        setState(() {
+          _loading = false;
+          _error = 'La persona no existe o el enlace ya no es válido.';
+        });
+        return;
+      }
+      if (resp.statusCode < 200 || resp.statusCode >= 300) {
+        throw StateError('CF ${resp.statusCode}');
       }
 
+      final body = jsonDecode(resp.body) as Map<String, dynamic>;
+      _nombreTarget = (body['nombre'] ?? '').toString().trim();
+      if (_nombreTarget.isEmpty) _nombreTarget = 'esta persona';
+      final rawOps = body['opciones'];
+      if (rawOps is List) {
+        _opcionesDomicilio = rawOps
+            .map((e) => e.toString())
+            .where((s) => s.trim().isNotEmpty)
+            .toList();
+      }
+      UserSession().clearPendingValidacionTarget();
       setState(() => _loading = false);
     } catch (e) {
       setState(() {
@@ -166,28 +210,13 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
   }
 
   Future<void> _cargarOpcionesDomicilio() async {
+    if (_opcionesDomicilio.length >= 3) return;
     setState(() => _loading = true);
     try {
-      final real = _domicilioReal!;
-      final opciones = <String>[real, ..._domiciliosSenuelo(real)];
-      var guard = 0;
-      while (opciones.length < 3 && guard < 8) {
-        for (final extra in _domiciliosSenuelo('$real-$guard')) {
-          if (!opciones.contains(extra)) opciones.add(extra);
-          if (opciones.length >= 3) break;
-        }
-        guard++;
+      if (_opcionesDomicilio.isEmpty) {
+        await _cargarTarget();
       }
-      opciones.shuffle();
-      _opcionesDomicilio = opciones.take(3).toList();
-    } catch (e) {
-      final real = _domicilioReal ?? '';
-      final fakes = real.isEmpty ? <String>[] : _domiciliosSenuelo(real);
-      _opcionesDomicilio = <String>[
-        if (real.isNotEmpty) real,
-        ...fakes,
-      ].take(3).toList();
-    }
+    } catch (_) {}
     setState(() => _loading = false);
   }
 
@@ -214,6 +243,16 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
         return;
       }
       await _cargarOpcionesDomicilio();
+      if (_opcionesDomicilio.length < 2) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No se pudieron cargar las opciones de domicilio. Probá de nuevo.'),
+            ),
+          );
+        }
+        return;
+      }
       setState(() => _paso = 1);
       return;
     }
@@ -256,7 +295,6 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
       }
 
       final token = uuid.v4();
-      final esCorrecto = _domicilioSeleccionado == _domicilioReal;
       final targetId = widget.usuarioId!;
 
       final payload = <String, dynamic>{
@@ -265,8 +303,6 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
         'targetNombre': _nombreTarget,
         'conoce': _conoce,
         'domicilioSeleccionado': _domicilioSeleccionado,
-        'domicilioReal': _domicilioReal,
-        'esCorrecto': esCorrecto,
         'tiempoViviendo': _tiempoViviendo,
         'estado': 'pendiente',
         'tipo': 'validacion_pendiente',
@@ -293,6 +329,9 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
       }
       if (resp.statusCode == 400 && resp.body.contains('no_self_validate')) {
         throw StateError('No podés validarte a vos mismo.');
+      }
+      if (resp.statusCode == 400 && resp.body.contains('no_domicilio')) {
+        throw StateError('Esta persona todavía no tiene un domicilio completo.');
       }
       if (resp.statusCode < 200 || resp.statusCode >= 300) {
         throw StateError('CF ${resp.statusCode}');

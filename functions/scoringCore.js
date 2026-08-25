@@ -5,6 +5,7 @@
 const admin = require("firebase-admin");
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
+const { mergePii, sanitizarOps } = require("./pii");
 
 const MODEL_VERSION = "v1.2-phase1-cf";
 const LOCK_TTL_MS = 15 * 60 * 1000;
@@ -105,20 +106,19 @@ async function runScoringBatch({ trigger = "scheduler", force = false } = {}) {
     for (const doc of usersSnap.docs) {
       try {
         const data = doc.data();
-        const scoreId = scoreIdentidadSimple(data);
-        const badge = badgeSimple(data, scoreId);
+        const merged = await mergePii(doc.ref, data);
+        const scoreId = scoreIdentidadSimple(merged);
+        const badge = badgeSimple(merged, scoreId);
         const features = {
-          f_auth_google: String(data.auth_provider || "").toLowerCase() === "google" ? 1 : 0,
-          f_email: data.email ? 1 : 0,
-          f_telefono: data.telefono ? 1 : 0,
-          f_doc_ocr: data.doc_validado === true ? 1 : 0,
-          f_foto_perfil: data.url_foto_perfil ? 1 : 0,
+          f_auth_google: String(merged.auth_provider || "").toLowerCase() === "google" ? 1 : 0,
+          f_email: merged.email ? 1 : 0,
+          f_telefono: merged.telefono ? 1 : 0,
+          f_doc_ocr: merged.doc_validado === true ? 1 : 0,
+          f_foto_perfil: merged.url_foto_perfil ? 1 : 0,
           f_score_identidad: scoreId,
           y_badge: badge,
         };
-        batch.set(
-          doc.ref,
-          {
+        const parentUpdate = {
             badge_prestador: badge,
             score_actualizado_en: admin.firestore.FieldValue.serverTimestamp(),
             badge_actualizado_en: admin.firestore.FieldValue.serverTimestamp(),
@@ -132,7 +132,20 @@ async function runScoringBatch({ trigger = "scheduler", force = false } = {}) {
               actualizado_en: admin.firestore.FieldValue.serverTimestamp(),
               last_run_id: runId,
             },
-          },
+        };
+        const piiOps = sanitizarOps(data);
+        if (piiOps) {
+          batch.set(
+            doc.ref.collection("privado").doc("identidad"),
+            piiOps.pii,
+            { merge: true }
+          );
+          Object.assign(parentUpdate, piiOps.deletes);
+          n++;
+        }
+        batch.set(
+          doc.ref,
+          parentUpdate,
           { merge: true }
         );
         batch.set(
@@ -150,7 +163,7 @@ async function runScoringBatch({ trigger = "scheduler", force = false } = {}) {
         n++;
         escritos++;
         procesados++;
-        if (n >= 400) {
+        if (n >= 120) {
           await batch.commit();
           batch = db.batch();
           n = 0;

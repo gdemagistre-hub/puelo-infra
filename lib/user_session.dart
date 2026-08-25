@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'catalogo_geo_cache.dart';
 import 'analytics/prox_analytics.dart';
+import 'identidad_pii.dart';
 
 /// Sesión en memoria + persistencia.
 ///
@@ -181,6 +182,23 @@ class UserSession {
     _applyHomeModoFromProfile();
     _persistUid(id, isDev: isDevImpersonation);
     _loadHomeModoPref();
+    hidratarIdentidad();
+  }
+
+  Future<void> hidratarIdentidad() async {
+    final id = uid;
+    final data = datosCompletos;
+    if (id == null || id.isEmpty || data == null) return;
+    try {
+      final merged = await IdentidadPii.hidratarYMigrar(id, data);
+      if (uid != id) return;
+      merged.removeWhere((_, v) => v is FieldValue);
+      datosCompletos = merged;
+      nombre = merged['nombre'] ?? nombre;
+      apellido = merged['apellido'] ?? apellido;
+    } catch (e) {
+      debugPrint('UserSession.hidratarIdentidad: $e');
+    }
   }
 
   bool get isAdmin {
@@ -289,6 +307,7 @@ class UserSession {
         authProvider = (data['auth_provider'] as String?) ?? 'google';
         isDevImpersonation = false;
         await _persistUid(user.uid, isDev: false);
+        await hidratarIdentidad();
 
         try {
           ProxAnalytics.instance.startSession(
