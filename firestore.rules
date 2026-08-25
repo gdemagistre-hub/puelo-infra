@@ -1,5 +1,5 @@
 rules_version = '2';
-// 2026-08-24: claim dev_impersonation con get() default false (tokens Google).
+// 2026-08-24: usuarios sin write anónimo.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -131,21 +131,10 @@ service cloud.firestore {
       allow read: if true;
 
       allow create: if createHasNoPrivileged()
-        && (
-          !isSignedIn()
-          || isOwner(userId)
-          || isAdmin()
-        );
+        && (isOwner(userId) || isAdmin());
 
-      allow update: if (
-          isAdmin()
-        ) || (
-          updateTouchesNoPrivileged()
-          && (
-            isOwner(userId)
-            || !isSignedIn()
-          )
-        );
+      allow update: if isAdmin()
+        || (isOwner(userId) && updateTouchesNoPrivileged());
 
       allow delete: if isAdmin();
 
