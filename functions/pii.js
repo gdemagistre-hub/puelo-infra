@@ -36,6 +36,11 @@ const PII_KEYS = [
   "cuit",
   "cuil",
   "doc_hash_datos",
+  "telefono",
+  "celular",
+  "phone",
+  "whatsapp",
+  "telefono_whatsapp",
 ];
 
 const CALLES_SENUELO = [
@@ -161,6 +166,11 @@ function nombreDe(merged) {
   return n || "esta persona";
 }
 
+function telefonoDe(merged) {
+  if (!merged) return "";
+  return String(merged.telefono || merged.celular || merged.phone || "").trim();
+}
+
 module.exports = {
   PII_KEYS,
   extractPii,
@@ -170,4 +180,5 @@ module.exports = {
   domicilioRealDe,
   opcionesQuiz,
   nombreDe,
+  telefonoDe,
 };
