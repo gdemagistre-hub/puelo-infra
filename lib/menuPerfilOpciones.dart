@@ -16,7 +16,6 @@ import 'theme/app_colors.dart';
 import 'legales/documento_legal_screen.dart';
 import 'legales/textos_legales.dart';
 
-/// Menú lateral / sheet de perfil — UX densa: ícono + título, sin subtítulos.
 class MenuPerfilOpcionesWidget extends StatefulWidget {
   final VoidCallback? onClose;
   final bool modoPrestador;
@@ -111,6 +110,25 @@ class _MenuPerfilOpcionesWidgetState extends State<MenuPerfilOpcionesWidget> {
     await HomeTourService.instance.reset(modoPrestador: modoPrestador);
     widget.onClose?.call();
     widget.onRequestHomeTour?.call();
+  }
+
+  Future<void> _irAOfrecerServicios(BuildContext context) async {
+    final s = UserSession();
+    s.datosCompletos = {
+      ...(s.datosCompletos ?? {}),
+      'es_trabajador': true,
+      'rol': 'trabajador',
+      'camino_elegido': 'ofrezo',
+    };
+    s.invalidateHomeCache();
+    await s.persistHomeModoPrestador(true);
+    if (!context.mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const RegistroTrabajadorWidget(),
+      ),
+    );
+    widget.onRolPuedeHaberCambiado?.call();
   }
 
   @override
@@ -309,14 +327,7 @@ class _MenuPerfilOpcionesWidgetState extends State<MenuPerfilOpcionesWidget> {
       borderRadius: BorderRadius.circular(14),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () async {
-          await Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => const RegistroTrabajadorWidget(),
-            ),
-          );
-          widget.onRolPuedeHaberCambiado?.call();
-        },
+        onTap: () => _irAOfrecerServicios(context),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           decoration: BoxDecoration(
