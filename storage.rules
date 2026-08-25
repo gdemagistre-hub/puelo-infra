@@ -1,5 +1,6 @@
 rules_version = '2';
-// 2026-08-24: claim ausente no rompe isOwnerPath.
+// 2026-08-25: lectura pública sólo foto_perfil + portfolio.
+// DNI, documentos y capacitaciones: dueño (o sesión para capacitaciones).
 service firebase.storage {
   match /b/{bucket}/o {
     function isImage() {
@@ -12,16 +13,34 @@ service firebase.storage {
       return request.auth != null
         && request.auth.token.get('dev_impersonation', false) == true;
     }
+    function isSignedIn() {
+      return request.auth != null && !isDevImpersonation();
+    }
     function isOwnerPath(userId) {
-      return request.auth != null
-        && !isDevImpersonation()
-        && request.auth.uid == userId;
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    function imageWrite() {
+      return request.resource == null || (underLimit() && isImage());
+    }
+
+    match /usuarios/{userId}/foto_perfil.jpg {
+      allow read: if true;
+      allow write: if isOwnerPath(userId) && imageWrite();
+    }
+
+    match /usuarios/{userId}/portfolio/{fileName} {
+      allow read: if true;
+      allow write: if isOwnerPath(userId) && imageWrite();
+    }
+
+    match /usuarios/{userId}/capacitaciones/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isOwnerPath(userId) && imageWrite();
     }
 
     match /usuarios/{userId}/{allPaths=**} {
-      allow read: if true;
-      allow write: if isOwnerPath(userId)
-        && (request.resource == null || (underLimit() && isImage()));
+      allow read: if isOwnerPath(userId);
+      allow write: if isOwnerPath(userId) && imageWrite();
     }
 
     match /{allPaths=**} {
