@@ -463,7 +463,6 @@ exports.registerVaultRecovery = onCall(
     cors: true,
     memory: "256MiB",
     timeoutSeconds: 30,
-    secrets: ["VAULT_RECOVERY_SECRET"],
   },
   async (request) => {
     requireVaultRecoverySecret();
@@ -499,7 +498,6 @@ exports.recoverVaultDek = onCall(
     cors: true,
     memory: "256MiB",
     timeoutSeconds: 30,
-    secrets: ["VAULT_RECOVERY_SECRET"],
   },
   async (request) => {
     requireVaultRecoverySecret();
