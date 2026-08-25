@@ -3,9 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 /// PII que no debe vivir en el documento público `usuarios/{uid}`.
 ///
 /// Firestore no enmascara campos en un get/list: o se lee el doc entero o no.
-/// La proyección pública es el propio documento padre (nombre, badge, zona,
-/// foto, teléfono para WhatsApp). Identidad sensible va a
-/// `usuarios/{uid}/privado/identidad` (solo dueño o admin).
+/// La proyección pública es el padre (nombre, badge, zona, foto,
+/// `tiene_whatsapp` / `tiene_telefono`). El número exacto va a
+/// `usuarios/{uid}/privado/identidad` y se revela sólo vía CF al contactar.
 class IdentidadPii {
   IdentidadPii._();
 
@@ -41,6 +41,11 @@ class IdentidadPii {
     'cuit',
     'cuil',
     'doc_hash_datos',
+    'telefono',
+    'celular',
+    'phone',
+    'whatsapp',
+    'telefono_whatsapp',
   };
 
   static DocumentReference<Map<String, dynamic>> refDe(String uid) =>
@@ -70,6 +75,13 @@ class IdentidadPii {
     return out;
   }
 
+  static String telefonoDe(Map<String, dynamic>? data) {
+    if (data == null) return '';
+    return (data['telefono'] ?? data['celular'] ?? data['phone'] ?? '')
+        .toString()
+        .trim();
+  }
+
   static Future<Map<String, dynamic>> cargar(String uid) async {
     try {
       final snap = await refDe(uid).get();
@@ -92,7 +104,7 @@ class IdentidadPii {
   }
 
   /// Si el padre todavía tiene PII, la copia a privado y la borra del padre.
-  /// Devuelve el mapa mezclado (padre + privado) para la sesión del dueño.
+  /// Deja flags públicos de contacto (`tiene_telefono` / `tiene_whatsapp`).
   static Future<Map<String, dynamic>> hidratarYMigrar(
     String uid,
     Map<String, dynamic> parent,
@@ -106,9 +118,18 @@ class IdentidadPii {
           {...fromParent, 'updated_at': FieldValue.serverTimestamp()},
           SetOptions(merge: true),
         );
+        final parentPatch = deletesDe(fromParent.keys);
+        final tel = telefonoDe(fromParent);
+        if (tel.isNotEmpty) {
+          parentPatch['tiene_telefono'] = true;
+          if (parent['tiene_whatsapp'] != false) {
+            parentPatch['tiene_whatsapp'] = parent['tiene_whatsapp'] == true ||
+                !parent.containsKey('tiene_whatsapp');
+          }
+        }
         batch.set(
           FirebaseFirestore.instance.collection('usuarios').doc(uid),
-          deletesDe(fromParent.keys),
+          parentPatch,
           SetOptions(merge: true),
         );
         await batch.commit();
