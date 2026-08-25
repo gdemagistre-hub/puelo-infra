@@ -4,6 +4,7 @@
  * 2026-08-24 etapa vault: VAULT_RECOVERY_SECRET obligatorio (fail-closed).
  * 2026-08-24 etapa A2: HMAC de comprobante sin texto de respaldo (fail-closed).
  * 2026-08-25 etapa A4b: export obtenerContactoPrestador (sin stub index_impl).
+ * 2026-08-25: bind Secret Manager en vault + comprobantes.
  */
 const { onRequest, onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
@@ -465,6 +466,7 @@ exports.registerVaultRecovery = onCall(
     cors: true,
     memory: "256MiB",
     timeoutSeconds: 30,
+    secrets: ["VAULT_RECOVERY_SECRET"],
   },
   async (request) => {
     requireVaultRecoverySecret();
@@ -500,6 +502,7 @@ exports.recoverVaultDek = onCall(
     cors: true,
     memory: "256MiB",
     timeoutSeconds: 30,
+    secrets: ["VAULT_RECOVERY_SECRET"],
   },
   async (request) => {
     requireVaultRecoverySecret();
@@ -572,7 +575,7 @@ function parseMonto(raw) {
 }
 
 exports.emitirRecibo = onCall(
-  { cors: true, memory: "256MiB", timeoutSeconds: 30 },
+  { cors: true, memory: "256MiB", timeoutSeconds: 30, secrets: ["RECIBO_HMAC_SECRET"] },
   async (request) => {
     const actorUid = requireAuthUid(request);
     const d = request.data || {};
@@ -673,7 +676,7 @@ exports.emitirRecibo = onCall(
 );
 
 exports.responderRecibo = onCall(
-  { cors: true, memory: "256MiB", timeoutSeconds: 30 },
+  { cors: true, memory: "256MiB", timeoutSeconds: 30, secrets: ["RECIBO_HMAC_SECRET"] },
   async (request) => {
     const actorUid = requireAuthUid(request);
     const d = request.data || {};
