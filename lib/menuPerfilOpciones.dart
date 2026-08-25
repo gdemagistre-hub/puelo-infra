@@ -6,6 +6,7 @@ import 'especialidadesLaboralesflotante.dart';
 import 'ZonaDeTrabajoflotante.dart';
 import 'capacitacionesflotante.dart';
 import 'registroTrabajador.dart';
+import 'elige_oficio.dart';
 import 'consola_prox.dart';
 import 'admin/readiness_admin_screen.dart';
 import 'user_session.dart';
@@ -123,10 +124,12 @@ class _MenuPerfilOpcionesWidgetState extends State<MenuPerfilOpcionesWidget> {
     s.invalidateHomeCache();
     await s.persistHomeModoPrestador(true);
     if (!context.mounted) return;
+    final profesiones = (s.datosCompletos?['profesiones'] as List?) ?? [];
+    final destino = profesiones.isEmpty
+        ? const EligeOficioWidget()
+        : const RegistroTrabajadorWidget();
     await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const RegistroTrabajadorWidget(),
-      ),
+      MaterialPageRoute(builder: (_) => destino),
     );
     widget.onRolPuedeHaberCambiado?.call();
   }
