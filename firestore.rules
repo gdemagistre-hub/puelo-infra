@@ -3,6 +3,7 @@ rules_version = '2';
 // 2026-08-24 etapa 5 Aikido: list de usuarios exige sesión (cierra enumeración masiva).
 // 2026-08-24 etapa 1 PII: DNI/email/calle en usuarios/{uid}/privado (dueño/admin).
 // get del padre queda abierto: proyección pública (nombre, badge, zona, foto, tel).
+// 2026-08-24 etapa A1: sin wildcard FlutterFlow (ya no hay allow write global).
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -24,11 +25,6 @@ service cloud.firestore {
 
     function isOwner(userId) {
       return isSignedIn() && !isDevImpersonation() && request.auth.uid == userId;
-    }
-
-    function isFlutterFlow() {
-      return isSignedIn()
-        && request.auth.token.email.matches('firebase@flutterflow.io');
     }
 
     function privilegedKeys() {
@@ -62,10 +58,6 @@ service cloud.firestore {
 
     function analyticsSizeOk() {
       return request.resource.data.keys().size() <= 24;
-    }
-
-    match /{document=**} {
-      allow read, write: if isFlutterFlow();
     }
 
     match /analytics_events/{id} {
