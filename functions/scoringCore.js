@@ -5,7 +5,7 @@
 const admin = require("firebase-admin");
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
-const { mergePii, sanitizarOps } = require("./pii");
+const { mergePii, sanitizarOps, flagsContactoPublico } = require("./pii");
 
 const MODEL_VERSION = "v1.2-phase1-cf";
 const LOCK_TTL_MS = 15 * 60 * 1000;
@@ -141,8 +141,11 @@ async function runScoringBatch({ trigger = "scheduler", force = false } = {}) {
             { merge: true }
           );
           Object.assign(parentUpdate, piiOps.deletes);
+          if (piiOps.flags) Object.assign(parentUpdate, piiOps.flags);
           n++;
         }
+        const flags = flagsContactoPublico(data, merged);
+        if (Object.keys(flags).length) Object.assign(parentUpdate, flags);
         batch.set(
           doc.ref,
           parentUpdate,
@@ -321,4 +324,3 @@ async function runTopServiciosAyer() {
 }
 
 module.exports = { runScoringBatch, runTopServiciosAyer, MODEL_VERSION };
-
