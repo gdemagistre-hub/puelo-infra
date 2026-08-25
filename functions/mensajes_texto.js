@@ -1,6 +1,7 @@
 /**
  * Mensajes M5 — texto libre append-only en conversaciones.
  * Se monta desde index.js: exports.enviarMensajeTexto = ...
+ * 2026-08-25: HMAC fail-closed con RECIBO_HMAC_SECRET (sin texto de respaldo).
  */
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
@@ -16,11 +17,14 @@ function requireAuthUid(request) {
 }
 
 function textoHmacSecret() {
-  return (
-    process.env.RECIBO_HMAC_SECRET ||
-    process.env.VAULT_RECOVERY_SECRET ||
-    "lifewalletpuelo-recibo-hmac-v1"
-  );
+  const secret = String(process.env.RECIBO_HMAC_SECRET || "").trim();
+  if (!secret) {
+    throw new HttpsError(
+      "unavailable",
+      "Firma de mensaje no disponible"
+    );
+  }
+  return secret;
 }
 
 function hashTexto(payload) {
@@ -40,6 +44,7 @@ exports.enviarMensajeTexto = onCall(
     memory: "256MiB",
     timeoutSeconds: 30,
     region: "us-east1",
+    secrets: ["RECIBO_HMAC_SECRET"],
   },
   async (request) => {
     const actorUid = requireAuthUid(request);
