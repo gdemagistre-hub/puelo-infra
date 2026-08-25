@@ -4,6 +4,7 @@ rules_version = '2';
 // 2026-08-24 etapa 1 PII: DNI/email/calle en usuarios/{uid}/privado (dueño/admin).
 // get del padre queda abierto: proyección pública (nombre, badge, zona, foto, tel).
 // 2026-08-24 etapa A1: sin wildcard FlutterFlow (ya no hay allow write global).
+// 2026-08-24 etapa A3: isAdmin() solo custom claim admin (no es_admin del doc público).
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -17,10 +18,9 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && !isDevImpersonation() && (
-        request.auth.token.admin == true ||
-        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.es_admin == true
-      );
+      return isSignedIn()
+        && !isDevImpersonation()
+        && request.auth.token.get('admin', false) == true;
     }
 
     function isOwner(userId) {
