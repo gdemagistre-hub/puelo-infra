@@ -102,7 +102,26 @@ function sanitizarOps(parentData) {
   const { pii, deletes } = extractPii(parentData);
   if (!Object.keys(pii).length) return null;
   pii.updated_at = admin.firestore.FieldValue.serverTimestamp();
-  return { pii, deletes };
+  const flags = {};
+  const tel = telefonoDe({ ...parentData, ...pii });
+  if (tel) {
+    flags.tiene_telefono = true;
+    if (parentData.tiene_whatsapp !== false) {
+      flags.tiene_whatsapp = true;
+    }
+  }
+  return { pii, deletes, flags };
+}
+
+function flagsContactoPublico(parentData, merged) {
+  const flags = {};
+  const tel = telefonoDe(merged || parentData);
+  if (!tel) return flags;
+  if (parentData.tiene_telefono !== true) flags.tiene_telefono = true;
+  if (parentData.tiene_whatsapp !== false && parentData.tiene_whatsapp !== true) {
+    flags.tiene_whatsapp = true;
+  }
+  return flags;
 }
 
 function domicilioRealDe(merged) {
@@ -177,6 +196,7 @@ module.exports = {
   loadMerged,
   mergePii,
   sanitizarOps,
+  flagsContactoPublico,
   domicilioRealDe,
   opcionesQuiz,
   nombreDe,
