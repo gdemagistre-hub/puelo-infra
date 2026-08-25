@@ -5,6 +5,7 @@
  * 2026-08-24 etapa A2: HMAC de comprobante sin texto de respaldo (fail-closed).
  * 2026-08-25 etapa A4b: export obtenerContactoPrestador (sin stub index_impl).
  * 2026-08-25: bind Secret Manager en vault + comprobantes.
+ * 2026-08-25: batch HTTP solo POST + X-Batch-Secret (sin secret en URL).
  */
 const { onRequest, onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
@@ -69,6 +70,20 @@ async function verifyBearer(req) {
   return admin.auth().verifyIdToken(m[1]);
 }
 
+function requireBatchSecret(req, res) {
+  const secret = process.env.BATCH_SECRET || "";
+  const provided = String(req.get("X-Batch-Secret") || "").trim();
+  if (!secret) {
+    res.status(503).json({ error: "batch_secret_not_configured" });
+    return false;
+  }
+  if (!timingSafeEqualString(provided, secret)) {
+    res.status(401).json({ error: "unauthorized" });
+    return false;
+  }
+  return true;
+}
+
 exports.scoringBatchHttp = onRequest(
   {
     invoker: "public",
@@ -80,26 +95,13 @@ exports.scoringBatchHttp = onRequest(
       res.status(204).send("");
       return;
     }
-    if (req.method !== "POST" && req.method !== "GET") {
-      res.status(405).send("Method not allowed");
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "method_not_allowed" });
       return;
     }
-    const secret = process.env.BATCH_SECRET || "";
-    const provided =
-      req.get("X-Batch-Secret") ||
-      req.query.secret ||
-      (req.body && req.body.secret) ||
-      "";
-    if (!secret) {
-      res.status(503).json({ error: "batch_secret_not_configured" });
-      return;
-    }
-    if (!timingSafeEqualString(provided, secret)) {
-      res.status(401).json({ error: "unauthorized" });
-      return;
-    }
-    const force = req.query.force === "1" || (req.body && req.body.force === true);
-    const trigger = req.query.trigger || (req.body && req.body.trigger) || "http";
+    if (!requireBatchSecret(req, res)) return;
+    const force = !!(req.body && req.body.force === true);
+    const trigger = (req.body && req.body.trigger) || "http";
     try {
       const result = await runScoringBatch({ trigger, force });
       res.status(200).json(result);
@@ -826,25 +828,12 @@ exports.fiadosVtoHttp = onRequest(
       res.status(204).send("");
       return;
     }
-    if (req.method !== "POST" && req.method !== "GET") {
-      res.status(405).send("Method not allowed");
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "method_not_allowed" });
       return;
     }
-    const secret = process.env.BATCH_SECRET || "";
-    const provided =
-      req.get("X-Batch-Secret") ||
-      req.query.secret ||
-      (req.body && req.body.secret) ||
-      "";
-    if (!secret) {
-      res.status(503).json({ error: "batch_secret_not_configured" });
-      return;
-    }
-    if (!timingSafeEqualString(provided, secret)) {
-      res.status(401).json({ error: "unauthorized" });
-      return;
-    }
-    const force = req.query.force === "1" || (req.body && req.body.force === true);
+    if (!requireBatchSecret(req, res)) return;
+    const force = !!(req.body && req.body.force === true);
     try {
       const result = await runFiadosVtoBatch({ force });
       res.status(200).json(result);
