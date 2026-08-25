@@ -32,6 +32,9 @@ class UserSession {
 
   bool isDevImpersonation = false;
 
+  /// Solo custom claim `admin` (no el campo público es_admin).
+  bool _adminClaim = false;
+
   String? pendingValidacionToken;
   String? pendingValidacionTargetId;
 
@@ -179,10 +182,12 @@ class UserSession {
         (data['auth_provider'] as String?) ??
         (isDevImpersonation ? 'dev' : null);
     this.isDevImpersonation = isDevImpersonation;
+    _adminClaim = false;
     _applyHomeModoFromProfile();
     _persistUid(id, isDev: isDevImpersonation);
     _loadHomeModoPref();
     hidratarIdentidad();
+    refreshAdminFromClaims();
   }
 
   Future<void> hidratarIdentidad() async {
@@ -202,25 +207,27 @@ class UserSession {
   }
 
   bool get isAdmin {
-    final d = datosCompletos;
-    if (d == null) return false;
-    if (d['es_admin'] == true || d['rol'] == 'admin') return true;
-    return false;
+    if (isDevImpersonation) return false;
+    return _adminClaim;
   }
 
   Future<bool> refreshAdminFromClaims() async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return isAdmin;
-      final token = await user.getIdTokenResult(true);
-      final claim = token.claims?['admin'] == true;
-      if (claim && datosCompletos != null) {
-        datosCompletos = {...datosCompletos!, 'es_admin': true};
+      if (isDevImpersonation) {
+        _adminClaim = false;
+        return false;
       }
-      return claim || isAdmin;
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        _adminClaim = false;
+        return false;
+      }
+      final token = await user.getIdTokenResult(true);
+      _adminClaim = token.claims?['admin'] == true;
+      return _adminClaim;
     } catch (e) {
       debugPrint('UserSession.refreshAdminFromClaims: $e');
-      return isAdmin;
+      return _adminClaim;
     }
   }
 
@@ -308,6 +315,7 @@ class UserSession {
         isDevImpersonation = false;
         await _persistUid(user.uid, isDev: false);
         await hidratarIdentidad();
+        await refreshAdminFromClaims();
 
         try {
           ProxAnalytics.instance.startSession(
@@ -363,6 +371,7 @@ class UserSession {
     pendingValidacionTargetId = null;
     authProvider = null;
     isDevImpersonation = false;
+    _adminClaim = false;
     _homeModoPrestadorPref = null;
     invalidateHomeCache();
     profileRevision.value = 0;
