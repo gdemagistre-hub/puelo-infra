@@ -6,6 +6,7 @@ import 'user_session.dart';
 import 'auth_service.dart';
 import 'registroCuenta.dart';
 import 'pantalla_gracias_validacion.dart';
+import 'validar_domicilio.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_copy.dart';
 import 'analytics/prox_analytics.dart';
@@ -260,6 +261,16 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
         context,
         MaterialPageRoute(
           builder: (context) => const PantallaGraciasValidacionWidget(),
+        ),
+      );
+      return;
+    }
+    final targetId = UserSession().pendingValidacionTargetId;
+    if (targetId != null && targetId.isNotEmpty) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ValidarDomicilioWidget(usuarioId: targetId),
         ),
       );
       return;

@@ -19,6 +19,8 @@ class UserSession {
   static const String _prefsUidKey = 'puelo_session_uid';
   static const String _prefsDevKey = 'puelo_session_dev';
   static const String _prefsHomeModoKey = 'puelo_home_modo_prestador';
+  static const String _prefsPendingTokenKey = 'puelo_pending_validacion_token';
+  static const String _prefsPendingTargetKey = 'puelo_pending_validacion_target';
 
   String? uid;
   String? nombre;
@@ -30,6 +32,7 @@ class UserSession {
   bool isDevImpersonation = false;
 
   String? pendingValidacionToken;
+  String? pendingValidacionTargetId;
 
   DateTime? _homeCacheAt;
   Map<String, dynamic>? _homeCacheData;
@@ -205,6 +208,7 @@ class UserSession {
 
   Future<bool> restaurarSesion() async {
     try {
+      await _loadPendingValidacion();
       User? user = FirebaseAuth.instance.currentUser;
       if (user == null && kIsWeb) {
         try {
@@ -292,6 +296,7 @@ class UserSession {
           );
         } catch (_) {}
         await _loadHomeModoPref();
+        await _loadPendingValidacion();
         return true;
       }
 
@@ -309,6 +314,7 @@ class UserSession {
       // Dropdown de prueba retirado: no restaurar sesión local sin Auth.
       await prefs.remove(_prefsUidKey);
       await prefs.remove(_prefsDevKey);
+      await _loadPendingValidacion();
       return false;
     } catch (e) {
       debugPrint('UserSession.restaurarSesion error: $e');
@@ -335,6 +341,7 @@ class UserSession {
     apellido = null;
     datosCompletos = null;
     pendingValidacionToken = null;
+    pendingValidacionTargetId = null;
     authProvider = null;
     isDevImpersonation = false;
     _homeModoPrestadorPref = null;
@@ -345,6 +352,8 @@ class UserSession {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_prefsUidKey);
       await prefs.remove(_prefsDevKey);
+      await prefs.remove(_prefsPendingTokenKey);
+      await prefs.remove(_prefsPendingTargetKey);
     } catch (e) {
       debugPrint('UserSession.cerrarSesion prefs error: $e');
     }
@@ -352,11 +361,53 @@ class UserSession {
 
   String get nombreCompleto => '$nombre $apellido'.trim();
 
+  Future<void> _loadPendingValidacion() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      pendingValidacionToken ??= prefs.getString(_prefsPendingTokenKey);
+      pendingValidacionTargetId ??= prefs.getString(_prefsPendingTargetKey);
+    } catch (e) {
+      debugPrint('UserSession._loadPendingValidacion: $e');
+    }
+  }
+
+  Future<void> _persistPendingValidacion() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (pendingValidacionToken != null && pendingValidacionToken!.isNotEmpty) {
+        await prefs.setString(_prefsPendingTokenKey, pendingValidacionToken!);
+      } else {
+        await prefs.remove(_prefsPendingTokenKey);
+      }
+      if (pendingValidacionTargetId != null &&
+          pendingValidacionTargetId!.isNotEmpty) {
+        await prefs.setString(_prefsPendingTargetKey, pendingValidacionTargetId!);
+      } else {
+        await prefs.remove(_prefsPendingTargetKey);
+      }
+    } catch (e) {
+      debugPrint('UserSession._persistPendingValidacion: $e');
+    }
+  }
+
   void setPendingValidacion(String token) {
     pendingValidacionToken = token;
+    _persistPendingValidacion();
+  }
+
+  void setPendingValidacionTarget(String userId) {
+    pendingValidacionTargetId = userId;
+    _persistPendingValidacion();
+  }
+
+  void clearPendingValidacionTarget() {
+    pendingValidacionTargetId = null;
+    _persistPendingValidacion();
   }
 
   void clearPendingValidacion() {
     pendingValidacionToken = null;
+    pendingValidacionTargetId = null;
+    _persistPendingValidacion();
   }
 }

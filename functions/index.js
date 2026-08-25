@@ -1,6 +1,6 @@
 /**
  * Cloud Functions — Puelo (lifewalletpuelo)
- * 2026-08-24: mintDevSession eliminado; validación exige Auth real.
+ * 2026-08-24: mintDevSession eliminado; submit+aplicar validación exigen Auth real.
  */
 const { onRequest, onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
@@ -132,16 +132,32 @@ exports.submitValidacionPendiente = onRequest(
       return;
     }
     try {
+      let validadorId = "";
+      try {
+        const decoded = await verifyBearer(req);
+        if (decoded && decoded.uid) validadorId = decoded.uid;
+      } catch (authErr) {
+        console.warn("submitValidacion token invalid", authErr.message || authErr);
+      }
+      if (!validadorId) {
+        res.status(401).json({ error: "unauthenticated" });
+        return;
+      }
       const b = req.body || {};
       const targetUserId = String(b.targetUserId || "").trim();
       if (!targetUserId) {
         res.status(400).json({ error: "targetUserId_required" });
         return;
       }
+      if (targetUserId === validadorId) {
+        res.status(400).json({ error: "no_self_validate" });
+        return;
+      }
       const token = String(b.token || "").trim() || db.collection("_").doc().id;
       const doc = {
         tipo: "validacion_pendiente",
         targetUserId,
+        validadorId,
         targetNombre: String(b.targetNombre || "").slice(0, 120),
         conoce: !!b.conoce,
         domicilioSeleccionado: String(b.domicilioSeleccionado || "").slice(0, 300),

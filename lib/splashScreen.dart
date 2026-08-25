@@ -6,6 +6,8 @@ import 'elige_camino.dart';
 import 'loginScreen.dart';
 import 'user_session.dart';
 import 'theme/app_copy.dart';
+import 'pantalla_gracias_validacion.dart';
+import 'validar_domicilio.dart';
 
 class SplashScreenWidget extends StatefulWidget {
   static const String routePath = '/splash';
@@ -70,7 +72,23 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
 
     try {
       if (restored && UserSession().isLoggedIn) {
-        if (EligeCaminoWidget.necesitaElegir()) {
+        if (UserSession().pendingValidacionToken != null) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const PantallaGraciasValidacionWidget(),
+            ),
+          );
+        } else if ((UserSession().pendingValidacionTargetId ?? '').isNotEmpty) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ValidarDomicilioWidget(
+                usuarioId: UserSession().pendingValidacionTargetId,
+              ),
+            ),
+          );
+        } else if (EligeCaminoWidget.necesitaElegir()) {
           Navigator.pushReplacementNamed(context, EligeCaminoWidget.routePath);
         } else {
           Navigator.pushReplacement(

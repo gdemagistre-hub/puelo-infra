@@ -3,9 +3,11 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
 import 'user_session.dart';
 import 'loginScreen.dart';
+import 'pantalla_gracias_validacion.dart';
 
 class ValidarDomicilioWidget extends StatefulWidget {
   final String? usuarioId;
@@ -107,6 +109,20 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
       _nombreTarget = '${data['nombre'] ?? ''} ${data['apellido'] ?? ''}'.trim();
       if (_nombreTarget.isEmpty) _nombreTarget = 'esta persona';
 
+      final me = FirebaseAuth.instance.currentUser?.uid;
+      if (me != null && me == widget.usuarioId) {
+        setState(() {
+          _loading = false;
+          _error =
+              'No podés validarte a vos mismo. Pedile el enlace a alguien que te conozca.';
+        });
+        return;
+      }
+
+      if (me != null) {
+        UserSession().clearPendingValidacionTarget();
+      }
+
       setState(() => _loading = false);
     } catch (e) {
       setState(() {
@@ -175,6 +191,20 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
     setState(() => _loading = false);
   }
 
+  bool get _tieneAuth => FirebaseAuth.instance.currentUser != null;
+
+  void _irALogin() {
+    final id = widget.usuarioId;
+    if (id != null && id.isNotEmpty) {
+      UserSession().setPendingValidacionTarget(id);
+    }
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginScreenWidget()),
+      (route) => false,
+    );
+  }
+
   Future<void> _avanzar() async {
     if (_paso == 0) {
       if (_conoce == null) {
@@ -206,9 +236,25 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
       return;
     }
 
+    if (!_tieneAuth) {
+      _irALogin();
+      return;
+    }
+
     setState(() => _loading = true);
 
     try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        _irALogin();
+        return;
+      }
+      final idToken = await user.getIdToken();
+      if (idToken == null || idToken.isEmpty) {
+        _irALogin();
+        return;
+      }
+
       final token = uuid.v4();
       final esCorrecto = _domicilioSeleccionado == _domicilioReal;
       final targetId = widget.usuarioId!;
@@ -227,68 +273,29 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
         'fuente': 'cliente_web',
       };
 
-      var saved = false;
-      String? lastError;
+      final uri = Uri.parse(
+        'https://us-east1-lifewalletpuelo.cloudfunctions.net/submitValidacionPendiente',
+      );
+      final resp = await http
+          .post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $idToken',
+            },
+            body: jsonEncode(payload),
+          )
+          .timeout(const Duration(seconds: 15));
 
-      // 1) Cloud Function (Admin SDK) — si está desplegada
-      try {
-        final uri = Uri.parse(
-          'https://us-east1-lifewalletpuelo.cloudfunctions.net/submitValidacionPendiente',
-        );
-        final resp = await http
-            .post(
-              uri,
-              headers: {'Content-Type': 'application/json'},
-              body: jsonEncode(payload),
-            )
-            .timeout(const Duration(seconds: 15));
-        if (resp.statusCode >= 200 && resp.statusCode < 300) {
-          saved = true;
-        } else {
-          lastError = 'CF ${resp.statusCode}';
-        }
-      } catch (e) {
-        lastError = 'CF $e';
+      if (resp.statusCode == 401) {
+        _irALogin();
+        return;
       }
-
-      // 2) Colecciones abiertas por rules TEMP
-      if (!saved) {
-        try {
-          final data = {
-            ...payload,
-            'creado_en': FieldValue.serverTimestamp(),
-          };
-          final batch = db.batch();
-          batch.set(db.collection('validaciones_pendientes').doc(token), data);
-          batch.set(db.collection('validaciones').doc(token), data);
-          batch.set(db.collection('calificaciones').doc(token), data);
-          await batch.commit();
-          saved = true;
-        } catch (e) {
-          lastError = 'batch $e';
-        }
+      if (resp.statusCode == 400 && resp.body.contains('no_self_validate')) {
+        throw StateError('No podés validarte a vos mismo.');
       }
-
-      // 3) Último recurso: inbox en el doc del usuario target (usuarios write abierto)
-      if (!saved) {
-        try {
-          await db.collection('usuarios').doc(targetId).set({
-            'validaciones_inbox': FieldValue.arrayUnion([
-              {
-                ...payload,
-                'creado_en_ms': DateTime.now().millisecondsSinceEpoch,
-              },
-            ]),
-            'updated_at': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-          saved = true;
-        } catch (e) {
-          lastError = 'inbox $e';
-        }
-      }
-
-      if (!saved) {
-        throw StateError(lastError ?? 'no se pudo guardar la validación');
+      if (resp.statusCode < 200 || resp.statusCode >= 300) {
+        throw StateError('CF ${resp.statusCode}');
       }
 
       UserSession().setPendingValidacion(token);
@@ -296,7 +303,9 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
       if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (context) => const LoginScreenWidget()),
+          MaterialPageRoute(
+            builder: (context) => const PantallaGraciasValidacionWidget(),
+          ),
           (route) => false,
         );
       }
@@ -337,6 +346,81 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
                 const SizedBox(height: 16),
                 Text(_error!, textAlign: TextAlign.center, style: TextStyle(fontSize: 16, color: textColor)),
               ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (!_tieneAuth) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          title: const Text(
+            'Ayudar a validar',
+            style: TextStyle(
+              color: Color(0xFF0F172A),
+              fontWeight: FontWeight.w700,
+              fontSize: 18,
+            ),
+          ),
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF0F172A),
+          elevation: 0,
+          surfaceTintColor: Colors.transparent,
+        ),
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(28, 16, 28, 32),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Icon(Icons.verified_user_outlined, size: 64, color: primaryColor),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Para confirmar a $_nombreTarget, iniciá sesión',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: textColor,
+                        height: 1.25,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Es gratis. Usá Google o email. Después son 3 preguntas, menos de un minuto.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Color(0xFF64748B),
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+                    ElevatedButton(
+                      onPressed: _irALogin,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text(
+                        'Iniciar sesión',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),

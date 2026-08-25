@@ -76,7 +76,8 @@ class _SolicitarValidacionWidgetState extends State<SolicitarValidacionWidget> {
     final mensaje = Uri.encodeComponent(
       'Hola, soy $nombre. ¿Me ayudás con algo rápido?\n\n'
       'En Puelo (app de oficios) me piden que alguien del barrio confirme '
-      'que me conoce y que la dirección es real. Son 3 preguntas, menos de un minuto.\n\n'
+      'que me conoce y que la dirección es real. Son 3 preguntas.\n'
+      'Entrá con Google o email (es gratis) y listo.\n\n'
       '$link\n\n¡Gracias!',
     );
     final url = Uri.parse('https://wa.me/?text=$mensaje');
@@ -401,7 +402,8 @@ class _SolicitarValidacionWidgetState extends State<SolicitarValidacionWidget> {
                         const SizedBox(height: 8),
                         const Text(
                           'Responde unas preguntas simples: si te conoce y si la dirección es correcta. '
-                          'No pide tarjetas ni datos bancarios. Es apoyo de quien te conoce en la vida real.',
+                          'Tiene que entrar con Google o email (es gratis). '
+                          'No pide tarjetas ni datos bancarios.',
                           style: TextStyle(
                             fontSize: 13,
                             color: AppColors.textMuted,
