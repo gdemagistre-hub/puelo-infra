@@ -2,6 +2,7 @@
  * Cloud Functions — Puelo (lifewalletpuelo)
  * 2026-08-24: mintDevSession eliminado; submit+aplicar validación exigen Auth real.
  * 2026-08-24 etapa vault: VAULT_RECOVERY_SECRET obligatorio (fail-closed).
+ * 2026-08-24 etapa A2: HMAC de comprobante sin texto de respaldo (fail-closed).
  */
 const { onRequest, onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
@@ -526,11 +527,14 @@ exports.recoverVaultDek = onCall(
 const RECIBO_CONCEPTOS = new Set(["sena", "anticipo", "saldo", "pago_total", "otro"]);
 
 function reciboHmacSecret() {
-  return (
-    process.env.RECIBO_HMAC_SECRET ||
-    process.env.VAULT_RECOVERY_SECRET ||
-    "lifewalletpuelo-recibo-hmac-v1"
-  );
+  const secret = String(process.env.RECIBO_HMAC_SECRET || "").trim();
+  if (!secret) {
+    throw new HttpsError(
+      "unavailable",
+      "Firma de comprobante no disponible"
+    );
+  }
+  return secret;
 }
 
 function canonicalReciboPayload(p) {
