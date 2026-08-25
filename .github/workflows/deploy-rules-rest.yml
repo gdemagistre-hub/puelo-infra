@@ -11,6 +11,10 @@ on:
 
 permissions: {}
 
+concurrency:
+  group: firestore-production-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy-rules:
     runs-on: ubuntu-latest

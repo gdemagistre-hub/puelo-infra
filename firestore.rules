@@ -5,6 +5,7 @@ rules_version = '2';
 // get del padre queda abierto: proyección pública (nombre, badge, zona, foto, tel).
 // 2026-08-24 etapa A1: sin wildcard FlutterFlow (ya no hay allow write global).
 // 2026-08-24 etapa A3: isAdmin() solo custom claim admin (no es_admin del doc público).
+// 2026-08-25: trabajos update — tipo y refs inmutables (no convertir evaluación en portfolio).
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -170,13 +171,18 @@ service cloud.firestore {
           )
         );
       allow update: if isAdmin() || (
-        isSignedIn() && (
+        isSignedIn()
+        && request.resource.data.tipo == resource.data.tipo
+        && (
           (
             resource.data.tipo == 'portfolio'
             && resource.data.usuario_id == request.auth.uid
+            && request.resource.data.usuario_id == resource.data.usuario_id
           ) || (
             resource.data.tipo == 'evaluacion'
             && resource.data.clienteRef == /databases/$(database)/documents/usuarios/$(request.auth.uid)
+            && request.resource.data.clienteRef == resource.data.clienteRef
+            && request.resource.data.get('prestador_id', '') == resource.data.get('prestador_id', '')
           )
         )
       );
