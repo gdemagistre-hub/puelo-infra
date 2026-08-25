@@ -624,11 +624,22 @@ class _PinResetEmbeddedState extends State<_PinResetEmbedded> {
       widget.onDone();
     } catch (e) {
       setState(() {
-        _error = 'No se pudo recuperar. Detalle: $e';
+        _error = _mensajeRecuperacion(e);
       });
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  String _mensajeRecuperacion(Object e) {
+    final s = e.toString().toLowerCase();
+    if (s.contains('unavailable') ||
+        s.contains('not-found') ||
+        s.contains('failed-precondition') ||
+        s.contains('internal')) {
+      return 'La recuperación no está disponible ahora. Si recordás el PIN, volvé atrás y desbloqueá.';
+    }
+    return 'No se pudo armar un PIN nuevo. Probá de nuevo en unos segundos.';
   }
 
   @override

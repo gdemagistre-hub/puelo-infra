@@ -180,6 +180,12 @@ class VaultSession extends ChangeNotifier {
         final dekBytes = await VaultCrypto.unwrapDek(dekWrappedPin, pinKey);
         _key = VaultCrypto.keyFromBytes(dekBytes);
         vaultVersion = 2;
+        try {
+          await _registerRecovery(base64Encode(dekBytes));
+          hasRecovery = true;
+        } catch (e) {
+          debugPrint('registerVaultRecovery (unlock): $e');
+        }
       } catch (e) {
         lastError = 'No se pudo abrir la bóveda';
         notifyListeners();

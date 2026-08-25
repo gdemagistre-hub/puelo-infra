@@ -1,7 +1,7 @@
 /**
  * Cloud Functions — Puelo (lifewalletpuelo)
  * 2026-08-24: mintDevSession eliminado; submit+aplicar validación exigen Auth real.
- * 2026-08-24 etapa 1 PII: previewValidacion + esCorrecto calculado en servidor.
+ * 2026-08-24 etapa vault: VAULT_RECOVERY_SECRET obligatorio (fail-closed).
  */
 const { onRequest, onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
@@ -412,9 +412,19 @@ exports.aplicarValidacionPendiente = onRequest(
   }
 );
 
+function requireVaultRecoverySecret() {
+  const secret = String(process.env.VAULT_RECOVERY_SECRET || "").trim();
+  if (!secret) {
+    throw new HttpsError(
+      "unavailable",
+      "Recuperación de bóveda no disponible"
+    );
+  }
+  return secret;
+}
+
 function recoveryKeyFor(uid) {
-  const secret =
-    process.env.VAULT_RECOVERY_SECRET || "lifewalletpuelo-vault-recovery-v1";
+  const secret = requireVaultRecoverySecret();
   return crypto.createHash("sha256").update(`${secret}:${uid}`).digest();
 }
 
@@ -449,8 +459,14 @@ function requireAuthUid(request) {
 }
 
 exports.registerVaultRecovery = onCall(
-  { cors: true, memory: "256MiB", timeoutSeconds: 30 },
+  {
+    cors: true,
+    memory: "256MiB",
+    timeoutSeconds: 30,
+    secrets: ["VAULT_RECOVERY_SECRET"],
+  },
   async (request) => {
+    requireVaultRecoverySecret();
     const uid = requireAuthUid(request);
     const dekBase64 = request.data && request.data.dekBase64;
     if (!dekBase64 || typeof dekBase64 !== "string") {
@@ -479,8 +495,14 @@ exports.registerVaultRecovery = onCall(
 );
 
 exports.recoverVaultDek = onCall(
-  { cors: true, memory: "256MiB", timeoutSeconds: 30 },
+  {
+    cors: true,
+    memory: "256MiB",
+    timeoutSeconds: 30,
+    secrets: ["VAULT_RECOVERY_SECRET"],
+  },
   async (request) => {
+    requireVaultRecoverySecret();
     const uid = requireAuthUid(request);
     const snap = await db.collection("usuarios").doc(uid).collection("vault").doc("meta").get();
     if (!snap.exists) {
