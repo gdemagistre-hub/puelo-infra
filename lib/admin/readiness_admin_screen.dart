@@ -9,11 +9,7 @@ import '../user_session.dart';
 class ReadinessAdminScreen extends StatefulWidget {
   const ReadinessAdminScreen({super.key});
 
-  static bool get puedeAcceder {
-    final data = UserSession().datosCompletos;
-    if (data == null) return false;
-    return data['es_admin'] == true || data['rol'] == 'admin';
-  }
+  static bool get puedeAcceder => UserSession().isAdmin;
 
   @override
   State<ReadinessAdminScreen> createState() => _ReadinessAdminScreenState();
@@ -53,7 +49,6 @@ class _ReadinessAdminScreenState extends State<ReadinessAdminScreen> {
       _error = null;
     });
     try {
-      // Preferir orden por readiness si el campo existe en la mayoría.
       QuerySnapshot<Map<String, dynamic>> snap;
       try {
         snap = await FirebaseFirestore.instance
