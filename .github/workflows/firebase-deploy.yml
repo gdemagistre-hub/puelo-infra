@@ -5,7 +5,6 @@ on:
       - main
   workflow_dispatch:
 
-# Deny all by default; job only needs contents read + GITHUB_TOKEN for hosting action.
 permissions: {}
 
 jobs:
@@ -13,9 +12,11 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      # action-hosting-deploy may comment on checks; keep minimal
       checks: write
     steps:
+      - name: Solo main
+        run: test "${GITHUB_REF}" = "refs/heads/main"
+
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Install Flutter
@@ -50,8 +51,6 @@ jobs:
             --dart-define=FIREBASE_API_KEY_WEB="$FIREBASE_API_KEY_WEB" \
             --dart-define=FIREBASE_API_KEY_ANDROID="$FIREBASE_API_KEY_ANDROID"
 
-      # Copia content/academia (MP3 + lo que haya) desde el propio repo.
-      # Self-contained: no depende de puelo-finanzas ni de curl externo.
       - name: Copy Academia content
         run: |
           set -e
@@ -66,7 +65,6 @@ jobs:
             echo "WARN: content/academia no encontrado en el repo"
           fi
 
-      # Firma sonora PROX (open + confirm).
       - name: Copy brand sounds
         run: |
           set -e
