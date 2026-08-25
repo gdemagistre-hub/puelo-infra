@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../user_session.dart';
 
-/// 5.8 — cierra el loop después de WhatsApp / llamada.
-/// No es chat: explica que el comprobante se registra en la tarjeta.
+/// Cierra el loop después de WhatsApp / llamada.
+/// Primario: registrar comprobante. Secundario: ver tarjeta.
 class PostContactoSheet {
   PostContactoSheet._();
 
@@ -15,6 +15,7 @@ class PostContactoSheet {
     String? prestadorNombre,
     required bool desdeTarjeta,
     VoidCallback? onPrimary,
+    VoidCallback? onPagar,
   }) async {
     final me = UserSession().uid;
     if (me != null && me == prestadorUid) return;
@@ -24,7 +25,8 @@ class PostContactoSheet {
     final titulo = nombre.isEmpty
         ? 'Ya le escribiste'
         : 'Le escribiste a $nombre';
-    final primaryLabel = desdeTarjeta ? 'Doy un pago' : 'Ver tarjeta';
+    final puedePagar = onPagar != null || (desdeTarjeta && onPrimary != null);
+    final puedeVerTarjeta = onPrimary != null && !desdeTarjeta;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -65,9 +67,8 @@ class PostContactoSheet {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Cuando cierren el trabajo, registrá el comprobante '
-                  'desde la tarjeta (Doy un pago). Queda en PROX; '
-                  'no hace falta un chat acá.',
+                  'Cuando paguen el trabajo, registralo acá. '
+                  'La otra parte lo confirma. No hace falta chat.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
@@ -76,27 +77,55 @@ class PostContactoSheet {
                   ),
                 ),
                 const SizedBox(height: 20),
-                SizedBox(
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      onPrimary?.call();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _primary,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                if (puedePagar)
+                  SizedBox(
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        if (onPagar != null) {
+                          onPagar();
+                        } else {
+                          onPrimary?.call();
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Doy un pago',
+                        style: TextStyle(fontWeight: FontWeight.w800),
                       ),
                     ),
-                    child: Text(
-                      primaryLabel,
-                      style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                if (puedeVerTarjeta) ...[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 44,
+                    child: OutlinedButton(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        onPrimary?.call();
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _primary,
+                        side: const BorderSide(color: _primary),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Ver tarjeta',
+                        style: TextStyle(fontWeight: FontWeight.w800),
+                      ),
                     ),
                   ),
-                ),
+                ],
                 const SizedBox(height: 8),
                 SizedBox(
                   height: 44,
