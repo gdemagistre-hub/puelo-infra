@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import 'user_session.dart';
@@ -41,6 +42,25 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
     'Entre 1 y 5 años',
     'Más de 5 años',
     'No sabe',
+  ];
+
+  static const List<String> _callesSenuelo = [
+    'San Martín',
+    'Belgrano',
+    'Rivadavia',
+    'Sarmiento',
+    'Mitre',
+    'Alsina',
+    'Moreno',
+    'Independencia',
+    '25 de Mayo',
+    '9 de Julio',
+    'Lavalle',
+    'Italia',
+    'España',
+    'Buenos Aires',
+    'Los Aromos',
+    'Los Pinos',
   ];
 
   @override
@@ -107,48 +127,51 @@ class _ValidarDomicilioWidgetState extends State<ValidarDomicilioWidget> {
     return 'Localidad desconocida';
   }
 
+  String _localidadDe(String domicilio) {
+    final i = domicilio.lastIndexOf(',');
+    if (i < 0) return 'Buenos Aires';
+    final loc = domicilio.substring(i + 1).trim();
+    return loc.isEmpty ? 'Buenos Aires' : loc;
+  }
+
+  List<String> _domiciliosSenuelo(String real) {
+    final loc = _localidadDe(real);
+    final rng = Random(real.hashCode ^ DateTime.now().microsecondsSinceEpoch);
+    final calles = List<String>.from(_callesSenuelo)..shuffle(rng);
+    final out = <String>[];
+    for (final calle in calles) {
+      final n = 40 + rng.nextInt(4600);
+      final fake = '$calle $n, $loc';
+      if (fake == real || out.contains(fake)) continue;
+      out.add(fake);
+      if (out.length >= 2) break;
+    }
+    return out;
+  }
+
   Future<void> _cargarOpcionesDomicilio() async {
     setState(() => _loading = true);
-
     try {
-      final List<String> opciones = [_domicilioReal!];
-
-      final query = await db
-          .collection('usuarios')
-          .where('perfil_completo', isEqualTo: true)
-          .limit(30)
-          .get();
-
-      final List<String> candidatas = [];
-      for (var d in query.docs) {
-        if (d.id == widget.usuarioId) continue;
-        final data = d.data();
-        final calle = (data['calle'] ?? '').toString().trim();
-        final numero = (data['numero'] ?? '').toString().trim();
-        final geo = data['direccion_geo'] as Map<String, dynamic>?;
-        if (calle.isEmpty || numero.isEmpty || geo == null || geo['localidad_id'] == null) continue;
-
-        final locNombre = await _resolverLocalidadNombre(geo['localidad_id']?.toString());
-        final dir = '$calle $numero, $locNombre';
-        if (dir != _domicilioReal && !candidatas.contains(dir)) {
-          candidatas.add(dir);
+      final real = _domicilioReal!;
+      final opciones = <String>[real, ..._domiciliosSenuelo(real)];
+      var guard = 0;
+      while (opciones.length < 3 && guard < 8) {
+        for (final extra in _domiciliosSenuelo('$real-$guard')) {
+          if (!opciones.contains(extra)) opciones.add(extra);
+          if (opciones.length >= 3) break;
         }
-        if (candidatas.length >= 8) break;
+        guard++;
       }
-
-      candidatas.shuffle();
-      opciones.addAll(candidatas.take(2));
-
-      while (opciones.length < 3) {
-        opciones.add(_domicilioReal!);
-      }
-
       opciones.shuffle();
-      _opcionesDomicilio = opciones;
+      _opcionesDomicilio = opciones.take(3).toList();
     } catch (e) {
-      _opcionesDomicilio = [_domicilioReal!, _domicilioReal!, _domicilioReal!];
+      final real = _domicilioReal ?? '';
+      final fakes = real.isEmpty ? <String>[] : _domiciliosSenuelo(real);
+      _opcionesDomicilio = <String>[
+        if (real.isNotEmpty) real,
+        ...fakes,
+      ].take(3).toList();
     }
-
     setState(() => _loading = false);
   }
 

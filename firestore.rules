@@ -1,5 +1,7 @@
 rules_version = '2';
 // 2026-08-24: usuarios sin write anónimo.
+// 2026-08-24 etapa 5 Aikido: list de usuarios exige sesión (cierra enumeración masiva de PII).
+// get queda abierto para el enlace /validarDomicilio?id= (vecino sin cuenta).
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -128,7 +130,8 @@ service cloud.firestore {
     }
 
     match /usuarios/{userId} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if isSignedIn();
 
       allow create: if createHasNoPrivileged()
         && (isOwner(userId) || isAdmin());
