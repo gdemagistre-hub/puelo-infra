@@ -35,3 +35,11 @@ Thumbs.db
 # Backups locales
 *.bundle
 *.tar.gz
+
+# Android / Play signing (nunca en Git)
+*.jks
+*.keystore
+android/key.properties
+android/app/google-services.json
+android/local.properties
+**/upload-keystore.jks

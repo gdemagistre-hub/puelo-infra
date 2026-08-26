@@ -60,7 +60,7 @@ void main() async {
     await Firebase.initializeApp(
       options: const FirebaseOptions(
         apiKey: androidKey,
-        appId: '1:74624927314:android:8e3376cf776fd40285818b',
+        appId: '1:74624927314:android:6ac67829e523ff3585818b',
         messagingSenderId: '74624927314',
         projectId: 'lifewalletpuelo',
         storageBucket: 'lifewalletpuelo.firebasestorage.app',

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "74624927314",
+    "project_id": "lifewalletpuelo",
+    "storage_bucket": "lifewalletpuelo.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:74624927314:android:6ac67829e523ff3585818b",
+        "android_client_info": {
+          "package_name": "app.puelo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "PEGAR_FIREBASE_API_KEY_ANDROID"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
