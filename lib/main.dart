@@ -129,11 +129,32 @@ class MyApp extends StatelessWidget {
           );
         }
 
+        if (uri.path == '/t' || uri.path.startsWith('/t/')) {
+          final segs = uri.pathSegments;
+          final token = segs.length >= 2
+              ? segs[1]
+              : (uri.queryParameters['t'] ?? '');
+          return MaterialPageRoute(
+            settings: settings,
+            builder: (context) => TarjetaDigitalWidget(
+              shareToken: token.isEmpty ? null : token,
+            ),
+          );
+        }
+
         if (uri.path == TarjetaDigitalWidget.routePath ||
             uri.path.startsWith('/tarjetaDigital')) {
           DocumentReference? userRef;
+          final String? shareToken = uri.queryParameters['t'];
           final String? idParam =
               uri.queryParameters['id'] ?? uri.queryParameters['usuarioRef'];
+
+          if (shareToken != null && shareToken.isNotEmpty) {
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (context) => TarjetaDigitalWidget(shareToken: shareToken),
+            );
+          }
 
           if (idParam != null && idParam.isNotEmpty) {
             userRef = FirebaseFirestore.instance.doc('usuarios/$idParam');
