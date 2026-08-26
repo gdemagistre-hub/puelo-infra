@@ -1,6 +1,7 @@
 /**
- * Tarjeta digital compartible — token opaco 21 días.
- * El anónimo lee tarjetas_share/{token}, no usuarios/{uid}.
+ * Tarjeta digital compartible — token opaco 7 días.
+ * Vitrina anónima: tarjetas_share/{token} (contacto sí, sin DNI/calle).
+ * usuarios/{uid} sigue exigiendo sesión.
  */
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
@@ -8,7 +9,8 @@ const crypto = require("crypto");
 const { loadMerged, telefonoDe } = require("./pii");
 
 const db = admin.firestore();
-const TTL_MS = 21 * 24 * 3600 * 1000;
+const TTL_DAYS = 7;
+const TTL_MS = TTL_DAYS * 24 * 3600 * 1000;
 const HOST = "https://lifewalletpuelo.web.app";
 
 function requireAuthUid(request) {
@@ -43,8 +45,8 @@ function snapshotDe(uid, data) {
     : [];
   const nombres = zonasNombres(data);
   const scoring = data.scoring && typeof data.scoring === "object" ? data.scoring : {};
-  const tel = telefonoDe(data);
-  const tieneTel = data.tiene_telefono === true || !!tel;
+  const tel = telefonoDe(data).replace(/[^\d+]/g, "").slice(0, 20);
+  const tieneTel = !!tel || data.tiene_telefono === true;
   const tieneWa = data.tiene_whatsapp === true || (tieneTel && data.tiene_whatsapp !== false);
   return {
     prestador_uid: uid,
@@ -66,6 +68,7 @@ function snapshotDe(uid, data) {
       Number(data.list_n_evaluaciones ?? data.nEvaluaciones ?? 0) || 0,
     tiene_whatsapp: tieneWa,
     tiene_telefono: tieneTel,
+    telefono: tel,
   };
 }
 
@@ -122,8 +125,9 @@ exports.crearTarjetaShare = onCall(
       ok: true,
       token,
       url,
+      telefono: snap.telefono || "",
       expires_at: new Date(now + TTL_MS).toISOString(),
-      dias: 21,
+      dias: TTL_DAYS,
     };
   }
 );
