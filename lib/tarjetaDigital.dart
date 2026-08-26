@@ -126,7 +126,8 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
   }
 
   Future<void> _copiarEnlace(String idDocumento) async {
-    Clipboard.setData(ClipboardData(text: '${Uri.base.origin}/#/tarjetaDigital?id=$idDocumento'));
+    final link = await TarjetaShareService.crearEnlace();
+    await Clipboard.setData(ClipboardData(text: link));
     _alerta('¡Enlace copiado al portapapeles!');
   }
 
