@@ -46,6 +46,17 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
     'limpieza': 'Limpieza',
   };
 
+  IconData _iconoBadge(String? badge) {
+    switch ((badge ?? '').toLowerCase().trim()) {
+      case 'bronce_plus': return Icons.verified_rounded;
+      case 'bronce': return Icons.workspace_premium_rounded;
+      case 'plata': return Icons.workspace_premium_rounded;
+      case 'oro': return Icons.emoji_events_rounded;
+      case 'registrado': return Icons.badge_outlined;
+      default: return Icons.radio_button_unchecked;
+    }
+  }
+
   String _labelProf(dynamic p) {
     final k = p.toString().toLowerCase().trim();
     return _labelOficio[k] ?? p.toString();
@@ -376,16 +387,14 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                             const SizedBox(height: 14),
                             Row(children: [
                               Expanded(child: _metricTile(child: Column(children: [
-                                if (badgeLabel.isNotEmpty)
-                                  Container(
-                                    width: double.infinity,
-                                    alignment: Alignment.center,
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-                                    decoration: BoxDecoration(color: Color(badgeColors.background), borderRadius: BorderRadius.circular(20), border: Border.all(color: Color(badgeColors.foreground).withOpacity(0.35))),
-                                    child: Text(badgeLabel, textAlign: TextAlign.center, maxLines: 2, style: TextStyle(fontSize: 11, height: 1.15, fontWeight: FontWeight.w800, color: Color(badgeColors.foreground))),
-                                  )
-                                else Text('Sin nivel', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.grey.shade500)),
-                                const SizedBox(height: 4),
+                                Container(
+                                  width: 36, height: 36,
+                                  decoration: BoxDecoration(color: Color(badgeColors.background), shape: BoxShape.circle, border: Border.all(color: Color(badgeColors.foreground).withOpacity(0.35))),
+                                  child: Icon(_iconoBadge(badge), size: 20, color: Color(badgeColors.foreground)),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(badgeLabel.isNotEmpty ? badgeLabel : 'Sin nivel', textAlign: TextAlign.center, maxLines: 2, style: TextStyle(fontSize: 11, height: 1.15, fontWeight: FontWeight.w800, color: badgeLabel.isNotEmpty ? Color(badgeColors.foreground) : Colors.grey.shade500)),
+                                const SizedBox(height: 2),
                                 Text('Nivel', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
                               ]))),
                               const SizedBox(width: 8),
