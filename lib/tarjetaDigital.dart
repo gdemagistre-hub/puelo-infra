@@ -281,7 +281,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
           if (n.isEmpty) return a[0].toUpperCase();
           return '${n[0]}${a[0]}'.toUpperCase();
         }();
-        final hasTel = ContactoService.puedeContactar(datos) || telefono.trim().isNotEmpty;
+        final hasTel = ContactoService.puedeContactar(datos) || telefono.trim().isNotEmpty || (datos['prestador_uid'] ?? '').toString().trim().isNotEmpty;
 
         return Scaffold(
           backgroundColor: bgColor,
