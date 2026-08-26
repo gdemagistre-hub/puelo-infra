@@ -56,7 +56,11 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
     final tok = (widget.shareToken ?? '').trim();
     if (tok.isNotEmpty) {
       _resolvedRef = FirebaseFirestore.instance.collection('tarjetas_share').doc(tok);
-      _fotosFuture = Future<List<_FotoItem>>.value(<_FotoItem>[]);
+      _fotosFuture = FirebaseFirestore.instance.collection('tarjetas_share').doc(tok).get().then((s) {
+        final uid = (s.data()?['prestador_uid'] ?? '').toString().trim();
+        if (uid.isEmpty) return <_FotoItem>[];
+        return _cargarFotos(uid);
+      });
       _loading = false;
       return;
     }
@@ -86,6 +90,14 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
   }
 
   Future<void> _contactarWhatsApp(String telefono, String nombre, {required String prestadorUid}) async {
+    if ((telefono).trim().isEmpty) {
+      final got = await ContactoService.resolverTelefono(prestadorUid: prestadorUid, tipo: 'whatsapp', origen: 'tarjeta', prestadorNombre: nombre);
+      if (got == null || got.isEmpty) {
+        _alerta(UserSession().uid == null ? 'Entrá con tu cuenta para escribirle por WhatsApp' : 'No hay WhatsApp disponible');
+        return;
+      }
+      telefono = got;
+    }
     ContactoService.registrar(prestadorUid: prestadorUid, tipo: 'whatsapp', origen: 'tarjeta', prestadorNombre: nombre.isEmpty ? null : nombre);
     final tel = telefono.replaceAll(RegExp(r'[^\d+]'), '');
     final url = Uri.parse('https://wa.me/$tel?text=${Uri.encodeComponent('Hola $nombre, vi tu tarjeta en Puelo y me gustaría hacerte una consulta.')}');
@@ -102,6 +114,14 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
   }
 
   Future<void> _realizarLlamada(String telefono, {required String prestadorUid, String? prestadorNombre}) async {
+    if ((telefono).trim().isEmpty) {
+      final got = await ContactoService.resolverTelefono(prestadorUid: prestadorUid, tipo: 'llamada', origen: 'tarjeta', prestadorNombre: prestadorNombre);
+      if (got == null || got.isEmpty) {
+        _alerta(UserSession().uid == null ? 'Entrá con tu cuenta para llamarlo' : 'No hay teléfono disponible');
+        return;
+      }
+      telefono = got;
+    }
     ContactoService.registrar(prestadorUid: prestadorUid, tipo: 'llamada', origen: 'tarjeta', prestadorNombre: prestadorNombre);
     final url = Uri.parse('tel:${telefono.replaceAll(RegExp(r'[^\d+]'), '')}');
     if (await canLaunchUrl(url)) await launchUrl(url);
@@ -227,7 +247,8 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
         final nombreMostrar = comercial.isNotEmpty ? comercial : '$nombre $apellido'.trim();
         final telefono = (datos['telefono'] ?? datos['celular'] ?? '').toString();
         final profesiones = datos['profesiones'] as List? ?? [];
-        final docId = snapshot.data!.id;
+        final rawId = snapshot.data!.id;
+        final docId = (datos['prestador_uid'] ?? '').toString().trim().isNotEmpty ? (datos['prestador_uid'] as String).trim() : rawId;
         final esPropietario = UserSession().uid == docId;
         final badge = (datos['list_badge'] ?? datos['badge_prestador'])?.toString();
         final scoringMap = datos['scoring'];
@@ -260,7 +281,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
           if (n.isEmpty) return a[0].toUpperCase();
           return '${n[0]}${a[0]}'.toUpperCase();
         }();
-        final hasTel = telefono.trim().isNotEmpty;
+        final hasTel = ContactoService.puedeContactar(datos) || telefono.trim().isNotEmpty;
 
         return Scaffold(
           backgroundColor: bgColor,
