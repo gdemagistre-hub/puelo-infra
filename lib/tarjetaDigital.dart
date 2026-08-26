@@ -10,6 +10,7 @@ import 'user_session.dart';
 import 'contacto_service.dart';
 import 'contacto/post_contacto_sheet.dart';
 import 'mensajes/emitir_recibo_sheet.dart';
+import 'tarjeta_share_service.dart';
 
 /// Tarjeta UX v2 — mismo diseño para cliente y prestador (hero trust).
 class TarjetaDigitalWidget extends StatefulWidget {
@@ -52,6 +53,13 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
   @override
   void initState() {
     super.initState();
+    final tok = (widget.shareToken ?? '').trim();
+    if (tok.isNotEmpty) {
+      _resolvedRef = FirebaseFirestore.instance.collection('tarjetas_share').doc(tok);
+      _fotosFuture = Future<List<_FotoItem>>.value(<_FotoItem>[]);
+      _loading = false;
+      return;
+    }
     if (widget.usuarioRef != null) {
       _resolvedRef = widget.usuarioRef;
       _fotosFuture = _cargarFotos(_resolvedRef!.id);
@@ -109,14 +117,15 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
   }
 
   Future<void> _compartirPorWhatsApp(String nombre, String idDocumento) async {
-    final origin = Uri.base.origin;
-    final link = '$origin/#/tarjetaDigital?id=$idDocumento';
+    final linkShare = await TarjetaShareService.crearEnlace();
+    final origin = linkShare;
+    final link = origin;
     final url = Uri.parse('https://wa.me/?text=${Uri.encodeComponent('¡Hola! Te comparto mi tarjeta de servicios en Puelo:\n\n$link')}');
     if (await canLaunchUrl(url)) await launchUrl(url, mode: LaunchMode.externalApplication);
     else _alerta('No se pudo abrir WhatsApp para compartir');
   }
 
-  void _copiarEnlace(String idDocumento) {
+  Future<void> _copiarEnlace(String idDocumento) async {
     Clipboard.setData(ClipboardData(text: '${Uri.base.origin}/#/tarjetaDigital?id=$idDocumento'));
     _alerta('¡Enlace copiado al portapapeles!');
   }
