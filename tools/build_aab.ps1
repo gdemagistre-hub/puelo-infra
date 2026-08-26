@@ -46,6 +46,12 @@ if (-not $webKey) { $webKey = $androidKey }
 Write-Host "Compilando AAB app.puelo (puede tardar varios minutos)..."
 & $flutter pub get
 if ($LASTEXITCODE -ne 0) { Fail "flutter pub get fallo" }
+$gp = "android\gradle.properties"
+$raw = Get-Content -LiteralPath $gp -Raw
+$raw = $raw -replace "android.newDsl\s*=\s*true","android.newDsl=false"
+if ($raw -notmatch "android.newDsl=false") { $raw = $raw.TrimEnd() + "`r`nandroid.newDsl=false`r`n" }
+Set-Content -LiteralPath $gp -Value $raw -NoNewline
+if ($LASTEXITCODE -ne 0) { Fail "flutter pub get fallo" }
 & $flutter build appbundle --release --dart-define=PUELLO_ENV=prod --dart-define=FIREBASE_API_KEY_WEB="$webKey" --dart-define=FIREBASE_API_KEY_ANDROID="$androidKey"
 if ($LASTEXITCODE -ne 0) { Fail "flutter build appbundle fallo" }
 
