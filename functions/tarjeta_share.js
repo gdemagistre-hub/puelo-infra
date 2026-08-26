@@ -5,6 +5,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const crypto = require("crypto");
+const { loadMerged, telefonoDe } = require("./pii");
 
 const db = admin.firestore();
 const TTL_MS = 21 * 24 * 3600 * 1000;
@@ -42,6 +43,9 @@ function snapshotDe(uid, data) {
     : [];
   const nombres = zonasNombres(data);
   const scoring = data.scoring && typeof data.scoring === "object" ? data.scoring : {};
+  const tel = telefonoDe(data);
+  const tieneTel = data.tiene_telefono === true || !!tel;
+  const tieneWa = data.tiene_whatsapp === true || (tieneTel && data.tiene_whatsapp !== false);
   return {
     prestador_uid: uid,
     nombre: String(data.nombre || "").slice(0, 80),
@@ -60,8 +64,8 @@ function snapshotDe(uid, data) {
     list_promedio: Number(data.list_promedio ?? data.promedioEstrellas ?? 0) || 0,
     list_n_evaluaciones:
       Number(data.list_n_evaluaciones ?? data.nEvaluaciones ?? 0) || 0,
-    tiene_whatsapp: data.tiene_whatsapp === true,
-    tiene_telefono: data.tiene_telefono === true,
+    tiene_whatsapp: tieneWa,
+    tiene_telefono: tieneTel,
   };
 }
 
@@ -75,17 +79,17 @@ exports.crearTarjetaShare = onCall(
   async (request) => {
     const uid = requireAuthUid(request);
     const rotar = !!(request.data && request.data.rotar);
-    const userRef = db.collection("usuarios").doc(uid);
-    const userSnap = await userRef.get();
-    if (!userSnap.exists) {
+    const loaded = await loadMerged(uid);
+    if (!loaded.merged) {
       throw new HttpsError("not-found", "No hay perfil");
     }
-    const data = userSnap.data() || {};
+    const data = loaded.merged;
     const snap = snapshotDe(uid, data);
     const now = Date.now();
     const expireAt = admin.firestore.Timestamp.fromMillis(now + TTL_MS);
 
-    let token = String(data.tarjeta_share_token || "").trim();
+    const parent = loaded.parent || {};
+    let token = String(parent.tarjeta_share_token || "").trim();
     if (token && !rotar) {
       const existing = await db.collection("tarjetas_share").doc(token).get();
       const exp = existing.exists ? existing.get("expire_at") : null;
@@ -111,7 +115,7 @@ exports.crearTarjetaShare = onCall(
       created_at: admin.firestore.FieldValue.serverTimestamp(),
       expire_at: expireAt,
     });
-    await userRef.set({ tarjeta_share_token: token }, { merge: true });
+    await loaded.ref.set({ tarjeta_share_token: token }, { merge: true });
 
     const url = `${HOST}/#/t/${token}`;
     return {
