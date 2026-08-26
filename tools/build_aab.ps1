@@ -14,13 +14,15 @@ if (-not (Test-Path -LiteralPath $flutter)) {
 $flutterBin = Split-Path -Parent $flutter
 $env:Path = "$flutterBin;" + $env:Path
 
-$jbr = "C:\Program Files\Android\Android Studio\jbr"
-if (Test-Path -LiteralPath $jbr) {
-  $env:JAVA_HOME = $jbr
-  $env:Path = "$jbr\bin;" + $env:Path
-  Write-Host "JAVA_HOME=$jbr"
+$jdk17 = Get-ChildItem "C:\Program Files\Microsoft" -Directory -ErrorAction SilentlyContinue |
+  Where-Object { $_.Name -like "jdk-17*" } |
+  Select-Object -First 1
+if ($jdk17) {
+  $env:JAVA_HOME = $jdk17.FullName
+  $env:Path = "$($jdk17.FullName)\bin;" + $env:Path
+  Write-Host "JAVA_HOME=$($jdk17.FullName)"
 } else {
-  Write-Host "WARN: no esta Android Studio JBR; Flutter puede usar un Java incompatible"
+  Write-Host "WARN: no esta JDK 17 de Microsoft"
 }
 
 Write-Host "Usando Flutter: $flutter"
