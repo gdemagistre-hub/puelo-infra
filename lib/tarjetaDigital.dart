@@ -378,9 +378,11 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
                               Expanded(child: _metricTile(child: Column(children: [
                                 if (badgeLabel.isNotEmpty)
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                    width: double.infinity,
+                                    alignment: Alignment.center,
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
                                     decoration: BoxDecoration(color: Color(badgeColors.background), borderRadius: BorderRadius.circular(20), border: Border.all(color: Color(badgeColors.foreground).withOpacity(0.35))),
-                                    child: Text(badgeLabel, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(badgeColors.foreground))),
+                                    child: Text(badgeLabel, textAlign: TextAlign.center, maxLines: 2, style: TextStyle(fontSize: 11, height: 1.15, fontWeight: FontWeight.w800, color: Color(badgeColors.foreground))),
                                   )
                                 else Text('Sin nivel', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.grey.shade500)),
                                 const SizedBox(height: 4),
