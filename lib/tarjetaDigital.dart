@@ -11,6 +11,7 @@ import 'contacto_service.dart';
 import 'contacto/post_contacto_sheet.dart';
 import 'mensajes/emitir_recibo_sheet.dart';
 import 'tarjeta_share_service.dart';
+import 'identidad_pii.dart';
 
 /// Tarjeta UX v2 — mismo diseño para cliente y prestador (hero trust).
 class TarjetaDigitalWidget extends StatefulWidget {
@@ -140,7 +141,11 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
     final linkShare = await TarjetaShareService.crearEnlace();
     final origin = linkShare;
     final link = origin;
-    final url = Uri.parse('https://wa.me/?text=${Uri.encodeComponent('¡Hola! Te comparto mi tarjeta de servicios en Puelo:\n\n$link')}');
+    final telMio = IdentidadPii.telefonoDe(UserSession().datosCompletos);
+    final cuerpo = telMio.isEmpty
+        ? 'Hola, te mando mi tarjeta en Puelo:\n$link\nEl link vale 7 días.'
+        : 'Hola, te mando mi tarjeta en Puelo:\n$link\nWhatsApp: $telMio\nEl link vale 7 días.';
+    final url = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(cuerpo)}');
     if (await canLaunchUrl(url)) await launchUrl(url, mode: LaunchMode.externalApplication);
     else _alerta('No se pudo abrir WhatsApp para compartir');
   }
@@ -148,7 +153,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
   Future<void> _copiarEnlace(String idDocumento) async {
     final link = await TarjetaShareService.crearEnlace();
     await Clipboard.setData(ClipboardData(text: link));
-    _alerta('¡Enlace copiado al portapapeles!');
+    _alerta('Enlace copiado. Vale 7 días.');
   }
 
   void _emitirRecibo(String contraparteUid, String nombreMostrar) {
