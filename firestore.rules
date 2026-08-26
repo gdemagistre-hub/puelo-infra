@@ -2,7 +2,7 @@ rules_version = '2';
 // 2026-08-24: usuarios sin write anónimo.
 // 2026-08-24 etapa 5 Aikido: list de usuarios exige sesión (cierra enumeración masiva).
 // 2026-08-24 etapa 1 PII: DNI/email/calle en usuarios/{uid}/privado (dueño/admin).
-// get del padre queda abierto: proyección pública (nombre, badge, zona, foto, tel).
+// 2026-08-26: get del padre exige sesión. Vitrina anónima = tarjetas_share/{token} 21d.
 // 2026-08-24 etapa A1: sin wildcard FlutterFlow (ya no hay allow write global).
 // 2026-08-24 etapa A3: isAdmin() solo custom claim admin (no es_admin del doc público).
 // 2026-08-25: trabajos update — tipo y refs inmutables (no convertir evaluación en portfolio).
@@ -123,9 +123,15 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /tarjetas_share/{token} {
+      allow get: if resource.data.expire_at is timestamp
+        && resource.data.expire_at > request.time;
+      allow list: if false;
+      allow create, update, delete: if false;
+    }
+
     match /usuarios/{userId} {
-      // Proyección pública (nombre, badge, zona, foto, tel). PII en /privado.
-      allow get: if true;
+      allow get: if isSignedIn() || isAdmin();
       allow list: if isSignedIn();
 
       allow create: if createHasNoPrivileged()
