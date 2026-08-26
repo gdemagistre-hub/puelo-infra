@@ -7,31 +7,22 @@ function Fail([string]$m) {
   exit 1
 }
 
-$flutterCandidates = @(
-  (Get-Command flutter -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source),
-  "$env:USERPROFILE\flutter\bin\flutter.bat",
-  "$env:USERPROFILE\dev\flutter\bin\flutter.bat",
-  "$env:LOCALAPPDATA\flutter\bin\flutter.bat",
-  "C:\flutter\bin\flutter.bat",
-  "C:\src\flutter\bin\flutter.bat"
-) | Where-Object { $_ -and (Test-Path $_) }
-
-if (-not $flutterCandidates) { Fail "No encuentro flutter.bat" }
-$flutter = $flutterCandidates[0]
-$flutterBin = Split-Path $flutter -Parent
-if ($env:Path -notlike ("*" + $flutterBin + "*")) {
-  $env:Path = $flutterBin + ";" + $env:Path
+$flutter = Join-Path $env:USERPROFILE "flutter\bin\flutter.bat"
+if (-not (Test-Path -LiteralPath $flutter)) {
+  Fail "No encuentro flutter.bat en $flutter"
 }
-Write-Host ("Usando Flutter: " + $flutter)
+$flutterBin = Split-Path -Parent $flutter
+$env:Path = "$flutterBin;" + $env:Path
+Write-Host "Usando Flutter: $flutter"
 
 $json = "android\app\google-services.json"
 $props = "android\key.properties"
 $jks = "android\upload-keystore.jks"
-if (-not (Test-Path $json)) { Fail "Falta google-services.json" }
-if (-not (Test-Path $props)) { Fail "Falta key.properties (etapa 3)" }
-if (-not (Test-Path $jks)) { Fail "Falta upload-keystore.jks (etapa 3)" }
+if (-not (Test-Path -LiteralPath $json)) { Fail "Falta google-services.json" }
+if (-not (Test-Path -LiteralPath $props)) { Fail "Falta key.properties (etapa 3)" }
+if (-not (Test-Path -LiteralPath $jks)) { Fail "Falta upload-keystore.jks (etapa 3)" }
 
-$gs = Get-Content $json -Raw | ConvertFrom-Json
+$gs = Get-Content -LiteralPath $json -Raw | ConvertFrom-Json
 $androidKey = $env:FIREBASE_API_KEY_ANDROID
 if (-not $androidKey) {
   $androidKey = $gs.client[0].api_key[0].current_key
@@ -47,6 +38,6 @@ if ($LASTEXITCODE -ne 0) { Fail "flutter pub get fallo" }
 if ($LASTEXITCODE -ne 0) { Fail "flutter build appbundle fallo" }
 
 $aab = "build\app\outputs\bundle\release\app-release.aab"
-if (-not (Test-Path $aab)) { Fail "No se genero el AAB" }
-Get-Item $aab | Format-List FullName, Length, LastWriteTime
+if (-not (Test-Path -LiteralPath $aab)) { Fail "No se genero el AAB" }
+Get-Item -LiteralPath $aab | Format-List FullName, Length, LastWriteTime
 Write-Host "OK. Ese archivo se sube a Play Console."
