@@ -13,6 +13,16 @@ if (-not (Test-Path -LiteralPath $flutter)) {
 }
 $flutterBin = Split-Path -Parent $flutter
 $env:Path = "$flutterBin;" + $env:Path
+
+$jbr = "C:\Program Files\Android\Android Studio\jbr"
+if (Test-Path -LiteralPath $jbr) {
+  $env:JAVA_HOME = $jbr
+  $env:Path = "$jbr\bin;" + $env:Path
+  Write-Host "JAVA_HOME=$jbr"
+} else {
+  Write-Host "WARN: no esta Android Studio JBR; Flutter puede usar un Java incompatible"
+}
+
 Write-Host "Usando Flutter: $flutter"
 
 $json = "android\app\google-services.json"
