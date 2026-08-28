@@ -16,6 +16,11 @@ class AuthService {
 
   static const String _fnRegion = 'us-east1';
 
+  /// Web OAuth client ID. En Android Play hace falta para el idToken
+  /// (google_sign_in 6.2). Lo inyecta tools/build_aab.ps1.
+  static const String _googleWebClientId =
+      String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
+
   Future<bool> _sendAuthEmailCf({
     required String type,
     String? email,
@@ -67,7 +72,20 @@ class AuthService {
       provider.setCustomParameters({'prompt': 'select_account'});
       cred = await _auth.signInWithPopup(provider);
     } else {
-      final googleSignIn = GoogleSignIn(scopes: const ['email', 'profile']);
+      if (_googleWebClientId.isEmpty) {
+        debugPrint(
+          'AuthService: falta GOOGLE_WEB_CLIENT_ID. '
+          'En Play esto suele ser ApiException 10.',
+        );
+      }
+      final googleSignIn = GoogleSignIn(
+        scopes: const ['email', 'profile'],
+        serverClientId:
+            _googleWebClientId.isEmpty ? null : _googleWebClientId,
+      );
+      try {
+        await googleSignIn.signOut();
+      } catch (_) {}
       final account = await googleSignIn.signIn();
       if (account == null) {
         throw AuthCancelledException();
