@@ -27,6 +27,7 @@ class LoginScreenWidget extends StatefulWidget {
 
 class _LoginScreenWidgetState extends State<LoginScreenWidget> {
   bool _loadingGoogle = false;
+  bool _loadingApple = false;
   bool _loadingFacebook = false;
   bool _loadingEmail = false;
   bool _showEmailForm = false;
@@ -80,6 +81,41 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
       );
     } finally {
       if (mounted) setState(() => _loadingFacebook = false);
+    }
+  }
+
+  Future<void> _entrarConApple() async {
+    ProxSounds.playOpenOnce();
+    setState(() => _loadingApple = true);
+    try {
+      await AuthService.instance.signInWithApple();
+      if (!mounted) return;
+      ProxAnalytics.instance.action('login_apple', screen: '/login');
+      await _navegarPostLogin();
+    } on AuthCancelledException {
+    } on AuthValidationException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 6),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'No se pudo iniciar con Apple. '
+            '${AuthService.humanizeAuthError(e)}',
+          ),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 6),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _loadingApple = false);
     }
   }
 
@@ -380,7 +416,7 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final busy = _loadingGoogle || _loadingFacebook || _loadingEmail;
+    final busy = _loadingGoogle || _loadingApple || _loadingFacebook || _loadingEmail;
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -500,7 +536,7 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                     ],
                     const SizedBox(height: 14),
                     _buildLoginButton(
-                      onPressed: busy ? null : () => _proximamente('Apple'),
+                      onPressed: busy ? null : _entrarConApple,
                       icon: _buildIconCircle(
                         backgroundColor: Colors.white.withOpacity(0.15),
                         child: const Icon(
@@ -509,9 +545,12 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                           size: 18,
                         ),
                       ),
-                      label: 'Continuar con Apple',
+                      label: _loadingApple
+                          ? 'Conectando con Apple…'
+                          : 'Continuar con Apple',
                       backgroundColor: Colors.black,
                       textColor: Colors.white,
+                      loading: _loadingApple,
                     ),
                     if (LoginScreenWidget.showFacebookLogin) ...[
                       const SizedBox(height: 14),
