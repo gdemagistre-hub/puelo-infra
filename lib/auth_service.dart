@@ -6,7 +6,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 import 'user_session.dart';
 
-/// Auth real (Google + Facebook web + email/password; Apple placeholder).
+/// Auth real (Google + Apple + Facebook web + email/password).
 class AuthService {
   AuthService._();
   static final AuthService instance = AuthService._();
@@ -109,9 +109,85 @@ class AuthService {
     await _auth.signInWithRedirect(provider);
   }
 
+  /// Sign in with Apple → perfil Firestore → UserSession.
+  ///
+  /// Requiere: Firebase Auth → Apple ON + (web/Android) Services ID + Key
+  /// en Apple Developer. Ver docs/APPLE_SIGN_IN.md.
+  /// El nombre solo llega en el PRIMER consentimiento de Apple.
   Future<void> signInWithApple() async {
-    throw UnimplementedError(
-      'Apple Auth se habilita en una etapa siguiente (mismo patrón que Google).',
+    final provider = AppleAuthProvider();
+    provider.addScope('email');
+    provider.addScope('name');
+
+    final UserCredential cred;
+    try {
+      if (kIsWeb) {
+        cred = await _auth.signInWithPopup(provider);
+      } else {
+        cred = await _auth.signInWithProvider(provider);
+      }
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'popup-closed-by-user' ||
+          e.code == 'cancelled-popup-request' ||
+          e.code == 'web-context-cancelled') {
+        throw AuthCancelledException();
+      }
+      throw AuthValidationException(humanizeAuthError(e));
+    }
+
+    final user = cred.user;
+    if (user == null) {
+      throw StateError('Apple Auth no devolvió usuario');
+    }
+
+    String? appleGiven;
+    String? appleFamily;
+    final profile = cred.additionalUserInfo?.profile;
+    if (profile != null) {
+      appleGiven = (profile['given_name'] ?? profile['givenName'] ?? '')
+          .toString()
+          .trim();
+      appleFamily = (profile['family_name'] ?? profile['familyName'] ?? '')
+          .toString()
+          .trim();
+      if (appleGiven.isEmpty && appleFamily.isEmpty) {
+        final full = (profile['name'] ?? '').toString().trim();
+        if (full.isNotEmpty) {
+          final parts = full.split(RegExp(r'\s+'));
+          appleGiven = parts.first;
+          if (parts.length > 1) {
+            appleFamily = parts.sublist(1).join(' ');
+          }
+        }
+      }
+    }
+
+    final displayFromApple = [
+      appleGiven ?? '',
+      appleFamily ?? '',
+    ].where((x) => x.isNotEmpty).join(' ');
+    if (displayFromApple.isNotEmpty &&
+        (user.displayName ?? '').trim().isEmpty) {
+      try {
+        await user.updateDisplayName(displayFromApple);
+        await user.reload();
+      } catch (e) {
+        debugPrint('AuthService Apple updateDisplayName: $e');
+      }
+    }
+
+    final refreshed = _auth.currentUser ?? user;
+    final data = await ensureUserProfile(
+      refreshed,
+      providerId: 'apple',
+      preferredNombre: appleGiven?.isNotEmpty == true ? appleGiven : null,
+      preferredApellido: appleFamily?.isNotEmpty == true ? appleFamily : null,
+    );
+    UserSession().iniciarSesion(
+      refreshed.uid,
+      data,
+      authProvider: 'apple',
+      isDevImpersonation: false,
     );
   }
 
@@ -324,7 +400,7 @@ class AuthService {
         case 'cancelled-popup-request':
           return 'Cancelaste el inicio de sesión.';
         case 'account-exists-with-different-credential':
-          return 'Ese email ya está asociado a Google o email. Entrá con ese método.';
+          return 'Ese email ya está asociado a otro método (Google, Apple o email). Entrá con ese método.';
         default:
           return e.message?.isNotEmpty == true
               ? e.message!
@@ -339,6 +415,8 @@ class AuthService {
   Future<Map<String, dynamic>> ensureUserProfile(
     User user, {
     required String providerId,
+    String? preferredNombre,
+    String? preferredApellido,
   }) async {
     final ref = _db.collection('usuarios').doc(user.uid);
     final snap = await ref.get();
@@ -354,9 +432,10 @@ class AuthService {
       }
     }
 
+    const providerIds = {'google.com', 'apple.com', 'facebook.com'};
     for (final p in user.providerData) {
       final pid = p.providerId;
-      if ((pid == 'google.com' || pid == 'facebook.com') &&
+      if (providerIds.contains(pid) &&
           (p.displayName ?? '').trim().isNotEmpty) {
         final d = p.displayName!.trim();
         final parts = d.split(RegExp(r'\s+'));
@@ -364,6 +443,13 @@ class AuthService {
         apellido = parts.length > 1 ? parts.sublist(1).join(' ') : apellido;
         break;
       }
+    }
+
+    if ((preferredNombre ?? '').trim().isNotEmpty) {
+      nombre = preferredNombre!.trim();
+    }
+    if ((preferredApellido ?? '').trim().isNotEmpty) {
+      apellido = preferredApellido!.trim();
     }
 
     final photo = (user.photoURL ?? '').trim().isNotEmpty
