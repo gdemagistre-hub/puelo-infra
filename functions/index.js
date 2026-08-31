@@ -9,10 +9,17 @@ setGlobalOptions({
   timeoutSeconds: 540,
 });
 
+function isCfHandler(v) {
+  return !!(v && typeof v === "function" && (v.__endpoint || v.run));
+}
+
 function assignSafe(modPath) {
   try {
     const m = require(modPath);
-    if (m && typeof m === "object") Object.assign(exports, m);
+    if (!m || typeof m !== "object") return;
+    for (const [k, v] of Object.entries(m)) {
+      if (isCfHandler(v)) exports[k] = v;
+    }
   } catch (e) {
     console.error("cf module skip", modPath, e && e.message);
   }
