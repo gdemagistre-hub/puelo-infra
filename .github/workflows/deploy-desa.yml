@@ -53,9 +53,9 @@ jobs:
           if [ -d content/academia ]; then cp -a content/academia build/web/content/; fi
           if [ -d content/brand ]; then cp -a content/brand build/web/content/; fi
 
-      - name: Deploy Hosting + Firestore rules a puelo-desa
+      - name: Deploy Hosting a puelo-desa
         uses: w9jds/firebase-action@5b73b1274a2229c7598af09e6e95addfb75f897b
         with:
-          args: deploy --only hosting,firestore:rules --project puelo-desa
+          args: deploy --only hosting --project puelo-desa
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PUELO_DESA }}
