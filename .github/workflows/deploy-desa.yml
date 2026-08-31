@@ -30,14 +30,21 @@ jobs:
 
       - name: Build Web App (desa)
         env:
-          FIREBASE_API_KEY_WEB: ${{ secrets.FIREBASE_API_KEY_WEB_DESA }}
-          FIREBASE_API_KEY_ANDROID: ${{ secrets.FIREBASE_API_KEY_ANDROID }}
+          FIREBASE_API_KEY_WEB_RAW: ${{ secrets.FIREBASE_API_KEY_WEB_DESA }}
         run: |
+          set -euo pipefail
+          WEB_KEY=$(printf '%s' "$FIREBASE_API_KEY_WEB_RAW" | tr -d '\r\n' )
+          if printf '%s' "$WEB_KEY" | grep -q 'AIza'; then
+            WEB_KEY=$(printf '%s' "$WEB_KEY" | grep -oE 'AIza[0-9A-Za-z_-]+' | head -n1)
+          fi
+          if [ ${#WEB_KEY} -lt 20 ]; then
+            echo "FIREBASE_API_KEY_WEB_DESA no parece una apiKey (una sola línea AIza... )"
+            exit 1
+          fi
           flutter pub get
           flutter build web --release \
             --dart-define=PUELLO_ENV=desa \
-            --dart-define=FIREBASE_API_KEY_WEB="$FIREBASE_API_KEY_WEB" \
-            --dart-define=FIREBASE_API_KEY_ANDROID="${FIREBASE_API_KEY_ANDROID:-}"
+            --dart-define=FIREBASE_API_KEY_WEB="$WEB_KEY"
 
       - name: Copy Academia + brand
         run: |
