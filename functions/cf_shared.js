@@ -52,6 +52,20 @@ function requireAuthUid(request) {
   return request.auth.uid;
 }
 
+function requireBatchSecret(req, res) {
+  const secret = process.env.BATCH_SECRET || "";
+  const provided = String(req.get("X-Batch-Secret") || "").trim();
+  if (!secret) {
+    res.status(503).json({ error: "batch_secret_not_configured" });
+    return false;
+  }
+  if (!timingSafeEqualString(provided, secret)) {
+    res.status(401).json({ error: "unauthorized" });
+    return false;
+  }
+  return true;
+}
+
 module.exports = {
   admin,
   db,
@@ -62,4 +76,5 @@ module.exports = {
   timingSafeEqualString,
   verifyBearer,
   requireAuthUid,
+  requireBatchSecret,
 };
