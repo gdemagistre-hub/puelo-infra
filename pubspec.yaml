@@ -25,6 +25,7 @@ dependencies:
       url: https://github.com/FlutterFlow/dropdown_button2.git
       ref: 514178337dfbea442f617daed39c704b57593fc9
       path: packages/dropdown_button2
+  firebase_app_check: 0.3.2+10
   firebase_auth: 5.6.0
   firebase_core: 3.14.0
   firebase_core_platform_interface: 5.4.0
