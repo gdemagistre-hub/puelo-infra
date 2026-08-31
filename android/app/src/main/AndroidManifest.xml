@@ -21,7 +21,7 @@
     </queries>
 
     <application
-        android:label="Puelo"
+        android:label="PROX"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:enableOnBackInvokedCallback="true">
@@ -43,7 +43,7 @@
             </intent-filter>
         </activity>
         <meta-data
-            android:name="flutterEmbedding"
+            android:name="flutter.embedding"
             android:value="2"/>
     </application>
 </manifest>
