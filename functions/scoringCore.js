@@ -5,7 +5,7 @@
 const admin = require("firebase-admin");
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
-const { mergePii, sanitizarOps, flagsContactoPublico } = require("./pii");
+const { mergePii, sanitizarOps, flagsContactoPublico, sanitizeValidacionesArray } = require("./pii");
 
 const MODEL_VERSION = "v1.2-phase1-cf";
 const LOCK_TTL_MS = 15 * 60 * 1000;
@@ -146,6 +146,8 @@ async function runScoringBatch({ trigger = "scheduler", force = false } = {}) {
         }
         const flags = flagsContactoPublico(data, merged);
         if (Object.keys(flags).length) Object.assign(parentUpdate, flags);
+        const valsClean = sanitizeValidacionesArray(data.validaciones_recibidas);
+        if (valsClean) parentUpdate.validaciones_recibidas = valsClean;
         batch.set(
           doc.ref,
           parentUpdate,

@@ -190,6 +190,24 @@ function telefonoDe(merged) {
   return String(merged.telefono || merged.celular || merged.phone || "").trim();
 }
 
+function sanitizeValidacionesArray(arr) {
+  if (!Array.isArray(arr)) return null;
+  let changed = false;
+  const out = arr.map((item) => {
+    if (!item || typeof item !== "object") return item;
+    if (!Object.prototype.hasOwnProperty.call(item, "domicilioReal") &&
+        !Object.prototype.hasOwnProperty.call(item, "domicilioSeleccionado")) {
+      return item;
+    }
+    changed = true;
+    const copy = { ...item };
+    delete copy.domicilioReal;
+    delete copy.domicilioSeleccionado;
+    return copy;
+  });
+  return changed ? out : null;
+}
+
 module.exports = {
   PII_KEYS,
   extractPii,
@@ -201,4 +219,5 @@ module.exports = {
   opcionesQuiz,
   nombreDe,
   telefonoDe,
+  sanitizeValidacionesArray,
 };
