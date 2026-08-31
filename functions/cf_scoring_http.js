@@ -47,8 +47,17 @@ exports.scoringBatchDaily = onSchedule(
     } catch (e) {
       console.error("topServiciosAyer", e);
     }
+    let purge = { status: "skipped" };
+    try {
+      const validacionCf = require("./cf_validacion");
+      purge = await validacionCf.purgeValidacionPiiFromCalificaciones({ limit: 250 });
+      console.log("purgeValidacionPii", purge);
+    } catch (e) {
+      console.error("purgeValidacionPii", e);
+      purge = { status: "error", error: String(e.message || e) };
+    }
     const result = await runScoringBatch({ trigger: "scheduler" });
     console.log("scoringBatchDaily", result);
-    return { scoring: result, topServicios: top };
+    return { scoring: result, topServicios: top, purgeValidacionPii: purge };
   }
 );
