@@ -1,26 +1,28 @@
-# S5 — Multi-proyecto Firebase (esqueleto)
+# S5 — Multi-proyecto Firebase
 
-Prod no se toca. `lifewalletpuelo` sigue recibiendo el deploy automático de `main`.
+Prod no se toca. `lifewalletpuelo` sigue con el deploy automático de `main`.
 
-| Alias | projectId | Deploy |
-|---|---|---|
-| prod | lifewalletpuelo | push a `main` (workflows actuales) |
-| desa | puelo-desa | Actions → Deploy Desa (manual) |
-| test | puelo-test | aún sin workflow |
+| Alias | projectId | Hosting | Functions |
+|---|---|---|---|
+| prod | lifewalletpuelo | push `main` | push `functions/**` |
+| desa | puelo-desa | Deploy Desa (manual) | Deploy Functions Desa (manual) |
+| test | puelo-test | Deploy Test (manual) | aún no |
 
-## Secrets GH
+URLs: https://lifewalletpuelo.web.app · https://puelo-desa.web.app · https://puelo-test.web.app
 
-- `FIREBASE_SERVICE_ACCOUNT_PUELO_DESA`
-- `FIREBASE_SERVICE_ACCOUNT_PUELO_TEST`
-- `FIREBASE_API_KEY_WEB_DESA`
-- `FIREBASE_API_KEY_WEB_TEST`
+## Secret Manager en desa (antes de Functions)
 
-Prod: `FIREBASE_SERVICE_ACCOUNT_LIFEWALLETPUELO` + `FIREBASE_API_KEY_WEB`.
+Valores **nuevos**, no copies prod.
 
-## Primera corrida desa
+```bash
+echo -n "desa-hmac-$(openssl rand -hex 16)" | gcloud secrets create RECIBO_HMAC_SECRET --data-file=- --project=puelo-desa
+echo -n "desa-vault-$(openssl rand -hex 16)" | gcloud secrets create VAULT_RECOVERY_SECRET --data-file=- --project=puelo-desa
+```
 
-1. GitHub → Actions → **Deploy Desa (manual)** → Run workflow.
-2. URL: https://puelo-desa.web.app
-3. Functions a desa: todavía no (S5.2).
+Si ya existen: `gcloud secrets versions add ...`
 
-Rollback aliases: `git checkout resguardo/2026-08-31-pre-s5 -- .firebaserc`
+Grant al compute SA no hace falta si el rol Firebase Admin ya cubre el bind en deploy.
+
+## Test
+
+En `puelo-test`: Firestore + Storage Get started + dominio Auth `puelo-test.web.app`.

@@ -1,0 +1,61 @@
+name: Deploy Test (manual)
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  build_and_deploy_test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@f2c4f6686ca8e8d6e6d0f28410eeef506ed66aff # v2.18.0
+        with:
+          channel: "stable"
+          cache: true
+
+      - name: Check test secrets
+        env:
+          WEB_KEY: ${{ secrets.FIREBASE_API_KEY_WEB_TEST }}
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PUELO_TEST }}
+        run: |
+          if [ -z "$WEB_KEY" ]; then echo "Falta FIREBASE_API_KEY_WEB_TEST"; exit 1; fi
+          if [ -z "$SA" ]; then echo "Falta FIREBASE_SERVICE_ACCOUNT_PUELO_TEST"; exit 1; fi
+          echo "Secrets test presentes"
+
+      - name: Build Web App (test)
+        env:
+          FIREBASE_API_KEY_WEB_RAW: ${{ secrets.FIREBASE_API_KEY_WEB_TEST }}
+        run: |
+          set -euo pipefail
+          WEB_KEY=$(printf '%s' "$FIREBASE_API_KEY_WEB_RAW" | tr -d '\r\n' )
+          if printf '%s' "$WEB_KEY" | grep -q 'AIza'; then
+            WEB_KEY=$(printf '%s' "$WEB_KEY" | grep -oE 'AIza[0-9A-Za-z_-]+' | head -n1)
+          fi
+          if [ ${#WEB_KEY} -lt 20 ]; then
+            echo "FIREBASE_API_KEY_WEB_TEST no parece una apiKey (una sola línea AIza... )"
+            exit 1
+          fi
+          flutter pub get
+          flutter build web --release \
+            --dart-define=PUELLO_ENV=test \
+            --dart-define=FIREBASE_API_KEY_WEB="$WEB_KEY"
+
+      - name: Copy Academia + brand
+        run: |
+          set -e
+          mkdir -p build/web/content
+          if [ -d content/academia ]; then cp -a content/academia build/web/content/; fi
+          if [ -d content/brand ]; then cp -a content/brand build/web/content/; fi
+
+      - name: Deploy Hosting + rules + Storage a puelo-test
+        uses: w9jds/firebase-action@5b73b1274a2229c7598af09e6e95addfb75f897b
+        with:
+          args: deploy --only hosting,firestore:rules,storage --project puelo-test
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PUELO_TEST }}
