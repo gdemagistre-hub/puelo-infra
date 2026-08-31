@@ -6,6 +6,8 @@ rules_version = '2';
 // 2026-08-24 etapa A1: sin wildcard FlutterFlow (ya no hay allow write global).
 // 2026-08-24 etapa A3: isAdmin() solo custom claim admin (no es_admin del doc público).
 // 2026-08-25: trabajos update — tipo y refs inmutables (no convertir evaluación en portfolio).
+// 2026-08-31 S2: list usuarios solo prestadores (es_trabajador==true) o admin;
+//                privilegedKeys ampliado (scoring/readiness/estrellas de sistema).
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -28,17 +30,40 @@ service cloud.firestore {
       return isSignedIn() && !isDevImpersonation() && request.auth.uid == userId;
     }
 
+    // Campos que solo escribe Admin SDK / claim admin.
+    // No incluir list_nombre, list_foto, list_visible, list_updated_at,
+    // list_promedio, list_n_eval, zona_ids, categorias_servicio, es_trabajador
+    // ni stats_negocio: el dueño los escribe vía UsuarioListSync / Mis Números.
     function privilegedKeys() {
       return [
         'es_admin',
         'scoring',
+        'scoring_stale',
         'badge_prestador',
         'riesgo_fraude',
         'fraud_flags',
         'score_identidad',
         'score_reputacion',
         'score_actividad',
-        'score_total'
+        'score_servicio',
+        'score_cliente',
+        'score_comportamiento',
+        'score_total',
+        'score_credito',
+        'score_credito_preview',
+        'trust_tier',
+        'promedioEstrellas',
+        'cantidadEvaluadores',
+        'nEvaluaciones',
+        'list_n_evaluaciones',
+        'validaciones_recibidas',
+        'readiness_microcredito',
+        'readiness_bucket',
+        'readiness_detalle',
+        'readiness_next_step',
+        'readiness_academia',
+        'readiness_oferta_elegible',
+        'readiness_actualizado_en'
       ];
     }
 
@@ -131,8 +156,11 @@ service cloud.firestore {
     }
 
     match /usuarios/{userId} {
+      // Get por UID (tarjeta, mensajes, validar) sigue con sesión.
       allow get: if isSignedIn() || isAdmin();
-      allow list: if isSignedIn();
+      // S2: no enumerar clientes. El buscador ya filtra es_trabajador==true.
+      allow list: if isAdmin()
+        || (isSignedIn() && resource.data.es_trabajador == true);
 
       allow create: if createHasNoPrivileged()
         && (isOwner(userId) || isAdmin());
