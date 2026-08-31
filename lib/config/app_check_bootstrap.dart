@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 /// Activa el SDK para que Firebase reciba tokens y métricas.
 /// NO enforce: si falta la site key o el provider falla, la app sigue.
 /// Enforce (bloquear requests sin token) es una etapa posterior + consola.
+///
+/// API firebase_app_check 0.3.x: `webProvider` / `androidProvider`.
 class AppCheckBootstrap {
   AppCheckBootstrap._();
 
@@ -23,7 +25,7 @@ class AppCheckBootstrap {
           return;
         }
         await FirebaseAppCheck.instance.activate(
-          providerWeb: ReCaptchaV3Provider(recaptchaSiteKey),
+          webProvider: ReCaptchaV3Provider(recaptchaSiteKey),
         );
       } else {
         await FirebaseAppCheck.instance.activate(
