@@ -1,5 +1,6 @@
 /**
  * Assembler Cloud Functions. setGlobalOptions una sola vez.
+ * TEMP: validacion y recibo se cargan solo si el archivo existe y exporta handlers.
  */
 const { setGlobalOptions } = require("firebase-functions/v2");
 setGlobalOptions({
@@ -8,11 +9,20 @@ setGlobalOptions({
   timeoutSeconds: 540,
 });
 
-Object.assign(exports, require("./cf_scoring_http"));
-Object.assign(exports, require("./cf_validacion"));
-Object.assign(exports, require("./cf_vault"));
-Object.assign(exports, require("./cf_recibo"));
-Object.assign(exports, require("./cf_fiados_sched"));
+function assignSafe(modPath) {
+  try {
+    const m = require(modPath);
+    if (m && typeof m === "object") Object.assign(exports, m);
+  } catch (e) {
+    console.error("cf module skip", modPath, e && e.message);
+  }
+}
+
+assignSafe("./cf_scoring_http");
+assignSafe("./cf_validacion");
+assignSafe("./cf_vault");
+assignSafe("./cf_recibo");
+assignSafe("./cf_fiados_sched");
 
 exports.enviarMensajeTexto = require("./mensajes_texto").enviarMensajeTexto;
 const calificacionAviso = require("./calificacion_aviso");

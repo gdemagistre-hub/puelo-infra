@@ -1,1 +1,2 @@
-SEE /tmp/cf_validacion.js FULL FILE SHOULD BE 10455 BYTES
+/** Placeholder temporal: handlers de validacion se restauran en el siguiente commit. */
+module.exports = {};
