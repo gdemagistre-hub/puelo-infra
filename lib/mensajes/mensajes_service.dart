@@ -109,7 +109,7 @@ class MensajesService {
     String origen = 'mensajes',
   }) async {
     if (!hasFirebaseAuth) {
-      throw StateError('Necesitás entrar con Google para registrar un pago');
+      throw Exception('Necesitás entrar con Google para registrar un pago');
     }
     try {
       final result = await _fn.httpsCallable('emitirRecibo').call({
@@ -121,7 +121,7 @@ class MensajesService {
       });
       return Map<String, dynamic>.from(result.data as Map);
     } catch (e) {
-      throw StateError(humanizeError(e));
+      throw Exception(humanizeError(e));
     }
   }
 
@@ -132,7 +132,7 @@ class MensajesService {
     String? motivo,
   }) async {
     if (!hasFirebaseAuth) {
-      throw StateError('Necesitás entrar con Google para responder');
+      throw Exception('Necesitás entrar con Google para responder');
     }
     try {
       final result = await _fn.httpsCallable('responderRecibo').call({
@@ -143,7 +143,7 @@ class MensajesService {
       });
       return Map<String, dynamic>.from(result.data as Map);
     } catch (e) {
-      throw StateError(humanizeError(e));
+      throw Exception(humanizeError(e));
     }
   }
 
@@ -152,10 +152,10 @@ class MensajesService {
     required String texto,
   }) async {
     if (!hasFirebaseAuth) {
-      throw StateError('Necesitás entrar con Google para enviar mensajes');
+      throw Exception('Necesitás entrar con Google para enviar mensajes');
     }
     final t = texto.trim();
-    if (t.isEmpty) throw StateError('Escribí un mensaje');
+    if (t.isEmpty) throw Exception('Escribí un mensaje');
     try {
       final result = await _fn.httpsCallable('enviarMensajeTexto').call({
         'conversacion_id': conversacionId,
@@ -163,7 +163,7 @@ class MensajesService {
       });
       return Map<String, dynamic>.from(result.data as Map);
     } catch (e) {
-      throw StateError(humanizeError(e));
+      throw Exception(humanizeError(e));
     }
   }
 
@@ -175,7 +175,7 @@ class MensajesService {
     String? respuestaTexto,
   }) async {
     if (!hasFirebaseAuth) {
-      throw StateError('Necesitás entrar con Google para responder');
+      throw Exception('Necesitás entrar con Google para responder');
     }
     try {
       final result = await _fn.httpsCallable('responderCalificacion').call({
@@ -187,12 +187,17 @@ class MensajesService {
       });
       return Map<String, dynamic>.from(result.data as Map);
     } catch (e) {
-      throw StateError(humanizeError(e));
+      throw Exception(humanizeError(e));
     }
   }
 
   static String humanizeError(Object? e) {
-    final s = '$e';
+    var s = '$e';
+    s = s
+        .replaceFirst('Exception: ', '')
+        .replaceFirst('StateError: ', '')
+        .replaceFirst('Bad state: ', '')
+        .replaceFirst('FirebaseFunctionsException: ', '');
     final lower = s.toLowerCase();
     if (lower.contains('unauthenticated') || lower.contains('not-authenticated')) {
       return 'Entrá con Google para usar mensajes.';
@@ -202,6 +207,12 @@ class MensajesService {
     }
     if (lower.contains('already-exists') || lower.contains('ya respondido')) {
       return 'Ese comprobante ya fue confirmado.';
+    }
+    if (lower.contains('comprobante pendiente') ||
+        lower.contains('pending_recibo') ||
+        (lower.contains('pendiente') && lower.contains('hilo'))) {
+      return 'Ya hay un comprobante pendiente con esta persona. '
+          'Esperá a que lo acepte o lo rechace y después registrá el siguiente.';
     }
     if (lower.contains('not-found')) {
       return 'No encontramos ese registro.';
@@ -215,13 +226,9 @@ class MensajesService {
     if (lower.contains('deadline') || lower.contains('timeout') || lower.contains('unavailable')) {
       return 'Sin conexión o el servidor no respondió. Probá de nuevo.';
     }
-    final m = RegExp(r'(?:FirebaseFunctionsException:\s*)?(?:\[[^\]]*\]\s*)?(.+)')
-        .firstMatch(s);
-    final msg = (m?.group(1) ?? s).trim();
+    final msg = s.trim();
     if (msg.length > 160) return '${msg.substring(0, 157)}…';
-    return msg
-        .replaceFirst('Exception: ', '')
-        .replaceFirst('StateError: ', '');
+    return msg;
   }
 
   static String labelConcepto(String? c) {
