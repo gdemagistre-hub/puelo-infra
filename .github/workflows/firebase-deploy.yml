@@ -44,12 +44,14 @@ jobs:
         env:
           FIREBASE_API_KEY_WEB: ${{ secrets.FIREBASE_API_KEY_WEB }}
           FIREBASE_API_KEY_ANDROID: ${{ secrets.FIREBASE_API_KEY_ANDROID }}
+          APPCHECK_RECAPTCHA_SITE_KEY: ${{ secrets.APPCHECK_RECAPTCHA_SITE_KEY }}
         run: |
           flutter pub get
           flutter build web --release \
             --dart-define=PUELLO_ENV=prod \
             --dart-define=FIREBASE_API_KEY_WEB="$FIREBASE_API_KEY_WEB" \
-            --dart-define=FIREBASE_API_KEY_ANDROID="$FIREBASE_API_KEY_ANDROID"
+            --dart-define=FIREBASE_API_KEY_ANDROID="$FIREBASE_API_KEY_ANDROID" \
+            --dart-define=APPCHECK_RECAPTCHA_SITE_KEY="${APPCHECK_RECAPTCHA_SITE_KEY:-}"
 
       - name: Copy Academia content
         run: |
