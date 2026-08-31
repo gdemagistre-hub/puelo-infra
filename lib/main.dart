@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'config/app_env.dart';
+import 'config/app_check_bootstrap.dart';
 import 'theme/app_theme.dart';
 import 'theme/app_copy.dart';
 import 'analytics/prox_analytics.dart';
@@ -67,6 +68,9 @@ void main() async {
       ),
     );
   }
+
+  // S3: App Check monitor. Fail-open si falta site key / provider.
+  await AppCheckBootstrap.activate();
 
   if (AppEnv.verboseLogging) {
     debugPrint('Puelo env=${AppEnv.label} showDevTools=${AppEnv.showDevTools}');
