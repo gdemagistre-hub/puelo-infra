@@ -37,8 +37,10 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
 
   void _avisoGeoNoListo() {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('El catálogo de zonas todavía es solo Argentina.'),
+      SnackBar(
+        content: Text(
+          'El catálogo de zonas todavía no está activo en ${_pais.name}.',
+        ),
       ),
     );
   }
