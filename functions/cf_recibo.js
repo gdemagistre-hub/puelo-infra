@@ -41,6 +41,27 @@ function conversacionIdFor(uidA, uidB) {
   return a < b ? `${a}__${b}` : `${b}__${a}`;
 }
 
+function currencyOfUserData(data) {
+  const c = String((data && data.currency) || "").trim().toUpperCase();
+  return c || "ARS";
+}
+
+function pagoSummary(monto, moneda, estado) {
+  const m = String(moneda || "ARS").toUpperCase();
+  const tag = m === "ARS" ? `Pago $${monto}` : `Pago ${monto} ${m}`;
+  return `${tag} · ${estado}`;
+}
+
+async function monedaDeActor(uid) {
+  try {
+    const snap = await db.collection("usuarios").doc(uid).get();
+    return currencyOfUserData(snap.exists ? snap.data() : null);
+  } catch (e) {
+    console.warn("monedaDeActor", e && e.message);
+    return "ARS";
+  }
+}
+
 function parseMonto(raw) {
   const n = typeof raw === "number" ? raw : Number(String(raw).replace(",", "."));
   if (!Number.isFinite(n) || n <= 0 || n > 999999999) return null;
@@ -81,13 +102,14 @@ exports.emitirRecibo = onCall(
     const createdAtIso = new Date().toISOString();
     const eventRef = convRef.collection("eventos").doc();
     const eventId = eventRef.id;
+    const moneda = await monedaDeActor(actorUid);
     const hashInput = {
       tipo: "recibo_emitido",
       conversacion_id: convId,
       actor_uid: actorUid,
       contraparte_uid: contraparte,
       monto,
-      moneda: "ARS",
+      moneda,
       concepto,
       nota,
       recibo_event_id: null,
@@ -101,7 +123,7 @@ exports.emitirRecibo = onCall(
       actor_uid: actorUid,
       contraparte_uid: contraparte,
       monto,
-      moneda: "ARS",
+      moneda,
       concepto,
       nota,
       estado: "pendiente",
@@ -120,7 +142,7 @@ exports.emitirRecibo = onCall(
         origen,
         created_at: admin.firestore.FieldValue.serverTimestamp(),
         updated_at: admin.firestore.FieldValue.serverTimestamp(),
-        last_summary: `Pago $${monto} · Pendiente`,
+        last_summary: pagoSummary(monto, moneda, "Pendiente"),
         last_event_at: admin.firestore.FieldValue.serverTimestamp(),
         pending_recibo_event_id: eventId,
         pending_recibo_actor_uid: actorUid,
@@ -128,7 +150,7 @@ exports.emitirRecibo = onCall(
     } else {
       batch.update(convRef, {
         updated_at: admin.firestore.FieldValue.serverTimestamp(),
-        last_summary: `Pago $${monto} · Pendiente`,
+        last_summary: pagoSummary(monto, moneda, "Pendiente"),
         last_event_at: admin.firestore.FieldValue.serverTimestamp(),
         pending_recibo_event_id: eventId,
         pending_recibo_actor_uid: actorUid,
@@ -224,8 +246,8 @@ exports.responderRecibo = onCall(
     };
     const label =
       decision === "aceptado"
-        ? `Pago $${recibo.monto} · Aceptado`
-        : `Pago $${recibo.monto} · Rechazado`;
+        ? pagoSummary(recibo.monto, recibo.moneda || "ARS", "Aceptado")
+        : pagoSummary(recibo.monto, recibo.moneda || "ARS", "Rechazado");
     const batch = db.batch();
     batch.set(respRef, respDoc);
     batch.update(convRef, {
