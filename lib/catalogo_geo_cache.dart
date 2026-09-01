@@ -4,9 +4,10 @@ import 'geo/catalogo_cl_head.dart';
 import 'geo/catalogo_cl_n3.dart';
 import 'geo/catalogo_pack.dart';
 import 'geo/catalogo_uy_head.dart';
+import 'geo/catalogo_uy_n3.dart';
 
 /// Cache geo por país. AR sigue en Firestore (cat_paises/AR).
-/// CL: CUT oficial embebido. UY: 19 departamentos; localidades 2011 en el siguiente push.
+/// CL/UY: listados oficiales embebidos (CUT / localidades 2011).
 class CatalogoGeoCache {
   CatalogoGeoCache._();
   static final CatalogoGeoCache instance = CatalogoGeoCache._();
@@ -29,19 +30,10 @@ class CatalogoGeoCache {
       };
     }
     if (iso == 'UY') {
-      final locs = <Map<String, String>>[
-        for (final d in kUyNivel1)
-          {
-            'id': 'UY-${d['id']}',
-            'nombre': d['nombre'] ?? '',
-            'padre': d['id'] ?? '',
-            'nivel1': d['id'] ?? '',
-          },
-      ];
       return {
         'nivel1': kUyNivel1,
         'nivel2': kUyNivel2,
-        'nivel3': locs,
+        'nivel3': CatalogoPack.parse(kUyNivel3Raw),
       };
     }
     return null;
