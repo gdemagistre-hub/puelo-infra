@@ -1,10 +1,12 @@
-import 'dart:convert';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/services.dart';
+
+import 'geo/catalogo_cl_head.dart';
+import 'geo/catalogo_cl_n3.dart';
+import 'geo/catalogo_pack.dart';
+import 'geo/catalogo_uy_head.dart';
 
 /// Cache geo por país. AR sigue en Firestore (cat_paises/AR).
-/// CL/UY salen de assets/geo/{iso}.json (listados oficiales).
+/// CL: CUT oficial embebido. UY: 19 departamentos; localidades 2011 en el siguiente push.
 class CatalogoGeoCache {
   CatalogoGeoCache._();
   static final CatalogoGeoCache instance = CatalogoGeoCache._();
@@ -14,19 +16,35 @@ class CatalogoGeoCache {
   List<Map<String, dynamic>>? _provinciasAR;
   final Map<String, List<Map<String, dynamic>>> _partidosPorProv = {};
   final Map<String, List<Map<String, dynamic>>> _localidadesPorPartido = {};
-  final Map<String, Map<String, dynamic>> _bundles = {};
   final Map<String, List<Map<String, dynamic>>> _n2 = {};
   final Map<String, List<Map<String, dynamic>>> _n3 = {};
   final Map<String, List<Map<String, dynamic>>> _n3por1 = {};
 
-  Future<Map<String, dynamic>?> _bundle(String iso) async {
-    if (iso == 'AR') return null;
-    if (_bundles.containsKey(iso)) return _bundles[iso];
-    final path = 'assets/geo/${iso.toLowerCase()}.json';
-    final raw = await rootBundle.loadString(path);
-    final map = jsonDecode(raw) as Map<String, dynamic>;
-    _bundles[iso] = map;
-    return map;
+  Map<String, List<Map<String, String>>>? _bundleOf(String iso) {
+    if (iso == 'CL') {
+      return {
+        'nivel1': kClNivel1,
+        'nivel2': kClNivel2,
+        'nivel3': CatalogoPack.parse(kClNivel3Raw),
+      };
+    }
+    if (iso == 'UY') {
+      final locs = <Map<String, String>>[
+        for (final d in kUyNivel1)
+          {
+            'id': 'UY-${d['id']}',
+            'nombre': d['nombre'] ?? '',
+            'padre': d['id'] ?? '',
+            'nivel1': d['id'] ?? '',
+          },
+      ];
+      return {
+        'nivel1': kUyNivel1,
+        'nivel2': kUyNivel2,
+        'nivel3': locs,
+      };
+    }
+    return null;
   }
 
   List<Map<String, dynamic>> _asMaps(dynamic raw) {
@@ -40,8 +58,7 @@ class CatalogoGeoCache {
   Future<List<Map<String, dynamic>>> nivel1(String iso) async {
     final s = iso.trim().toUpperCase();
     if (s.isEmpty || s == 'AR') return provinciasAR();
-    final b = await _bundle(s);
-    return _asMaps(b?['nivel1']);
+    return _asMaps(_bundleOf(s)?['nivel1']);
   }
 
   Future<List<Map<String, dynamic>>> nivel2(String iso, String nivel1Id) async {
@@ -49,8 +66,7 @@ class CatalogoGeoCache {
     if (s.isEmpty || s == 'AR') return partidosDeProvincia(nivel1Id);
     final key = '$s|$nivel1Id';
     if (_n2.containsKey(key)) return _n2[key]!;
-    final b = await _bundle(s);
-    final list = _asMaps(b?['nivel2'])
+    final list = _asMaps(_bundleOf(s)?['nivel2'])
         .where((e) => (e['padre'] ?? '').toString() == nivel1Id)
         .map((e) => {
               'id': e['id'],
@@ -69,8 +85,7 @@ class CatalogoGeoCache {
     if (s.isEmpty || s == 'AR') return localidadesDePartido(nivel2Id);
     final key = '$s|$nivel2Id';
     if (_n3.containsKey(key)) return _n3[key]!;
-    final b = await _bundle(s);
-    final list = _asMaps(b?['nivel3'])
+    final list = _asMaps(_bundleOf(s)?['nivel3'])
         .where((e) => (e['padre'] ?? '').toString() == nivel2Id)
         .map((e) => {
               'id': e['id'],
@@ -99,8 +114,7 @@ class CatalogoGeoCache {
     }
     final key = '$s|p|$nivel1Id';
     if (_n3por1.containsKey(key)) return _n3por1[key]!;
-    final b = await _bundle(s);
-    final list = _asMaps(b?['nivel3'])
+    final list = _asMaps(_bundleOf(s)?['nivel3'])
         .where((e) => (e['nivel1'] ?? '').toString() == nivel1Id)
         .map((e) => {
               'id': e['id'],
@@ -157,7 +171,6 @@ class CatalogoGeoCache {
     _provinciasAR = null;
     _partidosPorProv.clear();
     _localidadesPorPartido.clear();
-    _bundles.clear();
     _n2.clear();
     _n3.clear();
     _n3por1.clear();
