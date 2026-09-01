@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'Homepage.dart';
 import 'elige_camino.dart';
+import 'elige_pais.dart';
 import 'user_session.dart';
 import 'auth_service.dart';
 import 'registroCuenta.dart';
@@ -308,6 +309,13 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
         MaterialPageRoute(
           builder: (context) => ValidarDomicilioWidget(usuarioId: targetId),
         ),
+      );
+      return;
+    }
+    if (EligePaisWidget.necesitaElegir()) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const EligePaisWidget()),
       );
       return;
     }
