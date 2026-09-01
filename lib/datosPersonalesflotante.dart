@@ -10,6 +10,7 @@ import 'package:intl/intl.dart';
 import 'dni_ocr_parser.dart';
 import 'dni_ocr_scan.dart';
 import 'telefono_ar.dart';
+import 'geo/doc_catalog.dart';
 import 'user_session.dart';
 import 'usuario_list_sync.dart';
 import 'identidad_pii.dart';
@@ -64,10 +65,6 @@ class _DatosPersonalesFlotanteWidgetState
   bool _docValidado = false;
   String? _docHashDatos;
 
-  final List<String> _tiposDoc = ['DNI', 'Pasaporte', 'CI', 'CUIT', 'Otro'];
-  final List<String> _paises = [
-    'Argentina', 'Uruguay', 'Chile', 'Paraguay', 'Brasil', 'Bolivia', 'Otro',
-  ];
 
   @override
   void initState() {
@@ -318,8 +315,8 @@ class _DatosPersonalesFlotanteWidgetState
                                 ],
                                 decoration: _dec(
                                   'Celular *',
-                                  hint: '+5491112345678',
-                                  helper: '+ y 13 digitos, sin espacios',
+                                  hint: TelefonoAr.hint(),
+                                  helper: TelefonoAr.helper(),
                                 ),
                                 validator: _validarTelefono,
                               ),
@@ -376,13 +373,13 @@ class _DatosPersonalesFlotanteWidgetState
                       _buildDropdown(
                         'Tipo de documento',
                         _tipoDoc,
-                        _tiposDoc,
+                        DocCatalog.tipos(current: _tipoDoc),
                         (v) => setState(() => _tipoDoc = v),
                       ),
                       _buildDropdown(
                         'Pais de emision',
                         _paisDoc,
-                        _paises,
+                        DocCatalog.paisesEmisor(current: _paisDoc),
                         (v) => setState(() => _paisDoc = v),
                       ),
                       _buildField('Numero de documento', _docNumeroController),
