@@ -9,7 +9,11 @@ class DocCatalog {
   static CountryProfile get profile =>
       CountryProfile.of(UserSession().countryCode);
 
-  static bool get ocrEnabled => profile.ocrDniEnabled;
+  /// Tips Home de cámara/DNI. False = nadie los ve (launch trio).
+  /// Pasar a true más adelante: AR sí, CL/UY no.
+  static const bool tipsOcrEnabled = false;
+
+  static bool get ocrEnabled => tipsOcrEnabled && profile.ocrDniEnabled;
 
   static List<String> tipos({String? current}) {
     final types = List<String>.from(profile.idTypes);
