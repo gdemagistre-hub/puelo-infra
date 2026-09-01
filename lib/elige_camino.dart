@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'Homepage.dart';
 import 'elige_oficio.dart';
+import 'elige_pais.dart';
 import 'user_session.dart';
 
 /// Primera decisión post-login: ¿busca o ofrece servicios?
@@ -32,6 +33,20 @@ class _EligeCaminoWidgetState extends State<EligeCaminoWidget> {
   static const Color _prestador = Color(0xFF28B5CD);
 
   bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (EligePaisWidget.necesitaElegir()) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const EligePaisWidget()),
+        );
+      }
+    });
+  }
 
   Future<void> _elegir(String camino, {required bool quiereOfrecer}) async {
     if (_saving) return;
