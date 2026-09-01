@@ -68,6 +68,16 @@ class UserSession {
     final data = datosCompletos ?? {};
     final patch = CountryProfile.legacyPatch(data);
     if (patch.isEmpty) return;
+    // Alta nueva: no inventar AR. EligePais escribe el país.
+    final rawCc = (data['country_code'] ?? '').toString().trim();
+    final camino = (data['camino_elegido'] ?? '').toString().trim();
+    final esTrab = data['es_trabajador'] == true || data['rol'] == 'trabajador';
+    if (rawCc.isEmpty &&
+        data['pais_confirmado'] != true &&
+        camino.isEmpty &&
+        !esTrab) {
+      return;
+    }
     try {
       await FirebaseFirestore.instance.collection('usuarios').doc(id).set({
         ...patch,
@@ -333,8 +343,6 @@ class UserSession {
             'auth_uid': user.uid,
             'es_trabajador': false,
             'estado': 'activo',
-            'country_code': CountryProfile.defaultIso,
-            'currency': CountryProfile.defaultCurrency,
           };
           await FirebaseFirestore.instance.collection('usuarios').doc(user.uid).set({
             ...data,
