@@ -1,5 +1,5 @@
 /// Perfil de país (LATAM hispanohablante). Fallback AR.
-/// No i18n. No ES. No BR. geoReady/ocr solo AR en esta etapa.
+/// No i18n. No ES. No BR. geoReady AR/CL/UY. OCR solo AR.
 class CountryProfile {
   const CountryProfile({
     required this.iso,
@@ -13,6 +13,10 @@ class CountryProfile {
     required this.idTypes,
     required this.ocrDniEnabled,
     required this.legalPack,
+    required this.labelNivel1,
+    required this.labelNivel2,
+    required this.labelNivel3,
+    required this.geoLevels,
   });
 
   final String iso;
@@ -26,6 +30,11 @@ class CountryProfile {
   final List<String> idTypes;
   final bool ocrDniEnabled;
   final String legalPack;
+  final String labelNivel1;
+  final String labelNivel2;
+  final String labelNivel3;
+  /// 3 = región/provincia/comuna (o AR). 2 = departamento + localidad (UY).
+  final int geoLevels;
 
   static const String defaultIso = 'AR';
   static const String defaultCurrency = 'ARS';
@@ -56,6 +65,10 @@ class CountryProfile {
     bool geoReady = false,
     bool ocrDniEnabled = false,
     String? legalPack,
+    String? labelNivel1,
+    String? labelNivel2,
+    String? labelNivel3,
+    int geoLevels = 3,
   }) {
     return CountryProfile(
       iso: iso,
@@ -69,6 +82,10 @@ class CountryProfile {
       idTypes: idTypes ?? _idGen,
       ocrDniEnabled: ocrDniEnabled,
       legalPack: legalPack ?? iso.toLowerCase(),
+      labelNivel1: labelNivel1 ?? 'Provincia',
+      labelNivel2: labelNivel2 ?? 'Partido / Departamento',
+      labelNivel3: labelNivel3 ?? 'Localidad',
+      geoLevels: geoLevels,
     );
   }
 
@@ -95,6 +112,11 @@ class CountryProfile {
       phoneMin: 10,
       phoneMax: 11,
       idTypes: _idUy,
+      geoReady: true,
+      labelNivel1: 'Departamento',
+      labelNivel2: 'Departamento',
+      labelNivel3: 'Localidad',
+      geoLevels: 2,
     ),
     'CL': _row(
       iso: 'CL',
@@ -105,6 +127,10 @@ class CountryProfile {
       phoneMin: 10,
       phoneMax: 11,
       idTypes: _idCl,
+      geoReady: true,
+      labelNivel1: 'Región',
+      labelNivel2: 'Provincia',
+      labelNivel3: 'Comuna',
     ),
     'PY': _row(
       iso: 'PY',
