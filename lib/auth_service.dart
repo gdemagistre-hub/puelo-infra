@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:google_sign_in/google_sign_in.dart';
 
 import 'user_session.dart';
+import 'geo/country_profile.dart';
 
 /// Auth real (Google + Apple + Facebook web + email/password).
 class AuthService {
@@ -214,6 +215,7 @@ class AuthService {
     required String password,
     String? nombre,
     String? apellido,
+    String? countryCode,
   }) async {
     final e = email.trim().toLowerCase();
     if (e.isEmpty || !e.contains('@')) {
@@ -255,7 +257,7 @@ class AuthService {
       }
 
       final ref = _db.collection('usuarios').doc(user.uid);
-      await ref.set({
+      final payload = <String, dynamic>{
         'nombre': (nombre ?? '').trim(),
         'apellido': (apellido ?? '').trim(),
         'email': e,
@@ -266,7 +268,15 @@ class AuthService {
         'email_verified': false,
         'creado_en': FieldValue.serverTimestamp(),
         'updated_at': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      };
+      final iso = (countryCode ?? '').trim().toUpperCase();
+      if (iso.isNotEmpty && CountryProfile.isSupported(iso)) {
+        final pais = CountryProfile.of(iso);
+        payload['country_code'] = pais.iso;
+        payload['currency'] = pais.currency;
+        payload['pais_confirmado'] = true;
+      }
+      await ref.set(payload, SetOptions(merge: true));
 
       return _auth.currentUser ?? user;
     } on FirebaseAuthException catch (e) {
