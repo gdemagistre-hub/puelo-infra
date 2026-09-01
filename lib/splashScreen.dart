@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import 'Homepage.dart';
 import 'elige_camino.dart';
+import 'elige_pais.dart';
 import 'loginScreen.dart';
 import 'user_session.dart';
 import 'theme/app_copy.dart';
@@ -88,6 +89,8 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
               ),
             ),
           );
+        } else if (EligePaisWidget.necesitaElegir()) {
+          Navigator.pushReplacementNamed(context, EligePaisWidget.routePath);
         } else if (EligeCaminoWidget.necesitaElegir()) {
           Navigator.pushReplacementNamed(context, EligeCaminoWidget.routePath);
         } else {

@@ -1,0 +1,191 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+
+import 'Homepage.dart';
+import 'elige_camino.dart';
+import 'geo/country_profile.dart';
+import 'user_session.dart';
+
+/// Primera vez: país de operación. Default visual AR. No i18n.
+class EligePaisWidget extends StatefulWidget {
+  static const String routeName = 'EligePais';
+  static const String routePath = '/elige-pais';
+
+  const EligePaisWidget({super.key});
+
+  static bool necesitaElegir() {
+    final data = UserSession().datosCompletos;
+    if (data == null) return false;
+    final raw = (data['country_code'] ?? '').toString().trim();
+    if (raw.isNotEmpty) return false;
+    if (data['pais_confirmado'] == true) return false;
+    return true;
+  }
+
+  @override
+  State<EligePaisWidget> createState() => _EligePaisWidgetState();
+}
+
+class _EligePaisWidgetState extends State<EligePaisWidget> {
+  static const Color _accent = Color(0xFF734BE4);
+
+  String _iso = CountryProfile.defaultIso;
+  bool _saving = false;
+
+  Future<void> _confirmar() async {
+    if (_saving) return;
+    setState(() => _saving = true);
+
+    final pais = CountryProfile.of(_iso);
+    final uid = UserSession().uid;
+    final patch = <String, dynamic>{
+      'country_code': pais.iso,
+      'currency': pais.currency,
+      'pais_confirmado': true,
+      'updated_at': FieldValue.serverTimestamp(),
+    };
+
+    try {
+      if (uid != null && uid.isNotEmpty) {
+        await FirebaseFirestore.instance
+            .collection('usuarios')
+            .doc(uid)
+            .set(patch, SetOptions(merge: true));
+      }
+    } catch (e) {
+      debugPrint('EligePais save error: $e');
+    }
+
+    final data = Map<String, dynamic>.from(UserSession().datosCompletos ?? {});
+    data['country_code'] = pais.iso;
+    data['currency'] = pais.currency;
+    data['pais_confirmado'] = true;
+    UserSession().datosCompletos = data;
+    UserSession().invalidateHomeCache();
+
+    if (!mounted) return;
+
+    if (EligeCaminoWidget.necesitaElegir()) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const EligeCaminoWidget()),
+      );
+      return;
+    }
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => HomePageWidget(
+          initialModoPrestador: UserSession().preferredHomeModoPrestador,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 24),
+              const Text(
+                '¿En qué país trabajás?',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Hoy el catálogo de zonas está activo en Argentina. '
+                'Podés elegir otro país; el resto de la app se adapta de a poco.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.35,
+                  color: Color(0xFF475569),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Expanded(
+                child: ListView.separated(
+                  itemCount: CountryProfile.all.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, i) {
+                    final p = CountryProfile.all[i];
+                    final selected = p.iso == _iso;
+                    return Material(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(14),
+                        onTap: _saving ? null : () => setState(() => _iso = p.iso),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: selected ? _accent : const Color(0xFFE2E8F0),
+                              width: selected ? 1.6 : 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  p.name,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: selected
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                    color: const Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ),
+                              if (selected)
+                                const Icon(Icons.check_circle, color: _accent),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: _saving ? null : _confirmar,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _accent,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: Text(
+                    _saving ? 'Guardando…' : 'Continuar',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
