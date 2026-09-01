@@ -7,11 +7,14 @@ import 'geo/country_profile.dart';
 import 'user_session.dart';
 
 /// Primera vez: país de operación. Trio AR/CL/UY habilitado. Default visual AR.
+/// [modoCambio] = ya tiene país y lo cambia desde perfil/domicilio.
 class EligePaisWidget extends StatefulWidget {
   static const String routeName = 'EligePais';
   static const String routePath = '/elige-pais';
 
-  const EligePaisWidget({super.key});
+  final bool modoCambio;
+
+  const EligePaisWidget({super.key, this.modoCambio = false});
 
   static bool necesitaElegir() {
     final data = UserSession().datosCompletos;
@@ -29,10 +32,22 @@ class EligePaisWidget extends StatefulWidget {
 class _EligePaisWidgetState extends State<EligePaisWidget> {
   static const Color _accent = Color(0xFF734BE4);
 
-  String _iso = CountryProfile.defaultIso;
+  late String _iso;
   bool _saving = false;
 
   List<CountryProfile> get _paises => CountryProfile.listedForSelector;
+
+  @override
+  void initState() {
+    super.initState();
+    final actual = (UserSession().datosCompletos?['country_code'] ?? '')
+        .toString()
+        .trim()
+        .toUpperCase();
+    _iso = CountryProfile.isLaunch(actual)
+        ? actual
+        : CountryProfile.defaultIso;
+  }
 
   Future<void> _confirmar() async {
     if (_saving) return;
@@ -41,12 +56,22 @@ class _EligePaisWidgetState extends State<EligePaisWidget> {
 
     final pais = CountryProfile.of(_iso);
     final uid = UserSession().uid;
+    final anterior = (UserSession().datosCompletos?['country_code'] ?? '')
+        .toString()
+        .trim()
+        .toUpperCase();
+    final cambioPais = widget.modoCambio && anterior != pais.iso;
+
     final patch = <String, dynamic>{
       'country_code': pais.iso,
       'currency': pais.currency,
       'pais_confirmado': true,
       'updated_at': FieldValue.serverTimestamp(),
     };
+    if (cambioPais) {
+      patch['direccion_geo'] = FieldValue.delete();
+      patch['zonas_cobertura'] = FieldValue.delete();
+    }
 
     try {
       if (uid != null && uid.isNotEmpty) {
@@ -63,10 +88,20 @@ class _EligePaisWidgetState extends State<EligePaisWidget> {
     data['country_code'] = pais.iso;
     data['currency'] = pais.currency;
     data['pais_confirmado'] = true;
+    if (cambioPais) {
+      data.remove('direccion_geo');
+      data.remove('zonas_cobertura');
+    }
     UserSession().datosCompletos = data;
     UserSession().invalidateHomeCache();
+    UserSession().notifyProfileChanged();
 
     if (!mounted) return;
+
+    if (widget.modoCambio) {
+      Navigator.pop(context, pais.iso);
+      return;
+    }
 
     if (EligeCaminoWidget.necesitaElegir()) {
       Navigator.pushReplacement(
@@ -89,28 +124,54 @@ class _EligePaisWidgetState extends State<EligePaisWidget> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
+      appBar: widget.modoCambio
+          ? AppBar(
+              backgroundColor: Colors.white,
+              elevation: 0,
+              surfaceTintColor: Colors.transparent,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+                color: const Color(0xFF0F172A),
+                onPressed: () => Navigator.pop(context),
+              ),
+              title: const Text(
+                'País',
+                style: TextStyle(
+                  color: Color(0xFF0F172A),
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                ),
+              ),
+              centerTitle: false,
+            )
+          : null,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 24),
-              const Text(
-                '¿En qué país trabajás?',
+              if (!widget.modoCambio) const SizedBox(height: 24),
+              Text(
+                widget.modoCambio
+                    ? '¿En qué país operás ahora?'
+                    : '¿En qué país trabajás?',
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w800,
                   color: Color(0xFF0F172A),
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Empezamos por Argentina, Chile y Uruguay. '
-                'El resto de la región se va a ir habilitando.',
+              Text(
+                widget.modoCambio
+                    ? 'Si cambiás de país se borra la ubicación anterior '
+                        'para elegir las zonas de ese catálogo.'
+                    : 'Empezamos por Argentina, Chile y Uruguay. '
+                        'El resto de la región se va a ir habilitando.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 14,
                   height: 1.35,
                   color: Color(0xFF475569),
@@ -215,7 +276,9 @@ class _EligePaisWidgetState extends State<EligePaisWidget> {
                     ),
                   ),
                   child: Text(
-                    _saving ? 'Guardando…' : 'Continuar',
+                    _saving
+                        ? 'Guardando…'
+                        : (widget.modoCambio ? 'Guardar país' : 'Continuar'),
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
