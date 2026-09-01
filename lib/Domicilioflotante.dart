@@ -5,6 +5,7 @@ import 'usuario_list_sync.dart';
 import 'identidad_pii.dart';
 import 'widgets/searchable_picker.dart';
 import 'catalogo_geo_cache.dart';
+import 'elige_pais.dart';
 import 'geo/country_profile.dart';
 import 'theme/app_colors.dart';
 
@@ -283,6 +284,42 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
     });
   }
 
+  void _limpiarUbicacion() {
+    setState(() {
+      selectedProvinciaId = null;
+      selectedProvinciaNombre = null;
+      selectedPartidoId = null;
+      selectedPartidoNombre = null;
+      selectedLocalidadId = null;
+      selectedLocalidadNombre = null;
+      partidos = [];
+      localidades = [];
+    });
+  }
+
+  bool get _hayUbicacion =>
+      (selectedProvinciaId ?? '').isNotEmpty ||
+      (selectedLocalidadId ?? '').isNotEmpty ||
+      (selectedProvinciaNombre ?? '').isNotEmpty;
+
+  Future<void> _cambiarPais() async {
+    final iso = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => const EligePaisWidget(modoCambio: true),
+      ),
+    );
+    if (!mounted) return;
+    _limpiarUbicacion();
+    setState(() => _loading = true);
+    CatalogoGeoCache.instance.clear();
+    await _cargarDatos();
+    if (iso != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('País: ${CountryProfile.of(iso).name}')),
+      );
+    }
+  }
+
   Future<void> _actualizarDatos() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -310,21 +347,31 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
     setState(() => _saving = true);
 
     try {
-      await UsuarioListSync.mergeUserDoc(uid, {
+      final patch = <String, dynamic>{
         'calle': _calleController.text.trim(),
         'numero': _numeroController.text.trim(),
         'piso_depto': _pisoController.text.trim(),
         'cp': _cpController.text.trim(),
-        'direccion_geo': {
+        'updated_at': FieldValue.serverTimestamp(),
+      };
+      if (_hayUbicacion) {
+        patch['direccion_geo'] = {
           'provincia_id': selectedProvinciaId,
           'provincia_nombre': selectedProvinciaNombre,
           'partido_id': selectedPartidoId,
           'partido_nombre': selectedPartidoNombre,
           'localidad_id': selectedLocalidadId,
           'localidad_nombre': selectedLocalidadNombre,
-        },
-        'updated_at': FieldValue.serverTimestamp(),
-      });
+        };
+      } else {
+        patch['direccion_geo'] = FieldValue.delete();
+      }
+      await UsuarioListSync.mergeUserDoc(uid, patch);
+      if (!_hayUbicacion && UserSession().datosCompletos != null) {
+        final data = Map<String, dynamic>.from(UserSession().datosCompletos!);
+        data.remove('direccion_geo');
+        UserSession().datosCompletos = data;
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -464,9 +511,17 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
                         : '${_pais.labelNivel1}, ${_pais.labelNivel2.toLowerCase()} y ${_pais.labelNivel3.toLowerCase()}',
                     children: [
                       _buildGeoTile(
+                        label: 'País',
+                        value: _pais.name,
+                        onTap: _cambiarPais,
+                      ),
+                      _buildGeoTile(
                         label: _pais.labelNivel1,
                         value: selectedProvinciaNombre ?? 'Buscar o elegir…',
                         onTap: _abrirProvincia,
+                        onClear: selectedProvinciaNombre == null
+                            ? null
+                            : _limpiarUbicacion,
                       ),
                       if (_pais.geoLevels > 2)
                         _buildGeoTile(
@@ -479,8 +534,17 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
                         value: selectedLocalidadNombre ?? 'Buscar o elegir…',
                         onTap: _abrirLocalidad,
                       ),
+                      if (_hayUbicacion)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton(
+                            onPressed: _limpiarUbicacion,
+                            child: const Text('Quitar ubicación'),
+                          ),
+                        ),
                       Text(
-                        'Tocá cada campo para buscar escribiendo o desplazarte por la lista.',
+                        'Tocá País para cambiar AR, Chile o Uruguay. '
+                        'La cruz o «Quitar ubicación» deja la provincia en blanco.',
                         style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                       ),
                       const SizedBox(height: 8),
@@ -623,6 +687,7 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
     required String label,
     required String value,
     required VoidCallback onTap,
+    VoidCallback? onClear,
   }) {
     final empty = value.startsWith('Buscar');
     return Padding(
@@ -635,10 +700,19 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
           borderRadius: BorderRadius.circular(14),
           child: InputDecorator(
             decoration: _dec(label).copyWith(
-              suffixIcon: Icon(
-                Icons.search_rounded,
-                color: empty ? AppColors.textMuted : primaryColor,
-              ),
+              suffixIcon: onClear != null
+                  ? IconButton(
+                      tooltip: 'Quitar',
+                      icon: const Icon(Icons.close_rounded),
+                      color: AppColors.textMuted,
+                      onPressed: onClear,
+                    )
+                  : Icon(
+                      label == 'País'
+                          ? Icons.public_outlined
+                          : Icons.search_rounded,
+                      color: empty ? AppColors.textMuted : primaryColor,
+                    ),
             ),
             child: Text(
               value,
