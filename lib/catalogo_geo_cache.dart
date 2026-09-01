@@ -1,7 +1,10 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
 
-/// Cache en memoria de catálogos geográficos para evitar releer Firestore
-/// en cada pantalla (buscador, domicilio, zona) durante la sesión.
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/services.dart';
+
+/// Cache geo por país. AR sigue en Firestore (cat_paises/AR).
+/// CL/UY salen de assets/geo/{iso}.json (listados oficiales).
 class CatalogoGeoCache {
   CatalogoGeoCache._();
   static final CatalogoGeoCache instance = CatalogoGeoCache._();
@@ -11,6 +14,106 @@ class CatalogoGeoCache {
   List<Map<String, dynamic>>? _provinciasAR;
   final Map<String, List<Map<String, dynamic>>> _partidosPorProv = {};
   final Map<String, List<Map<String, dynamic>>> _localidadesPorPartido = {};
+  final Map<String, Map<String, dynamic>> _bundles = {};
+  final Map<String, List<Map<String, dynamic>>> _n2 = {};
+  final Map<String, List<Map<String, dynamic>>> _n3 = {};
+  final Map<String, List<Map<String, dynamic>>> _n3por1 = {};
+
+  Future<Map<String, dynamic>?> _bundle(String iso) async {
+    if (iso == 'AR') return null;
+    if (_bundles.containsKey(iso)) return _bundles[iso];
+    final path = 'assets/geo/${iso.toLowerCase()}.json';
+    final raw = await rootBundle.loadString(path);
+    final map = jsonDecode(raw) as Map<String, dynamic>;
+    _bundles[iso] = map;
+    return map;
+  }
+
+  List<Map<String, dynamic>> _asMaps(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+  }
+
+  Future<List<Map<String, dynamic>>> nivel1(String iso) async {
+    final s = iso.trim().toUpperCase();
+    if (s.isEmpty || s == 'AR') return provinciasAR();
+    final b = await _bundle(s);
+    return _asMaps(b?['nivel1']);
+  }
+
+  Future<List<Map<String, dynamic>>> nivel2(String iso, String nivel1Id) async {
+    final s = iso.trim().toUpperCase();
+    if (s.isEmpty || s == 'AR') return partidosDeProvincia(nivel1Id);
+    final key = '$s|$nivel1Id';
+    if (_n2.containsKey(key)) return _n2[key]!;
+    final b = await _bundle(s);
+    final list = _asMaps(b?['nivel2'])
+        .where((e) => (e['padre'] ?? '').toString() == nivel1Id)
+        .map((e) => {
+              'id': e['id'],
+              'nombre': e['nombre'],
+              'departamento_id': e['id'],
+              'departamento_nombre': e['nombre'],
+              'provincia_id': nivel1Id,
+            })
+        .toList();
+    _n2[key] = list;
+    return list;
+  }
+
+  Future<List<Map<String, dynamic>>> nivel3(String iso, String nivel2Id) async {
+    final s = iso.trim().toUpperCase();
+    if (s.isEmpty || s == 'AR') return localidadesDePartido(nivel2Id);
+    final key = '$s|$nivel2Id';
+    if (_n3.containsKey(key)) return _n3[key]!;
+    final b = await _bundle(s);
+    final list = _asMaps(b?['nivel3'])
+        .where((e) => (e['padre'] ?? '').toString() == nivel2Id)
+        .map((e) => {
+              'id': e['id'],
+              'nombre': e['nombre'],
+              'localidad_id': e['id'],
+              'localidad_nombre': e['nombre'],
+              'partido_id': nivel2Id,
+              'provincia_id': e['nivel1'],
+            })
+        .toList();
+    _n3[key] = list;
+    return list;
+  }
+
+  Future<List<Map<String, dynamic>>> localidadesDeNivel1(
+    String iso,
+    String nivel1Id,
+  ) async {
+    final s = iso.trim().toUpperCase();
+    if (s.isEmpty || s == 'AR') {
+      final q = await _db
+          .collection('cat_localidades')
+          .where('provincia_id', isEqualTo: nivel1Id)
+          .get();
+      return q.docs.map((d) => d.data()).toList();
+    }
+    final key = '$s|p|$nivel1Id';
+    if (_n3por1.containsKey(key)) return _n3por1[key]!;
+    final b = await _bundle(s);
+    final list = _asMaps(b?['nivel3'])
+        .where((e) => (e['nivel1'] ?? '').toString() == nivel1Id)
+        .map((e) => {
+              'id': e['id'],
+              'nombre': e['nombre'],
+              'localidad_id': e['id'],
+              'localidad_nombre': e['nombre'],
+              'partido_id': e['padre'],
+              'provincia_id': nivel1Id,
+            })
+        .toList();
+    _n3por1[key] = list;
+    return list;
+  }
 
   Future<List<Map<String, dynamic>>> provinciasAR() async {
     if (_provinciasAR != null) return _provinciasAR!;
@@ -50,10 +153,13 @@ class CatalogoGeoCache {
     return list;
   }
 
-  /// Llamar en logout si se quiere forzar datos frescos en la próxima sesión.
   void clear() {
     _provinciasAR = null;
     _partidosPorProv.clear();
     _localidadesPorPartido.clear();
+    _bundles.clear();
+    _n2.clear();
+    _n3.clear();
+    _n3por1.clear();
   }
 }
