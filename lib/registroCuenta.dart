@@ -49,6 +49,15 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
 
   Future<void> _registrar() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!CountryProfile.isLaunch(_paisIso)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Hoy podés registrarte en Argentina, Chile o Uruguay.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     if (!_aceptoLegales) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -288,21 +297,33 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
                         'País *',
                         prefix: const Icon(Icons.public_outlined),
                       ),
-                      items: CountryProfile.all
-                          .map(
-                            (p) => DropdownMenuItem(
-                              value: p.iso,
-                              child: Text(p.name),
+                      items: CountryProfile.listedForSelector.map((p) {
+                        final on = p.launchReady;
+                        return DropdownMenuItem(
+                          value: p.iso,
+                          enabled: on,
+                          child: Text(
+                            on ? p.name : '${p.name} · Próximamente',
+                            style: TextStyle(
+                              color: on ? textColor : Colors.grey,
                             ),
-                          )
-                          .toList(),
+                          ),
+                        );
+                      }).toList(),
                       onChanged: _isLoading
                           ? null
                           : (v) {
-                              if (v != null) setState(() => _paisIso = v);
+                              if (v != null && CountryProfile.isLaunch(v)) {
+                                setState(() => _paisIso = v);
+                              }
                             },
-                      validator: (v) =>
-                          (v == null || v.isEmpty) ? 'Obligatorio' : null,
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return 'Obligatorio';
+                        if (!CountryProfile.isLaunch(v)) {
+                          return 'Hoy: Argentina, Chile o Uruguay';
+                        }
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
