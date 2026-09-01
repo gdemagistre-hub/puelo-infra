@@ -30,6 +30,7 @@ import 'package:showcaseview/showcaseview.dart';
 import 'onboarding/home_tour_service.dart';
 import 'onboarding/home_tour_overlay.dart';
 import 'widgets/dev_auth_banner.dart';
+import 'geo/doc_catalog.dart';
 import 'contacto/contactos_prestador_card.dart';
 import 'mensajes/confirmar_pago_home_card.dart';
 
@@ -985,7 +986,10 @@ Widget _navAcademiaShowcase() {
         onTap: () async { _mostrarOpcionesSelfie(); },
       ));
     }
-    if (!docValidado) {
+    // OCR apagado en launch (AR/CL/UY iguales).
+    // Reactivar: DocCatalog.tipsOcrEnabled = true (sigue solo AR).
+    final ocrOn = DocCatalog.ocrEnabled;
+    if (ocrOn && !docValidado) {
       add(_RecoItem(
         id: 'ocr',
         title: 'Validá tu documento con la cámara',
@@ -993,7 +997,7 @@ Widget _navAcademiaShowcase() {
         icon: Icons.badge_outlined,
         onTap: () => _abrirFlotante(DatosPersonalesFlotanteWidget(modoPrestador: true)),
       ));
-    } else if (!_noVacio(data['url_foto_documento'])) {
+    } else if (ocrOn && !_noVacio(data['url_foto_documento'])) {
       add(_RecoItem(
         id: 'foto_doc',
         title: 'Adjuntá la foto de tu documento',
