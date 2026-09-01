@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'Homepage.dart';
 import 'auth_service.dart';
 import 'elige_camino.dart';
+import 'elige_pais.dart';
+import 'geo/country_profile.dart';
 import 'theme/app_colors.dart';
 import 'legales/documento_legal_screen.dart';
 import 'legales/textos_legales.dart';
@@ -33,6 +35,7 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
   bool _pendienteVerificacion = false;
   bool _aceptoLegales = false;
   String? _emailRegistrado;
+  String _paisIso = CountryProfile.defaultIso;
 
   @override
   void dispose() {
@@ -65,6 +68,7 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
         password: _passwordController.text,
         nombre: _nombreController.text,
         apellido: _apellidoController.text,
+        countryCode: _paisIso,
       );
       if (!mounted) return;
       setState(() {
@@ -153,6 +157,14 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
   }
 
   void _navegarPostLogin() {
+    if (EligePaisWidget.necesitaElegir()) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const EligePaisWidget()),
+        (_) => false,
+      );
+      return;
+    }
     if (EligeCaminoWidget.necesitaElegir()) {
       Navigator.pushAndRemoveUntil(
         context,
@@ -268,6 +280,29 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
                       ),
                       validator: (v) =>
                           (v == null || v.trim().isEmpty) ? 'Obligatorio' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: _paisIso,
+                      decoration: _dec(
+                        'País *',
+                        prefix: const Icon(Icons.public_outlined),
+                      ),
+                      items: CountryProfile.all
+                          .map(
+                            (p) => DropdownMenuItem(
+                              value: p.iso,
+                              child: Text(p.name),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: _isLoading
+                          ? null
+                          : (v) {
+                              if (v != null) setState(() => _paisIso = v);
+                            },
+                      validator: (v) =>
+                          (v == null || v.isEmpty) ? 'Obligatorio' : null,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
