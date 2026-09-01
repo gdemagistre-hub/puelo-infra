@@ -58,7 +58,7 @@ class _ZonaDeTrabajoFlotanteWidgetState
 
   Future<void> _cargarProvincias() async {
     if (!_pais.geoReady) return;
-    _todasLasProvincias = await CatalogoGeoCache.instance.provinciasAR();
+    _todasLasProvincias = await CatalogoGeoCache.instance.nivel1(_pais.iso);
   }
 
   void _avisoGeoNoListo() {
@@ -122,18 +122,13 @@ class _ZonaDeTrabajoFlotanteWidgetState
 
     try {
       final partidos =
-          await CatalogoGeoCache.instance.partidosDeProvincia(provId);
-
-      // Localidades por provincia: se obtienen de todos los partidos en cache
-      // o una query directa por provincia_id si existe ese campo.
-      final locQuery = await db
-          .collection('cat_localidades')
-          .where('provincia_id', isEqualTo: provId)
-          .get();
+          await CatalogoGeoCache.instance.nivel2(_pais.iso, provId);
+      final locs =
+          await CatalogoGeoCache.instance.localidadesDeNivel1(_pais.iso, provId);
 
       setState(() {
         _partidosDeProvincia = partidos;
-        _localidadesDeProvincia = locQuery.docs.map((d) => d.data()).toList();
+        _localidadesDeProvincia = locs;
 
         if (limpiarSeleccion) {
           _partidosSeleccionados.clear();
@@ -157,6 +152,16 @@ class _ZonaDeTrabajoFlotanteWidgetState
       _localidadesDeProvincia.clear();
     });
     await _cargarZonasDeProvincia(prov['id']!, limpiarSeleccion: true);
+    if (_pais.geoLevels == 2 && _partidosDeProvincia.isNotEmpty) {
+      final unico = _partidosDeProvincia.first;
+      _partidosSeleccionados = [
+        {
+          'id': (unico['departamento_id'] ?? unico['id']).toString(),
+          'nombre': (unico['departamento_nombre'] ?? unico['nombre']).toString(),
+        }
+      ];
+      if (mounted) setState(() {});
+    }
   }
 
   void _actualizarPartidos(List<Map<String, String>> nuevosPartidos) {
@@ -193,11 +198,11 @@ class _ZonaDeTrabajoFlotanteWidgetState
 
     final elegido = await SearchablePicker.pickSingle(
       context: context,
-      titulo: 'Seleccionar provincia',
+      titulo: 'Seleccionar ${_pais.labelNivel1.toLowerCase()}',
       opciones: opciones,
       selectedId: _provinciaId,
       accent: primaryColor,
-      hintBuscar: 'Ej: Buenos Aires, Córdoba…',
+      hintBuscar: 'Escribí el nombre…',
     );
     if (elegido != null) await _seleccionarProvincia(elegido);
   }
@@ -219,11 +224,11 @@ class _ZonaDeTrabajoFlotanteWidgetState
 
     final res = await SearchablePicker.pickMulti(
       context: context,
-      titulo: 'Seleccionar partidos',
+      titulo: 'Seleccionar ${_pais.labelNivel2.toLowerCase()}',
       opciones: opciones,
       seleccionadas: _partidosSeleccionados,
       accent: primaryColor,
-      hintBuscar: 'Escribí el nombre del partido…',
+      hintBuscar: 'Escribí el nombre…',
     );
     if (res != null) _actualizarPartidos(res);
   }
@@ -249,11 +254,11 @@ class _ZonaDeTrabajoFlotanteWidgetState
 
     final res = await SearchablePicker.pickMulti(
       context: context,
-      titulo: 'Seleccionar localidades',
+      titulo: 'Seleccionar ${_pais.labelNivel3.toLowerCase()}',
       opciones: opciones,
       seleccionadas: _localidadesSeleccionadas,
       accent: primaryColor,
-      hintBuscar: 'Escribí el nombre de la localidad…',
+      hintBuscar: 'Escribí el nombre…',
     );
     if (res != null) setState(() => _localidadesSeleccionadas = res);
   }
@@ -264,7 +269,7 @@ class _ZonaDeTrabajoFlotanteWidgetState
 
     if (_provinciaId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Seleccioná una provincia')),
+        SnackBar(content: Text('Seleccioná ${_pais.labelNivel1.toLowerCase()}')),
       );
       return;
     }
@@ -392,8 +397,8 @@ class _ZonaDeTrabajoFlotanteWidgetState
                   onTap: null,
                 ),
                 _buildSelectorWidget(
-                  label: 'Provincia',
-                  valor: _provinciaNombre ?? 'Buscar o elegir provincia',
+                  label: _pais.labelNivel1,
+                  valor: _provinciaNombre ?? 'Buscar o elegir',
                   onTap: _abrirProvincia,
                 ),
                 if (_cargandoZonas)
@@ -403,21 +408,22 @@ class _ZonaDeTrabajoFlotanteWidgetState
                       child: CircularProgressIndicator(color: primaryColor),
                     ),
                   ),
+                if (_pais.geoLevels > 2)
+                  _buildSelectorWidget(
+                    label: _pais.labelNivel2,
+                    valor: _partidosSeleccionados.isEmpty
+                        ? 'Buscar o elegir (múltiples)'
+                        : _partidosSeleccionados
+                            .map((e) => e['nombre'])
+                            .join(', '),
+                    onTap: _provinciaId == null || _cargandoZonas
+                        ? null
+                        : _abrirPartidos,
+                  ),
                 _buildSelectorWidget(
-                  label: 'Partidos / Departamentos',
-                  valor: _partidosSeleccionados.isEmpty
-                      ? 'Buscar o elegir (múltiples)'
-                      : _partidosSeleccionados
-                          .map((e) => e['nombre'])
-                          .join(', '),
-                  onTap: _provinciaId == null || _cargandoZonas
-                      ? null
-                      : _abrirPartidos,
-                ),
-                _buildSelectorWidget(
-                  label: 'Localidades',
+                  label: _pais.labelNivel3,
                   valor: _localidadesSeleccionadas.isEmpty
-                      ? 'Buscar o elegir localidades'
+                      ? 'Buscar o elegir'
                       : _localidadesSeleccionadas
                           .map((e) => e['nombre'])
                           .join(', '),
