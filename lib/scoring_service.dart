@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'identidad_pii.dart';
 import 'scoring_features.dart';
 import 'stats_negocio.dart';
+import 'geo/doc_catalog.dart';
 
 /// Scoring Puelo v1.2-phase1 — TEMP minimal restore to unblock build.
 /// Full body will be restored from artifacts/scoring_service_PHASE1_web_lock.dart
@@ -278,7 +279,7 @@ class ScoringService {
       case 'nuevo':
         return 'Acabás de empezar · completá tu perfil';
       case 'registrado':
-        return 'Datos básicos cargados · validá tu DNI para subir';
+        return 'Datos básicos cargados · validá tu documento para subir';
       case 'bronce':
         return 'Perfil sólido · seguí sumando validaciones';
       case 'bronce_plus':
@@ -335,8 +336,10 @@ class ScoringService {
     if (!_noVacio(data['url_foto_perfil'])) {
       add('foto', 'Subí una foto de perfil', 'Los clientes confían más con cara visible');
     }
-    if (!docOk) {
-      add('ocr', 'Validá tu DNI con la cámara', 'Salto grande a Bronce Plus');
+    if (!docOk && DocCatalog.ocrEnabled) {
+      add('ocr', 'Validá tu documento con la cámara', 'Salto grande a Bronce Plus');
+    } else if (!docOk) {
+      add('doc', 'Cargá tu documento', 'Completá tipo y número en Datos personales');
     }
     if (!_noVacio(data['telefono'])) {
       add('tel', 'Agregá tu celular', 'Necesario para que te contacten');
