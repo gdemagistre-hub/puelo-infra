@@ -256,6 +256,16 @@ class CountryProfile {
     return _latamEs.contains(s);
   }
 
+  /// ISO del doc. Vacío o desconocido = AR (legado).
+  static String isoOfData(Map<String, dynamic>? data) {
+    return normalizeIso((data?['country_code'] ?? '').toString());
+  }
+
+  /// Matching intra-país. Legado sin campo cuenta como AR.
+  static bool sameCountry(Map<String, dynamic>? data, String? viewerIso) {
+    return isoOfData(data) == normalizeIso(viewerIso);
+  }
+
   /// Campos faltantes para merge. Vacío si el doc ya tiene país.
   static Map<String, dynamic> legacyPatch(Map<String, dynamic>? data) {
     final patch = <String, dynamic>{};
