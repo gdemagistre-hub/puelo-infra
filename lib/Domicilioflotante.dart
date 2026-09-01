@@ -113,7 +113,7 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
 
     try {
       if (_geoListo) {
-        provincias = await CatalogoGeoCache.instance.provinciasAR();
+        provincias = await CatalogoGeoCache.instance.nivel1(_pais.iso);
       }
 
       final doc = await db.collection('usuarios').doc(uid).get();
@@ -137,11 +137,11 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
 
           if (selectedProvinciaId != null) {
             partidos = await CatalogoGeoCache.instance
-                .partidosDeProvincia(selectedProvinciaId!);
+                .nivel2(_pais.iso, selectedProvinciaId!);
           }
           if (selectedPartidoId != null) {
             localidades = await CatalogoGeoCache.instance
-                .localidadesDePartido(selectedPartidoId!);
+                .nivel3(_pais.iso, selectedPartidoId!);
           }
         }
       }
@@ -169,11 +169,11 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
 
     final elegido = await SearchablePicker.pickSingle(
       context: context,
-      titulo: 'Provincia',
+      titulo: _pais.labelNivel1,
       opciones: opciones,
       selectedId: selectedProvinciaId,
       accent: primaryColor,
-      hintBuscar: 'Escribí el nombre de la provincia…',
+      hintBuscar: 'Escribí el nombre…',
     );
     if (elegido == null) return;
 
@@ -189,7 +189,14 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
     });
 
     partidos = await CatalogoGeoCache.instance
-        .partidosDeProvincia(elegido['id']!);
+        .nivel2(_pais.iso, elegido['id']!);
+    if (_pais.geoLevels == 2 && partidos.isNotEmpty) {
+      selectedPartidoId = partidos.first['id']?.toString() ?? elegido['id'];
+      selectedPartidoNombre =
+          (partidos.first['nombre'] ?? elegido['nombre']).toString();
+      localidades = await CatalogoGeoCache.instance
+          .nivel3(_pais.iso, selectedPartidoId!);
+    }
     if (mounted) setState(() {});
   }
 
@@ -200,7 +207,7 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
     }
     if (selectedProvinciaId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Primero elegí la provincia')),
+        SnackBar(content: Text('Primero elegí ${_pais.labelNivel1.toLowerCase()}')),
       );
       return;
     }
@@ -217,11 +224,11 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
 
     final elegido = await SearchablePicker.pickSingle(
       context: context,
-      titulo: 'Partido / Departamento',
+      titulo: _pais.labelNivel2,
       opciones: opciones,
       selectedId: selectedPartidoId,
       accent: primaryColor,
-      hintBuscar: 'Escribí el nombre del partido…',
+      hintBuscar: 'Escribí el nombre…',
     );
     if (elegido == null) return;
 
@@ -234,7 +241,7 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
     });
 
     localidades = await CatalogoGeoCache.instance
-        .localidadesDePartido(elegido['id']!);
+        .nivel3(_pais.iso, elegido['id']!);
     if (mounted) setState(() {});
   }
 
@@ -245,7 +252,7 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
     }
     if (selectedPartidoId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Primero elegí el partido')),
+        SnackBar(content: Text('Primero elegí ${_pais.labelNivel2.toLowerCase()}')),
       );
       return;
     }
@@ -262,11 +269,11 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
 
     final elegido = await SearchablePicker.pickSingle(
       context: context,
-      titulo: 'Localidad',
+      titulo: _pais.labelNivel3,
       opciones: opciones,
       selectedId: selectedLocalidadId,
       accent: primaryColor,
-      hintBuscar: 'Escribí el nombre de la localidad…',
+      hintBuscar: 'Escribí el nombre…',
     );
     if (elegido == null) return;
 
@@ -284,12 +291,12 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
 
     if (tieneCalle || tieneNumero) {
       if (selectedProvinciaId == null ||
-          selectedPartidoId == null ||
-          selectedLocalidadId == null) {
+          selectedLocalidadId == null ||
+          (_pais.geoLevels > 2 && selectedPartidoId == null)) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'Si cargás calle y número, también son obligatorios provincia, partido y localidad.',
+              'Si cargás calle y número, completá también la ubicación.',
             ),
           ),
         );
@@ -452,20 +459,23 @@ class _DomicilioFlotanteWidgetState extends State<DomicilioFlotanteWidget> {
                   _sectionCard(
                     icon: Icons.map_outlined,
                     title: 'Ubicación',
-                    subtitle: 'Provincia, partido y localidad',
+                    subtitle: _pais.geoLevels == 2
+                        ? '${_pais.labelNivel1} y ${_pais.labelNivel3.toLowerCase()}'
+                        : '${_pais.labelNivel1}, ${_pais.labelNivel2.toLowerCase()} y ${_pais.labelNivel3.toLowerCase()}',
                     children: [
                       _buildGeoTile(
-                        label: 'Provincia',
+                        label: _pais.labelNivel1,
                         value: selectedProvinciaNombre ?? 'Buscar o elegir…',
                         onTap: _abrirProvincia,
                       ),
+                      if (_pais.geoLevels > 2)
+                        _buildGeoTile(
+                          label: _pais.labelNivel2,
+                          value: selectedPartidoNombre ?? 'Buscar o elegir…',
+                          onTap: _abrirPartido,
+                        ),
                       _buildGeoTile(
-                        label: 'Partido / Departamento',
-                        value: selectedPartidoNombre ?? 'Buscar o elegir…',
-                        onTap: _abrirPartido,
-                      ),
-                      _buildGeoTile(
-                        label: 'Localidad',
+                        label: _pais.labelNivel3,
                         value: selectedLocalidadNombre ?? 'Buscar o elegir…',
                         onTap: _abrirLocalidad,
                       ),
