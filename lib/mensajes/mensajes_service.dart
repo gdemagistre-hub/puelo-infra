@@ -3,6 +3,8 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
+import '../geo/money_format.dart';
+
 /// Cliente de Mensajes — CF us-east1 + lectura Firestore.
 class MensajesService {
   MensajesService._();
@@ -248,13 +250,6 @@ class MensajesService {
 
   static String formatMonto(dynamic m) {
     final n = m is num ? m.toDouble() : double.tryParse('$m') ?? 0;
-    final s = n.toStringAsFixed(n.truncateToDouble() == n ? 0 : 2);
-    final parts = s.split('.');
-    final intPart = parts[0].replaceAllMapped(
-      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
-      (m) => '${m[1]}.',
-    );
-    if (parts.length > 1) return '\$$intPart,${parts[1]}';
-    return '\$$intPart';
+    return MoneyFormat.format(n);
   }
 }

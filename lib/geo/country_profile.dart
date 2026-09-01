@@ -76,7 +76,7 @@ class CountryProfile {
       currency: 'ARS',
       dialCode: '+54',
       phoneExample: '+5491112345678',
-      phoneMin: 12,
+      phoneMin: 13,
       phoneMax: 13,
       idTypes: _idAr,
       geoReady: true,
