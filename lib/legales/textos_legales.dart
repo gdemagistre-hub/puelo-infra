@@ -1,6 +1,25 @@
+import '../geo/country_profile.dart';
+import '../user_session.dart';
+
 /// Textos legales PUELO — versión producto 2026-08-22.
+/// Pack publicado: [CountryProfile.legalPack] == ar. No hay pack CL/UY/MX aún.
 class TextosLegales {
   static const String vigencia = '22 de agosto de 2026';
+  static const String packPublicado = 'ar';
+
+  static String packId([String? iso]) =>
+      CountryProfile.of(iso ?? UserSession().countryCode).legalPack;
+
+  static bool packReady([String? iso]) => packId(iso) == packPublicado;
+
+  /// Vacío en AR. En otros países avisa que el pack local no está publicado.
+  static String packNota([String? iso]) {
+    if (packReady(iso)) return '';
+    final name = CountryProfile.of(iso ?? UserSession().countryCode).name;
+    return 'El pack legal publicado hoy es el de Argentina. '
+        'El de $name se suma cuando el servicio esté activo en ese país.';
+  }
+
 
   static const String terminosTitulo = 'Términos y Condiciones';
   static const String terminosBajada =
