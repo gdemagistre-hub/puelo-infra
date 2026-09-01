@@ -256,6 +256,9 @@ class CountryProfile {
     return _latamEs.contains(s);
   }
 
+  static List<CountryProfile> get all =>
+      _byIso.values.toList(growable: false);
+
   /// Nombres para dropdowns (sin BR / ES / PT).
   static List<String> get supportedNames =>
       _byIso.values.map((e) => e.name).toList(growable: false);
