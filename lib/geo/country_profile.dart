@@ -256,6 +256,12 @@ class CountryProfile {
     return _latamEs.contains(s);
   }
 
+  /// Nombres para dropdowns (sin BR / ES / PT).
+  static List<String> get supportedNames =>
+      _byIso.values.map((e) => e.name).toList(growable: false);
+
+  bool get legalPackReady => legalPack == 'ar';
+
   /// ISO del doc. Vacío o desconocido = AR (legado).
   static String isoOfData(Map<String, dynamic>? data) {
     return normalizeIso((data?['country_code'] ?? '').toString());

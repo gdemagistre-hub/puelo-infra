@@ -89,6 +89,17 @@ class DocumentoLegalScreen extends StatelessWidget {
               color: Colors.grey.shade500,
             ),
           ),
+          if (TextosLegales.packNota().isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              TextosLegales.packNota(),
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.35,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           ..._secciones.map((s) => _bloque(s)),
           const SizedBox(height: 16),
