@@ -89,3 +89,4 @@ flutter:
   assets:
     - assets/images/
     - assets/usuarios_dummy_500.json
+    - assets/geo/
