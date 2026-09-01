@@ -297,19 +297,15 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
                         'País *',
                         prefix: const Icon(Icons.public_outlined),
                       ),
-                      items: CountryProfile.listedForSelector.map((p) {
-                        final on = p.launchReady;
-                        return DropdownMenuItem(
-                          value: p.iso,
-                          enabled: on,
-                          child: Text(
-                            on ? p.name : '${p.name} · Próximamente',
-                            style: TextStyle(
-                              color: on ? textColor : Colors.grey,
+                      items: CountryProfile.listedForSelector
+                          .where((p) => p.launchReady)
+                          .map(
+                            (p) => DropdownMenuItem(
+                              value: p.iso,
+                              child: Text(p.name),
                             ),
-                          ),
-                        );
-                      }).toList(),
+                          )
+                          .toList(),
                       onChanged: _isLoading
                           ? null
                           : (v) {
@@ -324,6 +320,14 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
                         }
                         return null;
                       },
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Próximamente se sumarán más países.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
