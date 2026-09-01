@@ -8,6 +8,7 @@ import 'usuario_list_sync.dart';
 import 'identidad_pii.dart';
 import 'package:intl/intl.dart';
 import 'user_session.dart';
+import 'geo/doc_catalog.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_copy.dart';
 
@@ -644,7 +645,7 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
                                 value: _tipoDocSeleccionado,
                                 decoration:
                                     _inputDeco('Tipo', obligatorio: false),
-                                items: ['DNI', 'Pasaporte', 'Cédula']
+                                items: DocCatalog.tipos(current: _tipoDocSeleccionado)
                                     .map(
                                       (t) => DropdownMenuItem(
                                         value: t,
@@ -665,12 +666,8 @@ class _CompletarPerfilWidgetState extends State<CompletarPerfilWidget> {
                                   'País emisor',
                                   obligatorio: false,
                                 ),
-                                items: [
-                                  'Argentina',
-                                  'Uruguay',
-                                  'Chile',
-                                  'Otro',
-                                ]
+                                items: DocCatalog.paisesEmisor(
+                                        current: _paisDocSeleccionado)
                                     .map(
                                       (p) => DropdownMenuItem(
                                         value: p,
