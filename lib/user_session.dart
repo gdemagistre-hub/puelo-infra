@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'catalogo_geo_cache.dart';
 import 'analytics/prox_analytics.dart';
 import 'identidad_pii.dart';
+import 'geo/country_profile.dart';
 
 /// Sesión en memoria + persistencia.
 ///
@@ -45,6 +46,38 @@ class UserSession {
   final ValueNotifier<int> profileRevision = ValueNotifier<int>(0);
 
   bool get isLoggedIn => uid != null && uid!.isNotEmpty;
+
+  /// ISO-3166. Legacy sin campo = AR.
+  String get countryCode {
+    final raw =
+        (datosCompletos?['country_code'] ?? '').toString().trim().toUpperCase();
+    return raw.isEmpty ? CountryProfile.defaultIso : CountryProfile.of(raw).iso;
+  }
+
+  /// ISO-4217. Legacy sin campo = moneda del perfil (ARS si AR).
+  String get currency {
+    final raw = (datosCompletos?['currency'] ?? '').toString().trim().toUpperCase();
+    if (raw.isNotEmpty) return raw;
+    return CountryProfile.of(countryCode).currency;
+  }
+
+  /// Backfill lazy. No pisa country_code ya seteado.
+  Future<void> ensureCountryDefaults() async {
+    final id = uid;
+    if (id == null || id.isEmpty) return;
+    final data = datosCompletos ?? {};
+    final patch = CountryProfile.legacyPatch(data);
+    if (patch.isEmpty) return;
+    try {
+      await FirebaseFirestore.instance.collection('usuarios').doc(id).set({
+        ...patch,
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('UserSession.ensureCountryDefaults: $e');
+    }
+    datosCompletos = {...data, ...patch};
+  }
 
   bool? _homeModoPrestadorPref;
 
@@ -188,6 +221,7 @@ class UserSession {
     _loadHomeModoPref();
     hidratarIdentidad();
     refreshAdminFromClaims();
+    ensureCountryDefaults();
   }
 
   Future<void> hidratarIdentidad() async {
@@ -299,6 +333,8 @@ class UserSession {
             'auth_uid': user.uid,
             'es_trabajador': false,
             'estado': 'activo',
+            'country_code': CountryProfile.defaultIso,
+            'currency': CountryProfile.defaultCurrency,
           };
           await FirebaseFirestore.instance.collection('usuarios').doc(user.uid).set({
             ...data,
@@ -324,6 +360,7 @@ class UserSession {
         } catch (_) {}
         await _loadHomeModoPref();
         await _loadPendingValidacion();
+        await ensureCountryDefaults();
         return true;
       }
 
