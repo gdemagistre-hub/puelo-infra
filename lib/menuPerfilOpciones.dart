@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'datosPersonalesflotante.dart';
 import 'Domicilioflotante.dart';
+import 'elige_pais.dart';
 import 'especialidadesLaboralesflotante.dart';
 import 'ZonaDeTrabajoflotante.dart';
 import 'capacitacionesflotante.dart';
@@ -228,6 +229,19 @@ class _MenuPerfilOpcionesWidgetState extends State<MenuPerfilOpcionesWidget> {
                       context,
                       DomicilioFlotanteWidget(modoPrestador: modoPrestador),
                     ),
+                  ),
+                  _row(
+                    icon: Icons.public_outlined,
+                    label: 'País',
+                    onTap: () async {
+                      await Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              const EligePaisWidget(modoCambio: true),
+                        ),
+                      );
+                      if (mounted) setState(() {});
+                    },
                   ),
                 ]),
                 if (!modoPrestador) ...[
