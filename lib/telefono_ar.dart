@@ -1,17 +1,28 @@
 import 'package:flutter/services.dart';
 
-/// Celular AR: + y 13 digitos.
-class TelefonoAr {
-  static final allowChars = FilteringTextInputFormatter.allow(RegExp(r'[+\d]'));
-  static final lengthLimit = LengthLimitingTextInputFormatter(14);
+import 'geo/country_profile.dart';
+import 'geo/telefono_e164.dart';
+import 'user_session.dart';
 
-  static String? validar(String? v) {
-    final t = (v ?? '').trim();
-    if (t.isEmpty) return 'El celular es obligatorio';
-    if (!RegExp(r'^\+\d{13}$').hasMatch(t)) {
-      return 'Formato: + y 13 numeros (ej: +5491112345678)';
-    }
-    return null;
+/// Celular. AR: + y 13 dígitos (regla vigente).
+/// Otros países: E.164 según [CountryProfile].
+class TelefonoAr {
+  static CountryProfile get _profile =>
+      CountryProfile.of(UserSession().countryCode);
+
+  static final allowChars = FilteringTextInputFormatter.allow(RegExp(r'[+\d]'));
+
+  static TextInputFormatter get lengthLimit =>
+      LengthLimitingTextInputFormatter(1 + _profile.phoneMax);
+
+  static String? validar(String? v) =>
+      TelefonoE164.validar(v, iso: UserSession().countryCode);
+
+  static String hint() => _profile.phoneExample;
+
+  static String helper() {
+    if (_profile.iso == 'AR') return '+ y 13 digitos, sin espacios';
+    return '${_profile.dialCode} · ejemplo ${_profile.phoneExample}';
   }
 }
 
@@ -23,8 +34,10 @@ class TelefonoInputFormatter extends TextInputFormatter {
   ) {
     final text = newValue.text;
     if (text.isEmpty) return newValue;
+    final maxDigits = CountryProfile.of(UserSession().countryCode).phoneMax;
     final digits = text.replaceAll(RegExp(r'\D'), '');
-    final limited = digits.length > 13 ? digits.substring(0, 13) : digits;
+    final limited =
+        digits.length > maxDigits ? digits.substring(0, maxDigits) : digits;
     final result = '+$limited';
     return TextEditingValue(
       text: result,
