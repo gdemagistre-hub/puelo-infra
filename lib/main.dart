@@ -14,6 +14,7 @@ import 'splashScreen.dart';
 import 'loginScreen.dart';
 import 'Homepage.dart';
 import 'elige_camino.dart';
+import 'elige_pais.dart';
 import 'elige_oficio.dart';
 import 'registroTrabajador.dart';
 import 'buscadorPrestadores.dart';
@@ -97,6 +98,7 @@ class MyApp extends StatelessWidget {
           initialModoPrestador: UserSession().preferredHomeModoPrestador,
         ),
         EligeCaminoWidget.routePath: (context) => const EligeCaminoWidget(),
+        EligePaisWidget.routePath: (context) => const EligePaisWidget(),
         EligeOficioWidget.routePath: (context) => const EligeOficioWidget(),
         RegistroTrabajadorWidget.routePath: (context) =>
             const RegistroTrabajadorWidget(),
