@@ -30,6 +30,9 @@ class CountryProfile {
   static const String defaultIso = 'AR';
   static const String defaultCurrency = 'ARS';
 
+  /// Países que se pueden elegir hoy. El resto se muestra grisado.
+  static const List<String> launchIsos = ['AR', 'CL', 'UY'];
+
   static const List<String> _latamEs = [
     'AR', 'UY', 'CL', 'PY', 'BO', 'PE', 'EC', 'CO', 'VE',
     'MX', 'GT', 'HN', 'SV', 'NI', 'CR', 'PA', 'DO', 'CU',
@@ -256,8 +259,26 @@ class CountryProfile {
     return _latamEs.contains(s);
   }
 
+  static bool isLaunch(String? iso) {
+    final s = (iso ?? '').trim().toUpperCase();
+    return launchIsos.contains(s);
+  }
+
+  bool get launchReady => launchIsos.contains(iso);
+
   static List<CountryProfile> get all =>
       _byIso.values.toList(growable: false);
+
+  /// AR, CL, UY primero; el resto después. No borra países del mapa.
+  static List<CountryProfile> get listedForSelector {
+    final launch = <CountryProfile>[];
+    for (final iso in launchIsos) {
+      final p = _byIso[iso];
+      if (p != null) launch.add(p);
+    }
+    final rest = _byIso.values.where((p) => !launchIsos.contains(p.iso));
+    return [...launch, ...rest];
+  }
 
   /// Nombres para dropdowns (sin BR / ES / PT).
   static List<String> get supportedNames =>

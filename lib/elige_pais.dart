@@ -6,7 +6,7 @@ import 'elige_camino.dart';
 import 'geo/country_profile.dart';
 import 'user_session.dart';
 
-/// Primera vez: país de operación. Default visual AR. No i18n.
+/// Primera vez: país de operación. Trio AR/CL/UY habilitado. Default visual AR.
 class EligePaisWidget extends StatefulWidget {
   static const String routeName = 'EligePais';
   static const String routePath = '/elige-pais';
@@ -32,8 +32,11 @@ class _EligePaisWidgetState extends State<EligePaisWidget> {
   String _iso = CountryProfile.defaultIso;
   bool _saving = false;
 
+  List<CountryProfile> get _paises => CountryProfile.listedForSelector;
+
   Future<void> _confirmar() async {
     if (_saving) return;
+    if (!CountryProfile.isLaunch(_iso)) return;
     setState(() => _saving = true);
 
     final pais = CountryProfile.of(_iso);
@@ -104,8 +107,8 @@ class _EligePaisWidgetState extends State<EligePaisWidget> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Hoy el catálogo de zonas está activo en Argentina. '
-                'Podés elegir otro país; el resto de la app se adapta de a poco.',
+                'Empezamos por Argentina, Chile y Uruguay. '
+                'El resto de la región se va a ir habilitando.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14,
@@ -116,46 +119,81 @@ class _EligePaisWidgetState extends State<EligePaisWidget> {
               const SizedBox(height: 20),
               Expanded(
                 child: ListView.separated(
-                  itemCount: CountryProfile.all.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemCount: _paises.length,
+                  separatorBuilder: (context, i) {
+                    if (i == CountryProfile.launchIsos.length - 1) {
+                      return const Padding(
+                        padding: EdgeInsets.fromLTRB(4, 16, 4, 8),
+                        child: Text(
+                          'Próximamente',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF94A3B8),
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                      );
+                    }
+                    return const SizedBox(height: 8);
+                  },
                   itemBuilder: (context, i) {
-                    final p = CountryProfile.all[i];
-                    final selected = p.iso == _iso;
-                    return Material(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      child: InkWell(
+                    final p = _paises[i];
+                    final enabled = p.launchReady;
+                    final selected = enabled && p.iso == _iso;
+                    return Opacity(
+                      opacity: enabled ? 1 : 0.45,
+                      child: Material(
+                        color: enabled ? Colors.white : const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(14),
-                        onTap: _saving ? null : () => setState(() => _iso = p.iso),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 14,
-                          ),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: selected ? _accent : const Color(0xFFE2E8F0),
-                              width: selected ? 1.6 : 1,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: (!enabled || _saving)
+                              ? null
+                              : () => setState(() => _iso = p.iso),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 14,
                             ),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  p.name,
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: selected
-                                        ? FontWeight.w700
-                                        : FontWeight.w500,
-                                    color: const Color(0xFF0F172A),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: selected
+                                    ? _accent
+                                    : const Color(0xFFE2E8F0),
+                                width: selected ? 1.6 : 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    p.name,
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: selected
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                      color: enabled
+                                          ? const Color(0xFF0F172A)
+                                          : const Color(0xFF64748B),
+                                    ),
                                   ),
                                 ),
-                              ),
-                              if (selected)
-                                const Icon(Icons.check_circle, color: _accent),
-                            ],
+                                if (selected)
+                                  const Icon(Icons.check_circle, color: _accent),
+                                if (!enabled)
+                                  const Text(
+                                    'Próximamente',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF94A3B8),
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
