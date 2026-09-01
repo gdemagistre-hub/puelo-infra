@@ -80,6 +80,10 @@ class PrestadorListFields {
       'list_score_comportamiento': scoreComportamiento,
       'list_visible': visible,
       'es_trabajador': data['es_trabajador'] == true || profesiones.isNotEmpty,
+      'country_code': (() {
+        final c = (data['country_code'] ?? '').toString().trim().toUpperCase();
+        return c.isEmpty ? 'AR' : c;
+      })(),
     };
     if (touchTimestamp) {
       payload['list_updated_at'] = FieldValue.serverTimestamp();
