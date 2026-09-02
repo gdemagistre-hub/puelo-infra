@@ -20,6 +20,14 @@ function requireAuthUid(request) {
   return request.auth.uid;
 }
 
+function requireAdmin(request) {
+  const uid = requireAuthUid(request);
+  if (request.auth.token.admin !== true) {
+    throw new HttpsError("permission-denied", "Solo admin");
+  }
+  return uid;
+}
+
 function newToken() {
   return crypto.randomBytes(16).toString("hex");
 }
@@ -115,6 +123,7 @@ exports.crearTarjetaShare = onCall(
     await db.collection("tarjetas_share").doc(token).set({
       ...snap,
       telefono: admin.firestore.FieldValue.delete(),
+      celular: admin.firestore.FieldValue.delete(),
       created_at: admin.firestore.FieldValue.serverTimestamp(),
       expire_at: expireAt,
     });
@@ -128,5 +137,32 @@ exports.crearTarjetaShare = onCall(
       expires_at: new Date(now + TTL_MS).toISOString(),
       dias: TTL_DAYS,
     };
+  }
+);
+
+/** Admin: quita telefono/celular de snapshots vigentes. No enumera números. */
+exports.sanitizarTarjetasShare = onCall(
+  {
+    cors: true,
+    memory: "256MiB",
+    timeoutSeconds: 60,
+    region: "us-east1",
+  },
+  async (request) => {
+    requireAdmin(request);
+    const snap = await db.collection("tarjetas_share").limit(200).get();
+    let stripped = 0;
+    const batch = db.batch();
+    for (const doc of snap.docs) {
+      const d = doc.data() || {};
+      if (d.telefono == null && d.celular == null) continue;
+      batch.update(doc.ref, {
+        telefono: admin.firestore.FieldValue.delete(),
+        celular: admin.firestore.FieldValue.delete(),
+      });
+      stripped += 1;
+    }
+    if (stripped > 0) await batch.commit();
+    return { ok: true, scanned: snap.size, stripped };
   }
 );
