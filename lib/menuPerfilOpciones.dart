@@ -555,6 +555,12 @@ class _MenuPerfilOpcionesWidgetState extends State<MenuPerfilOpcionesWidget> {
                     'Buenas prácticas',
                     TipoDocumentoLegal.buenasPracticas,
                   ),
+                  Divider(
+                      height: 1, indent: 48, color: Colors.grey.shade200),
+                  _legalRow(
+                    'Protección infantil',
+                    TipoDocumentoLegal.csae,
+                  ),
                 ],
               ),
               crossFadeState: _legalesAbierto
