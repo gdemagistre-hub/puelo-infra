@@ -62,7 +62,7 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Para crear la cuenta tenés que aceptar los términos, la privacidad y las buenas prácticas.',
+            'Para crear la cuenta tenés que aceptar los términos, la privacidad, las buenas prácticas y la política de protección infantil.',
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -434,6 +434,10 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
                                     _linkLegal(
                                       'Buenas prácticas',
                                       TipoDocumentoLegal.buenasPracticas,
+                                    ),
+                                    _linkLegal(
+                                      'Protección infantil',
+                                      TipoDocumentoLegal.csae,
                                     ),
                                   ],
                                 ),
