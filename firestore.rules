@@ -1,7 +1,7 @@
 rules_version = '2';
-// 2026-09-02 AppSec R7: trabajos_galeria ya no es listado anónimo.
-// Rollback: checkout 57f3c14 -- firestore.rules
-// Resguardo amplio: resguardo/2026-09-02-pre-appsec-mitigaciones
+// 2026-09-02 cap writes: demanda/analytics ID anclado al uid + día ART.
+// Rollback: checkout resguardo/2026-09-02-pre-cap-writes-demanda-analytics -- firestore.rules lib/demanda/demanda_oficios_service.dart lib/analytics/prox_analytics.dart
+// Resguardo: resguardo/2026-09-02-pre-cap-writes-demanda-analytics @ 1a450b47
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -76,13 +76,16 @@ service cloud.firestore {
       return request.resource.data.keys().size() <= 24;
     }
 
+    // ID = {uid}_{yyyymmddART}_{00-39}. Máximo 40 docs/día por cuenta.
     match /analytics_events/{id} {
-      allow create: if isSignedIn()
+      allow create, update: if isSignedIn()
+        && id.size() < 96
+        && id.matches('^' + request.auth.uid + '_[0-9]{8}_[0-3][0-9]$')
         && analyticsKeysOk() && analyticsSizeOk()
         && request.resource.data.type is string
         && request.resource.data.session_id is string;
       allow read: if isAdmin();
-      allow update, delete: if false;
+      allow delete: if false;
     }
 
     match /contactos/{id} {
@@ -110,8 +113,11 @@ service cloud.firestore {
       }
     }
 
+    // ID = {uid}_{yyyymmddART}_{oficio_id}. Un tap por oficio por día por cuenta.
     match /demanda_eventos/{id} {
-      allow create: if isSignedIn()
+      allow create, update: if isSignedIn()
+        && id.size() < 128
+        && id.matches('^' + request.auth.uid + '_[0-9]{8}_[a-z0-9_]+$')
         && request.resource.data.keys().hasOnly(
           ['oficio_id', 'fuente', 'created_at'])
         && request.resource.data.oficio_id is string
@@ -120,7 +126,7 @@ service cloud.firestore {
         && request.resource.data.fuente is string
         && request.resource.data.fuente.size() < 32;
       allow read: if isAdmin();
-      allow update, delete: if false;
+      allow delete: if false;
     }
 
     match /cat_paises/{doc} {

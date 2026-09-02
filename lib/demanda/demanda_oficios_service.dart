@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -77,15 +78,29 @@ class DemandaOficiosService {
     return null;
   }
 
+  /// Día civil ART (UTC-3, sin DST). Alineado al batch 02:30 ART.
+  static String ymdArt([DateTime? now]) {
+    final art = (now ?? DateTime.now()).toUtc().subtract(const Duration(hours: 3));
+    final y = art.year.toString().padLeft(4, '0');
+    final m = art.month.toString().padLeft(2, '0');
+    final d = art.day.toString().padLeft(2, '0');
+    return '$y$m$d';
+  }
+
   static Future<void> registrar(String? raw, {required String fuente}) async {
     final id = resolver(raw);
     if (id == null) return;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null || uid.isEmpty) return;
+    final fuenteOk = fuente.trim();
+    if (fuenteOk.isEmpty || fuenteOk.length >= 32) return;
     try {
-      await FirebaseFirestore.instance.collection('demanda_eventos').add({
+      final docId = '${uid}_${ymdArt()}_$id';
+      await FirebaseFirestore.instance.collection('demanda_eventos').doc(docId).set({
         'oficio_id': id,
-        'fuente': fuente,
+        'fuente': fuenteOk,
         'created_at': FieldValue.serverTimestamp(),
-      });
+      }, SetOptions(merge: true));
     } catch (e) {
       debugPrint('DemandaOficiosService.registrar: $e');
     }
@@ -105,14 +120,14 @@ class DemandaOficiosService {
       final out = <Map<String, dynamic>>[];
       for (final item in raw) {
         if (item is! Map) continue;
-        final id = resolver(item['id']?.toString());
-        if (id == null || !seen.add(id)) continue;
-        out.add(_iconoDe(id, out.length));
+        final oid = resolver(item['id']?.toString());
+        if (oid == null || !seen.add(oid)) continue;
+        out.add(_iconoDe(oid, out.length));
         if (out.length >= 8) break;
       }
-      for (final id in idsDefault) {
+      for (final defId in idsDefault) {
         if (out.length >= 8) break;
-        if (seen.add(id)) out.add(_iconoDe(id, out.length));
+        if (seen.add(defId)) out.add(_iconoDe(defId, out.length));
       }
       return out.length == 8 ? out : fallback;
     } catch (e) {

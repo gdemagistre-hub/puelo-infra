@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
@@ -14,7 +15,7 @@ import '../user_session.dart';
 /// - No envía nombre, email, teléfono, documento ni direcciones.
 /// - `uid` es el id de sesión de la app (opcional); no se envían tokens.
 /// - Mensajes de error se recortan y se limpian de emails/teléfonos.
-/// - Buffer + rate-limit para no saturar Firestore en pico 9–18.
+/// - Buffer + rate-limit cliente + cap rules: máx 40 docs/día/uid.
 /// - Fallos de analytics nunca rompen la UX (todo en try/catch).
 class ProxAnalytics {
   ProxAnalytics._();
@@ -22,6 +23,7 @@ class ProxAnalytics {
 
   static const int _maxBuffer = 20;
   static const int _maxEventsPerMinute = 40;
+  static const int _maxSlotsPerDay = 40;
   static const Duration _flushEvery = Duration(seconds: 8);
   static const int _errorMsgMaxLen = 120;
 
@@ -38,6 +40,8 @@ class ProxAnalytics {
   DateTime _minuteWindowStart = DateTime.now();
   bool _flushing = false;
   bool _enabled = true;
+  String? _slotDay;
+  int _slotForDay = 0;
 
   String get sessionId {
     _sessionId ??= _newSessionId();
@@ -127,15 +131,15 @@ class ProxAnalytics {
 
   void track(String type, {Map<String, dynamic>? props}) {
     if (!_enabled) return;
+    if (FirebaseAuth.instance.currentUser == null) return;
     if (!_allowEvent()) return;
 
-    final uid = UserSession().uid;
+    final uid = UserSession().uid ?? FirebaseAuth.instance.currentUser?.uid;
     final payload = <String, dynamic>{
       'type': type,
       'ts': FieldValue.serverTimestamp(),
       'client_ts': DateTime.now().toUtc().toIso8601String(),
       'session_id': sessionId,
-      // uid opaco de sesión app — no PII
       if (uid != null && uid.isNotEmpty) 'uid': uid,
       'env': AppEnv.label,
       if (props != null) ..._sanitizeProps(props)!,
@@ -156,16 +160,25 @@ class ProxAnalytics {
     if (_buffer.isEmpty) return;
     if (!_enabled && !force) return;
 
+    final authUid = FirebaseAuth.instance.currentUser?.uid;
+    if (authUid == null || authUid.isEmpty) {
+      _buffer.clear();
+      return;
+    }
+
     _flushing = true;
     final batch = List<Map<String, dynamic>>.from(_buffer);
     _buffer.clear();
 
     try {
-      // Escrituras individuales: si una falla, no bloquea el resto.
-      // Evitamos batch enorme que falle entero por reglas.
+      final ymd = _ymdArt();
       for (final event in batch) {
+        final slot = _nextSlot(ymd);
+        if (slot < 0) break;
         try {
-          await _db.collection('analytics_events').add(event);
+          final docId =
+              '${authUid}_${ymd}_${slot.toString().padLeft(2, '0')}';
+          await _db.collection('analytics_events').doc(docId).set(event);
         } catch (e) {
           if (AppEnv.verboseLogging) {
             debugPrint('ProxAnalytics write skip: $e');
@@ -203,6 +216,25 @@ class ProxAnalytics {
     return true;
   }
 
+  int _nextSlot(String ymd) {
+    if (_slotDay != ymd) {
+      _slotDay = ymd;
+      _slotForDay = 0;
+    }
+    if (_slotForDay >= _maxSlotsPerDay) return -1;
+    final slot = _slotForDay;
+    _slotForDay++;
+    return slot;
+  }
+
+  static String _ymdArt([DateTime? now]) {
+    final art = (now ?? DateTime.now()).toUtc().subtract(const Duration(hours: 3));
+    final y = art.year.toString().padLeft(4, '0');
+    final m = art.month.toString().padLeft(2, '0');
+    final d = art.day.toString().padLeft(2, '0');
+    return '$y$m$d';
+  }
+
   Map<String, dynamic>? _sanitizeProps(Map<String, dynamic>? props) {
     if (props == null) return null;
     const blocked = {
@@ -238,7 +270,6 @@ class ProxAnalytics {
 
   String _sanitizeErrorMessage(String raw) {
     var s = raw;
-    // Quitar emails y secuencias largas de dígitos (teléfonos)
     s = s.replaceAll(
       RegExp(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'),
       '[email]',
@@ -263,7 +294,6 @@ class ProxRouteObserver extends NavigatorObserver {
   String? _nameOf(Route<dynamic>? route) {
     final n = route?.settings.name;
     if (n == null || n.isEmpty) return null;
-    // Normalizar paths con query
     try {
       final uri = Uri.parse(n);
       return uri.path.isEmpty ? n : uri.path;
