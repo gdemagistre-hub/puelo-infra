@@ -37,4 +37,6 @@ exports.avisarCalificacionPrestador = calificacionAviso.avisarCalificacionPresta
 exports.responderCalificacion = calificacionAviso.responderCalificacion;
 exports.sendAuthEmail = require("./auth_emails").sendAuthEmail;
 exports.obtenerContactoPrestador = require("./contacto_prestador").obtenerContactoPrestador;
-exports.crearTarjetaShare = require("./tarjeta_share").crearTarjetaShare;
+const tarjetaShare = require("./tarjeta_share");
+exports.crearTarjetaShare = tarjetaShare.crearTarjetaShare;
+exports.sanitizarTarjetasShare = tarjetaShare.sanitizarTarjetasShare;
