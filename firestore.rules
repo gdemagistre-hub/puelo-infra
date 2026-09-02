@@ -2,7 +2,6 @@ rules_version = '2';
 // 2026-09-02 AppSec R5-R6: calificaciones/evals con sesión; demanda/analytics autenticados;
 // trabajos portfolio sigue público para vitrina share.
 // Rollback: resguardo/2026-09-02-pre-appsec-mitigaciones
-rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
