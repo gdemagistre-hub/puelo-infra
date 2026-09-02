@@ -261,7 +261,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
         final apellido = (datos['apellido'] ?? '').toString();
         final comercial = (datos['nombre_comercial'] ?? '').toString().trim();
         final nombreMostrar = comercial.isNotEmpty ? comercial : '$nombre $apellido'.trim();
-        final telefono = (datos['telefono'] ?? datos['celular'] ?? '').toString();
+        final telefono = '';
         final profesiones = datos['profesiones'] as List? ?? [];
         final rawId = snapshot.data!.id;
         final docId = (datos['prestador_uid'] ?? '').toString().trim().isNotEmpty ? (datos['prestador_uid'] as String).trim() : rawId;
@@ -297,7 +297,7 @@ class _TarjetaDigitalWidgetState extends State<TarjetaDigitalWidget> {
           if (n.isEmpty) return a[0].toUpperCase();
           return '${n[0]}${a[0]}'.toUpperCase();
         }();
-        final hasTel = ContactoService.puedeContactar(datos) || telefono.trim().isNotEmpty || (datos['prestador_uid'] ?? '').toString().trim().isNotEmpty;
+        final hasTel = ContactoService.puedeContactar(datos) || esPropietario;
 
         return Scaffold(
           backgroundColor: bgColor,
