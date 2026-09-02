@@ -1,8 +1,8 @@
 /**
- * Validación vecinal — S1 (2026-08-31)
+ * Validación vecinal — S1 + R3 (2026-09-02)
  * Calle real solo se usa en memoria para calcular esCorrecto.
+ * Preview: opciones fijadas por par validador+target (no rotan).
  * Persistencia: validaciones / validaciones_pendientes (rules read,write false).
- * Nunca se escribe en calificaciones (colección pública de estrellas).
  */
 const { onRequest } = require("firebase-functions/v2/https");
 const {
@@ -14,6 +14,8 @@ const {
 } = require("./cf_shared");
 const { loadMerged, domicilioRealDe, opcionesQuiz, nombreDe } = require("./pii");
 
+const PREVIEW_HITS_MAX = 12;
+
 function stripCalleFields(data) {
   if (!data || typeof data !== "object") return data;
   const out = { ...data };
@@ -24,8 +26,6 @@ function stripCalleFields(data) {
 
 function registroValidacionPublico(pend, validadorId, via) {
   return {
-    validadorId,
-    validador_id: validadorId,
     conoce: !!(pend && pend.conoce),
     esCorrecto: !!(pend && pend.esCorrecto),
     tiempoViviendo: String((pend && pend.tiempoViviendo) || "").slice(0, 80),
@@ -33,6 +33,50 @@ function registroValidacionPublico(pend, validadorId, via) {
     tipo: "identidad",
     via,
   };
+}
+
+function quizLockId(validadorId, targetUserId) {
+  const a = String(validadorId || "").replace(/\//g, "_");
+  const b = String(targetUserId || "").replace(/\//g, "_");
+  return `quiz_${a}_${b}`.slice(0, 700);
+}
+
+async function opcionesFijasParaPar(validadorId, targetUserId, real) {
+  const ref = db.collection("validaciones_pendientes").doc(
+    quizLockId(validadorId, targetUserId)
+  );
+  const snap = await ref.get();
+  const data = snap.exists ? snap.data() || {} : {};
+  if (Array.isArray(data.opciones) && data.opciones.length >= 3) {
+    const hits = Number(data.preview_hits || 0) || 0;
+    if (hits >= PREVIEW_HITS_MAX) {
+      const err = new Error("quiz_rate");
+      err.code = "quiz_rate";
+      throw err;
+    }
+    await ref.set(
+      {
+        preview_hits: hits + 1,
+        last_preview_at: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+    return data.opciones.slice(0, 3).map((s) => String(s));
+  }
+  const opciones = opcionesQuiz(real);
+  await ref.set(
+    {
+      tipo: "quiz_lock",
+      targetUserId,
+      validadorId,
+      opciones,
+      preview_hits: 1,
+      creado_en: admin.firestore.FieldValue.serverTimestamp(),
+      last_preview_at: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+  return opciones;
 }
 
 async function findPendienteValidacion(token) {
@@ -132,10 +176,20 @@ const previewValidacionPendiente = onRequest(httpOpts, async (req, res) => {
       res.status(400).json({ error: "no_domicilio" });
       return;
     }
+    let opciones;
+    try {
+      opciones = await opcionesFijasParaPar(validadorId, targetUserId, real);
+    } catch (e) {
+      if (e && e.code === "quiz_rate") {
+        res.status(429).json({ error: "quiz_rate" });
+        return;
+      }
+      throw e;
+    }
     res.status(200).json({
       ok: true,
       nombre: nombreDe(loaded.merged),
-      opciones: opcionesQuiz(real),
+      opciones,
     });
   } catch (e) {
     console.error("previewValidacionPendiente", e);
@@ -333,8 +387,6 @@ const aplicarValidacionPendiente = onRequest(httpOpts, async (req, res) => {
       validaciones_emitidas_count: admin.firestore.FieldValue.increment(1),
       validaciones_emitidas: admin.firestore.FieldValue.arrayUnion([
         {
-          target_id: targetUserId,
-          token,
           fecha: new Date().toISOString(),
         },
       ]),
