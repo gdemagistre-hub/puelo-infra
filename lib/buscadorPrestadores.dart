@@ -249,18 +249,17 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     return (scoreId ?? 0).toDouble() * 10 + badgeRank * 20 + (scoreServ ?? 0).toDouble() * 3 + (scoreComp ?? 0).toDouble() * 2 + estrellas;
   }
 
-  String _telefonoDe(Map<String, dynamic> data) => (data['telefono'] ?? data['celular'] ?? '').toString().trim();
-  bool _tieneWhatsApp(Map<String, dynamic> data) {
-    if (_telefonoDe(data).isEmpty) return false;
-    if (data.containsKey('tiene_whatsapp')) return data['tiene_whatsapp'] == true;
-    return true;
+  bool _puedeWhatsApp(Map<String, dynamic> data) {
+    return ContactoService.puedeContactar(data);
   }
+
   String? _fotoUrl(Map<String, dynamic> data) {
     final raw = (data['url_foto_perfil'] ?? data['foto_perfil'] ?? '').toString().trim();
     if (raw.isEmpty) return null;
     if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
     return null;
   }
+
   String _initials(Map<String, dynamic> data) {
     final n = (data['nombre'] ?? data['list_nombre'] ?? '').toString().trim();
     final a = (data['apellido'] ?? '').toString().trim();
@@ -269,10 +268,12 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
     if (n.isEmpty) return a[0].toUpperCase();
     return '${n[0]}${a[0]}'.toUpperCase();
   }
+
   String _labelsOficios(List<dynamic> profesiones) {
     if (profesiones.isEmpty) return 'Prestador';
     return profesiones.map((e) => CatalogoOficios.label(e.toString())).take(2).join(' · ');
   }
+
   String _zonaResumen(Map<String, dynamic> data) {
     final cobertura = data['zonas_cobertura'] as Map<String, dynamic>?;
     if (cobertura == null) return '';
@@ -288,17 +289,24 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
   }
 
   Future<void> _abrirWhatsApp(String prestadorUid, Map<String, dynamic> data) async {
-    final telRaw = _telefonoDe(data);
-    if (telRaw.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Este prestador no cargó teléfono.')));
-      return;
-    }
-    final tel = telRaw.replaceAll(RegExp(r'[^\d+]'), '');
     final nombre = (data['nombre'] ?? '').toString().trim();
     final apellido = (data['apellido'] ?? '').toString().trim();
     final comercial = (data['nombre_comercial'] ?? data['list_nombre'] ?? '').toString().trim();
     final nombreLog = comercial.isNotEmpty ? comercial : '$nombre $apellido'.trim();
-    ContactoService.registrar(prestadorUid: prestadorUid, tipo: 'whatsapp', origen: 'buscador', prestadorNombre: nombreLog.isEmpty ? null : nombreLog);
+    final telRaw = await ContactoService.resolverTelefono(
+      prestadorUid: prestadorUid,
+      tipo: 'whatsapp',
+      origen: 'buscador',
+      prestadorNombre: nombreLog.isEmpty ? null : nombreLog,
+    );
+    if (telRaw == null || telRaw.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(ContactoService.lastError ?? 'No se pudo abrir WhatsApp'),
+      ));
+      return;
+    }
+    final tel = telRaw.replaceAll(RegExp(r'[^\d+]'), '');
     final mensaje = Uri.encodeComponent('Hola${nombre.isNotEmpty ? ' $nombre' : ''}, te escribo desde PROX. Vi tu perfil y me gustaría consultar por un trabajo.');
     final url = Uri.parse('https://wa.me/$tel?text=$mensaje');
     if (await canLaunchUrl(url)) {
@@ -497,8 +505,7 @@ class _BuscadorPrestadoresWidgetState extends State<BuscadorPrestadoresWidget> {
                                       final listNombre = (data['list_nombre'] ?? '').toString().trim();
                                       final comercial = (data['nombre_comercial'] ?? '').toString().trim();
                                       final nombreMostrar = listNombre.isNotEmpty ? listNombre : (comercial.isNotEmpty ? comercial : '${data['nombre'] ?? ''} ${data['apellido'] ?? ''}'.trim());
-                                      final tel = _telefonoDe(data);
-                                      final puedeWa = tel.isNotEmpty && _tieneWhatsApp(data);
+                                      final puedeWa = _puedeWhatsApp(data);
                                       final zona = _zonaResumen(data);
                                       final cerca = _scoreZonaPref(data) > 0;
                                       return Container(
