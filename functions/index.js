@@ -31,6 +31,7 @@ assignSafe("./cf_vault");
 assignSafe("./cf_recibo");
 assignSafe("./cf_fiados_sched");
 assignSafe("./cf_pii_sanitize");
+assignSafe("./cf_oficios_libres_sched");
 
 exports.enviarMensajeTexto = require("./mensajes_texto").enviarMensajeTexto;
 const calificacionAviso = require("./calificacion_aviso");
