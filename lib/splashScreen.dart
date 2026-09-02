@@ -7,7 +7,6 @@ import 'elige_pais.dart';
 import 'loginScreen.dart';
 import 'user_session.dart';
 import 'theme/app_copy.dart';
-import 'branding/prox_splash_bytes.dart';
 import 'pantalla_gracias_validacion.dart';
 import 'validar_domicilio.dart';
 
@@ -140,24 +139,18 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Image.memory(
-                      kProxSplashLogoBytes,
+                    Image.asset(
+                      'assets/images/logo_prox_splash.png.png',
                       width: 200,
                       fit: BoxFit.contain,
-                      gaplessPlayback: true,
                       errorBuilder: (_, __, ___) => Image.asset(
-                        'assets/images/logo_prox_splash.png.png',
+                        'assets/images/lifewallet.png',
                         width: 200,
                         fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => Image.asset(
-                          'assets/images/lifewallet.png',
-                          width: 200,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => const Icon(
-                            Icons.handyman_rounded,
-                            size: 80,
-                            color: Color(0xFF734BE4),
-                          ),
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.handyman_rounded,
+                          size: 80,
+                          color: Color(0xFF734BE4),
                         ),
                       ),
                     ),
