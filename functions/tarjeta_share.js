@@ -1,7 +1,7 @@
 /**
  * Tarjeta digital compartible — token opaco 7 días.
- * Vitrina anónima: tarjetas_share/{token} (contacto sí, sin DNI/calle).
- * usuarios/{uid} sigue exigiendo sesión.
+ * Vitrina anónima: tarjetas_share/{token} (sin DNI/calle/teléfono).
+ * El número se revela solo vía obtenerContactoPrestador con sesión.
  */
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
@@ -68,7 +68,6 @@ function snapshotDe(uid, data) {
       Number(data.list_n_evaluaciones ?? data.nEvaluaciones ?? 0) || 0,
     tiene_whatsapp: tieneWa,
     tiene_telefono: tieneTel,
-    telefono: tel,
   };
 }
 
@@ -115,6 +114,7 @@ exports.crearTarjetaShare = onCall(
 
     await db.collection("tarjetas_share").doc(token).set({
       ...snap,
+      telefono: admin.firestore.FieldValue.delete(),
       created_at: admin.firestore.FieldValue.serverTimestamp(),
       expire_at: expireAt,
     });
@@ -125,7 +125,6 @@ exports.crearTarjetaShare = onCall(
       ok: true,
       token,
       url,
-      telefono: snap.telefono || "",
       expires_at: new Date(now + TTL_MS).toISOString(),
       dias: TTL_DAYS,
     };

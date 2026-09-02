@@ -2,11 +2,58 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { loadMerged, nombreDe, telefonoDe } = require("./pii");
 
+const CONTACTO_CUOTA_DIA = 40;
+
 function requireAuthUid(request) {
   if (!request.auth || !request.auth.uid) {
     throw new HttpsError("unauthenticated", "Necesitás sesión Google");
   }
   return request.auth.uid;
+}
+
+function esPrestadorDoc(data) {
+  if (!data || typeof data !== "object") return false;
+  if (data.es_trabajador === true) return true;
+  const rol = String(data.rol || "").trim().toLowerCase();
+  if (rol === "trabajador" || rol === "prestador") return true;
+  const camino = String(data.camino_elegido || "").trim().toLowerCase();
+  if (camino === "ofrezo" || camino === "ofrezco") return true;
+  if (Array.isArray(data.profesiones) && data.profesiones.length > 0) return true;
+  return false;
+}
+
+function ymdUtc(d) {
+  return d.toISOString().slice(0, 10);
+}
+
+async function consumirCuotaContacto(db, actorUid) {
+  const ref = db
+    .collection("usuarios")
+    .doc(actorUid)
+    .collection("privado")
+    .doc("rate_contacto");
+  const hoy = ymdUtc(new Date());
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const data = snap.exists ? snap.data() || {} : {};
+    const dia = String(data.dia || "");
+    const n = dia === hoy ? Number(data.n || 0) || 0 : 0;
+    if (n >= CONTACTO_CUOTA_DIA) {
+      throw new HttpsError(
+        "resource-exhausted",
+        "Llegaste al tope de contactos por hoy. Probá mañana."
+      );
+    }
+    tx.set(
+      ref,
+      {
+        dia: hoy,
+        n: n + 1,
+        updated_at: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+  });
 }
 
 exports.obtenerContactoPrestador = onCall(
@@ -27,6 +74,12 @@ exports.obtenerContactoPrestador = onCall(
     if (!loaded.merged) {
       throw new HttpsError("not-found", "Prestador no encontrado");
     }
+    if (!esPrestadorDoc(loaded.parent || loaded.merged)) {
+      throw new HttpsError(
+        "permission-denied",
+        "Solo se puede contactar a quien ofrece servicios."
+      );
+    }
     const tel = telefonoDe(loaded.merged);
     if (!tel) {
       throw new HttpsError(
@@ -35,6 +88,7 @@ exports.obtenerContactoPrestador = onCall(
       );
     }
     const db = admin.firestore();
+    await consumirCuotaContacto(db, actorUid);
     await db.collection("contactos").add({
       cliente_uid: actorUid,
       prestador_uid: target,
