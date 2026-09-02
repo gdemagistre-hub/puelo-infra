@@ -1019,7 +1019,7 @@ Widget _navAcademiaShowcase() {
       add(_RecoItem(
         id: 'domicilio',
         title: 'Completá tu domicilio',
-        subtitle: 'Provincia, partido y localidad · suma Confianza',
+        subtitle: '${DocCatalog.profile.labelsDomicilio} · suma Confianza',
         icon: Icons.home_outlined,
         onTap: () => _abrirFlotante(DomicilioFlotanteWidget(modoPrestador: true)),
       ));
