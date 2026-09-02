@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import 'textos_legales.dart';
 
-/// Pantalla de lectura de un documento legal (TyC, Privacidad, Buenas prácticas).
+/// Pantalla de lectura de un documento legal.
 class DocumentoLegalScreen extends StatelessWidget {
   final TipoDocumentoLegal tipo;
   final bool modoPrestador;
@@ -25,6 +25,8 @@ class DocumentoLegalScreen extends StatelessWidget {
         return TextosLegales.privacidadTitulo;
       case TipoDocumentoLegal.buenasPracticas:
         return TextosLegales.buenasTitulo;
+      case TipoDocumentoLegal.csae:
+        return TextosLegales.csaeTitulo;
     }
   }
 
@@ -36,6 +38,8 @@ class DocumentoLegalScreen extends StatelessWidget {
         return TextosLegales.privacidadBajada;
       case TipoDocumentoLegal.buenasPracticas:
         return TextosLegales.buenasBajada;
+      case TipoDocumentoLegal.csae:
+        return TextosLegales.csaeBajada;
     }
   }
 
@@ -47,6 +51,8 @@ class DocumentoLegalScreen extends StatelessWidget {
         return TextosLegales.privacidad;
       case TipoDocumentoLegal.buenasPracticas:
         return TextosLegales.buenasPracticas;
+      case TipoDocumentoLegal.csae:
+        return TextosLegales.csae;
     }
   }
 
@@ -62,7 +68,9 @@ class DocumentoLegalScreen extends StatelessWidget {
           onPressed: () => Navigator.of(context).maybePop(),
         ),
         title: Text(
-          _titulo,
+          tipo == TipoDocumentoLegal.csae
+              ? 'Protección infantil'
+              : _titulo,
           style: const TextStyle(
             color: AppColors.text,
             fontWeight: FontWeight.w700,
@@ -110,8 +118,7 @@ class DocumentoLegalScreen extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
-              'Versión de producto en revisión legal. '
-              'La confianza que construís en PUELO se usa solo dentro de PUELO.',
+              TextosLegales.pieLegal,
               style: TextStyle(
                 fontSize: 12,
                 height: 1.35,
