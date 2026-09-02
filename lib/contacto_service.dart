@@ -7,20 +7,43 @@ import 'identidad_pii.dart';
 import 'user_session.dart';
 
 /// Contacto cliente → prestador.
-///
-/// El número ya no vive en el doc público. Se pide a
-/// `obtenerContactoPrestador` (us-east1) y se registra en `contactos`.
+/// El número no se lee del doc público. Sale de `obtenerContactoPrestador`.
 class ContactoService {
   ContactoService._();
 
   static const String functionsRegion = 'us-east1';
+
+  /// Último error humano de [resolverTelefono] (para snackbar).
+  static String? lastError;
 
   static bool puedeContactar(Map<String, dynamic>? data) {
     if (data == null) return false;
     if (data['tiene_whatsapp'] == true || data['tiene_telefono'] == true) {
       return true;
     }
-    return IdentidadPii.telefonoDe(data).isNotEmpty;
+    return false;
+  }
+
+  static String _mensajeDe(Object e) {
+    if (e is FirebaseFunctionsException) {
+      switch (e.code) {
+        case 'unauthenticated':
+          return 'Entrá con tu cuenta para contactarlo';
+        case 'permission-denied':
+          return 'Solo se puede contactar a quien ofrece servicios';
+        case 'resource-exhausted':
+          return 'Llegaste al tope de contactos por hoy. Probá mañana.';
+        case 'failed-precondition':
+          return 'Este prestador no cargó teléfono';
+        case 'not-found':
+          return 'No encontramos ese perfil';
+        default:
+          return (e.message ?? '').trim().isEmpty
+              ? 'No se pudo obtener el contacto'
+              : e.message!.trim();
+      }
+    }
+    return 'No se pudo obtener el contacto';
   }
 
   static Future<String?> resolverTelefono({
@@ -30,15 +53,17 @@ class ContactoService {
     String? prestadorNombre,
     String? fallback,
   }) async {
+    lastError = null;
     final me = UserSession().uid;
     if (prestadorUid.isEmpty) return null;
     if (me != null && me == prestadorUid) {
       final own = IdentidadPii.telefonoDe(UserSession().datosCompletos);
       if (own.isNotEmpty) return own;
-      if ((fallback ?? '').trim().isNotEmpty) return fallback!.trim();
+      lastError = 'No tenés teléfono cargado';
       return null;
     }
     if (FirebaseAuth.instance.currentUser == null) {
+      lastError = 'Entrá con tu cuenta para contactarlo';
       debugPrint('ContactoService.resolverTelefono: sin Auth');
       return null;
     }
@@ -52,20 +77,13 @@ class ContactoService {
       final data = Map<String, dynamic>.from(result.data as Map);
       final tel = (data['telefono'] ?? '').toString().trim();
       if (tel.isNotEmpty) return tel;
+      lastError = 'Este prestador no cargó teléfono';
+      return null;
     } catch (e) {
+      lastError = _mensajeDe(e);
       debugPrint('ContactoService.resolverTelefono CF: $e');
+      return null;
     }
-    final local = (fallback ?? '').trim();
-    if (local.isNotEmpty) {
-      await registrar(
-        prestadorUid: prestadorUid,
-        tipo: tipo,
-        origen: origen,
-        prestadorNombre: prestadorNombre,
-      );
-      return local;
-    }
-    return null;
   }
 
   static Future<void> registrar({

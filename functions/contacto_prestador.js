@@ -26,7 +26,7 @@ function ymdUtc(d) {
   return d.toISOString().slice(0, 10);
 }
 
-async function consumirCuotaContacto(db, actorUid) {
+async function consumirCuotaContacto(db, actorUid, targetUid) {
   const ref = db
     .collection("usuarios")
     .doc(actorUid)
@@ -37,18 +37,27 @@ async function consumirCuotaContacto(db, actorUid) {
     const snap = await tx.get(ref);
     const data = snap.exists ? snap.data() || {} : {};
     const dia = String(data.dia || "");
-    const n = dia === hoy ? Number(data.n || 0) || 0 : 0;
+    const reset = dia !== hoy;
+    const n = reset ? 0 : Number(data.n || 0) || 0;
+    const destinos = reset || typeof data.destinos !== "object" || !data.destinos
+      ? {}
+      : { ...data.destinos };
+    if (destinos[targetUid]) {
+      return;
+    }
     if (n >= CONTACTO_CUOTA_DIA) {
       throw new HttpsError(
         "resource-exhausted",
         "Llegaste al tope de contactos por hoy. Probá mañana."
       );
     }
+    destinos[targetUid] = true;
     tx.set(
       ref,
       {
         dia: hoy,
         n: n + 1,
+        destinos,
         updated_at: admin.firestore.FieldValue.serverTimestamp(),
       },
       { merge: true }
@@ -88,7 +97,7 @@ exports.obtenerContactoPrestador = onCall(
       );
     }
     const db = admin.firestore();
-    await consumirCuotaContacto(db, actorUid);
+    await consumirCuotaContacto(db, actorUid, target);
     await db.collection("contactos").add({
       cliente_uid: actorUid,
       prestador_uid: target,
