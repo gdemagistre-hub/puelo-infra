@@ -1,13 +1,8 @@
 rules_version = '2';
-// 2026-08-24: usuarios sin write anónimo.
-// 2026-08-24 etapa 5 Aikido: list de usuarios exige sesión (cierra enumeración masiva).
-// 2026-08-24 etapa 1 PII: DNI/email/calle en usuarios/{uid}/privado (dueño/admin).
-// 2026-08-26: get del padre exige sesión. Vitrina anónima = tarjetas_share/{token} 21d.
-// 2026-08-24 etapa A1: sin wildcard FlutterFlow (ya no hay allow write global).
-// 2026-08-24 etapa A3: isAdmin() solo custom claim admin (no es_admin del doc público).
-// 2026-08-25: trabajos update — tipo y refs inmutables (no convertir evaluación en portfolio).
-// 2026-08-31 S2: list usuarios solo prestadores (es_trabajador==true) o admin;
-//                privilegedKeys ampliado (scoring/readiness/estrellas de sistema).
+// 2026-09-02 AppSec R5-R6: calificaciones/evals con sesión; demanda/analytics autenticados;
+// trabajos portfolio sigue público para vitrina share.
+// Rollback: resguardo/2026-09-02-pre-appsec-mitigaciones
+rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -30,10 +25,6 @@ service cloud.firestore {
       return isSignedIn() && !isDevImpersonation() && request.auth.uid == userId;
     }
 
-    // Campos que solo escribe Admin SDK / claim admin.
-    // No incluir list_nombre, list_foto, list_visible, list_updated_at,
-    // list_promedio, list_n_eval, zona_ids, categorias_servicio, es_trabajador
-    // ni stats_negocio: el dueño los escribe vía UsuarioListSync / Mis Números.
     function privilegedKeys() {
       return [
         'es_admin',
@@ -87,7 +78,8 @@ service cloud.firestore {
     }
 
     match /analytics_events/{id} {
-      allow create: if analyticsKeysOk() && analyticsSizeOk()
+      allow create: if isSignedIn()
+        && analyticsKeysOk() && analyticsSizeOk()
         && request.resource.data.type is string
         && request.resource.data.session_id is string;
       allow read: if isAdmin();
@@ -120,7 +112,8 @@ service cloud.firestore {
     }
 
     match /demanda_eventos/{id} {
-      allow create: if request.resource.data.keys().hasOnly(
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(
           ['oficio_id', 'fuente', 'created_at'])
         && request.resource.data.oficio_id is string
         && request.resource.data.oficio_id.size() > 0
@@ -156,9 +149,7 @@ service cloud.firestore {
     }
 
     match /usuarios/{userId} {
-      // Get por UID (tarjeta, mensajes, validar) sigue con sesión.
       allow get: if isSignedIn() || isAdmin();
-      // S2: no enumerar clientes. El buscador ya filtra es_trabajador==true.
       allow list: if isAdmin()
         || (isSignedIn() && resource.data.es_trabajador == true);
 
@@ -192,7 +183,9 @@ service cloud.firestore {
     }
 
     match /trabajos/{id} {
-      allow read: if true;
+      allow read: if isSignedIn()
+        || isAdmin()
+        || resource.data.get('tipo', 'portfolio') in ['portfolio', 'trabajo'];
       allow create: if isSignedIn()
         && request.resource.data.tipo in ['portfolio', 'evaluacion']
         && (
@@ -227,12 +220,13 @@ service cloud.firestore {
 
     match /trabajos_galeria/{id} {
       allow read: if true;
-      allow create: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.usuario_id == request.auth.uid;
       allow update, delete: if isAdmin();
     }
 
     match /calificaciones/{id} {
-      allow read: if true;
+      allow read: if isSignedIn() || isAdmin();
       allow create: if isSignedIn()
         && request.resource.data.cliente_id == request.auth.uid
         && request.resource.data.prestador_id is string
