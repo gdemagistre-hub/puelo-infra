@@ -312,6 +312,12 @@ class CountryProfile {
 
   bool get legalPackReady => legalPack == 'ar';
 
+  /// Texto corto para tips / helpers de domicilio.
+  String get labelsDomicilio {
+    if (geoLevels <= 2) return '$labelNivel1 y $labelNivel3';
+    return '$labelNivel1, $labelNivel2 y $labelNivel3';
+  }
+
   /// ISO del doc. Vacío o desconocido = AR (legado).
   static String isoOfData(Map<String, dynamic>? data) {
     return normalizeIso((data?['country_code'] ?? '').toString());
