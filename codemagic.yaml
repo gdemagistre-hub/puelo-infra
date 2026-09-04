@@ -6,6 +6,8 @@ workflows:
     integrations:
       app_store_connect: Codemagic PROX
     environment:
+      groups:
+        - ios_firebase
       flutter: stable
       xcode: latest
       cocoapods: default
@@ -29,7 +31,6 @@ workflows:
             printf '%s\n' "$CERTIFICATE_PRIVATE_KEY" > "$KEY"
           else
             openssl genrsa -out "$KEY" 2048
-            echo "Generated a new CERTIFICATE_PRIVATE_KEY. Save it in Codemagic env after this build."
           fi
           chmod 600 "$KEY"
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
@@ -49,10 +50,8 @@ workflows:
         script: |
           #!/usr/bin/env bash
           if [ -z "${FIREBASE_API_KEY_IOS:-}" ] || [ -z "${FIREBASE_APP_ID_IOS:-}" ]; then
-            echo "Faltan variables en App settings de puelo-infra:"
-            echo "FIREBASE_API_KEY_IOS y FIREBASE_APP_ID_IOS"
-            echo "Applications → puelo-infra → Environment variables"
-            env | awk -F= '/FIREBASE/ {print $1}' || true
+            echo "El grupo ios_firebase no llegó al job."
+            env | awk -F= '/FIREBASE|GOOGLESERVICE/ {print $1}' || true
             exit 1
           fi
           echo "Firebase iOS env OK"
