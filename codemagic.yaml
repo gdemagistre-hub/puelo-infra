@@ -12,6 +12,11 @@ workflows:
       vars:
         BUNDLE_ID: app.puelo
     scripts:
+      - name: Prebuild iOS module
+        script: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          bash tools/codemagic_prebuild_ios.sh
       - name: Init keychain
         script: |
           keychain initialize
@@ -28,11 +33,6 @@ workflows:
       - name: Apply signing to Xcode project
         script: |
           xcode-project use-profiles
-      - name: Prebuild iOS module
-        script: |
-          #!/usr/bin/env bash
-          set -euo pipefail
-          bash tools/codemagic_prebuild_ios.sh
       - name: Flutter pub get
         script: |
           flutter pub get
