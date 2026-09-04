@@ -2,6 +2,9 @@
 # Pre-build Codemagic: crea ios/ si falta, fija bundle app.puelo, plist + permisos.
 set -euo pipefail
 
+# Plugins actuales (messaging, ML Kit, sqflite) no tienen SPM completo.
+flutter config --no-enable-swift-package-manager
+
 if [ ! -d ios ]; then
   flutter create --platforms=ios --org app --project-name life_wallet_puelo .
 fi
@@ -24,4 +27,13 @@ if [ -f "$PLIST" ]; then
   /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string PROX usa la cámara para tu foto de perfil y para leer el documento." "$PLIST" 2>/dev/null || true
   /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string PROX accede a tus fotos para el perfil y los trabajos realizados." "$PLIST" 2>/dev/null || true
   /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryAddUsageDescription string PROX guarda imágenes en tu galería solo si vos lo pedís." "$PLIST" 2>/dev/null || true
+fi
+
+# Podfile: plataforma explícita (el warning asignaba 15.0 solo).
+if [ -f ios/Podfile ]; then
+  if grep -q "^# platform :ios" ios/Podfile; then
+    sed -i '' 's/^# platform :ios.*/platform :ios, '"'"'15.0'"'"'/' ios/Podfile
+  elif ! grep -q "^platform :ios" ios/Podfile; then
+    printf '%s\n%s\n' "platform :ios, '15.0'" "$(cat ios/Podfile)" > ios/Podfile
+  fi
 fi

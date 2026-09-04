@@ -45,13 +45,14 @@ workflows:
           xcode-project use-profiles
       - name: Flutter pub get
         script: |
+          flutter config --no-enable-swift-package-manager
           flutter pub get
       - name: Check Firebase env
         script: |
           #!/usr/bin/env bash
           if [ -z "${FIREBASE_API_KEY_IOS:-}" ] || [ -z "${FIREBASE_APP_ID_IOS:-}" ]; then
             echo "El grupo ios_firebase no llegó al job."
-            env | awk -F= '/FIREBASE|GOOGLESERVICE/ {print $1}' || true
+            env | awk -F= '/FIREBASE|GOOGLESERVICE|CERTIFICATE_PRIVATE/ {print $1}' || true
             exit 1
           fi
           echo "Firebase iOS env OK"
@@ -59,6 +60,7 @@ workflows:
         script: |
           #!/usr/bin/env bash
           set -euo pipefail
+          flutter config --no-enable-swift-package-manager
           flutter build ipa --release \
             --export-options-plist=/Users/builder/export_options.plist \
             --dart-define=FIREBASE_API_KEY_IOS="$FIREBASE_API_KEY_IOS" \
