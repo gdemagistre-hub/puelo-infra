@@ -6,13 +6,28 @@ workflows:
     integrations:
       app_store_connect: Codemagic PROX
     environment:
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: app.puelo
       flutter: stable
       xcode: latest
       cocoapods: default
+      vars:
+        BUNDLE_ID: app.puelo
     scripts:
+      - name: Init keychain
+        script: |
+          keychain initialize
+      - name: Fetch or create App Store signing files
+        script: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+      - name: Add certificates to keychain
+        script: |
+          keychain add-certificates
+      - name: Apply signing to Xcode project
+        script: |
+          xcode-project use-profiles
       - name: Prebuild iOS module
         script: |
           #!/usr/bin/env bash
