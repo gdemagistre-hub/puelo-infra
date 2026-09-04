@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -30,10 +31,15 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Keys inyectadas en compile-time. Nunca en el repo.
-  // Local:  --dart-define=FIREBASE_API_KEY_WEB=... --dart-define=FIREBASE_API_KEY_ANDROID=...
-  // CI:     secrets FIREBASE_API_KEY_WEB / FIREBASE_API_KEY_ANDROID
+  // Local/CI:
+  //   --dart-define=FIREBASE_API_KEY_WEB=...
+  //   --dart-define=FIREBASE_API_KEY_ANDROID=...
+  //   --dart-define=FIREBASE_API_KEY_IOS=...
+  //   --dart-define=FIREBASE_APP_ID_IOS=...
   const webKey = String.fromEnvironment('FIREBASE_API_KEY_WEB');
   const androidKey = String.fromEnvironment('FIREBASE_API_KEY_ANDROID');
+  const iosKey = String.fromEnvironment('FIREBASE_API_KEY_IOS');
+  const iosAppId = String.fromEnvironment('FIREBASE_APP_ID_IOS');
 
   if (kIsWeb) {
     if (webKey.isEmpty) {
@@ -50,6 +56,23 @@ void main() async {
         storageBucket: 'lifewalletpuelo.firebasestorage.app',
         messagingSenderId: '74624927314',
         appId: '1:74624927314:web:3fadcc533dd1f3a985818b',
+      ),
+    );
+  } else if (defaultTargetPlatform == TargetPlatform.iOS) {
+    if (iosKey.isEmpty || iosAppId.isEmpty) {
+      debugPrint(
+        'Falta FIREBASE_API_KEY_IOS o FIREBASE_APP_ID_IOS. '
+        'En Codemagic van como variables + --dart-define.',
+      );
+    }
+    await Firebase.initializeApp(
+      options: FirebaseOptions(
+        apiKey: iosKey,
+        appId: iosAppId,
+        messagingSenderId: '74624927314',
+        projectId: 'lifewalletpuelo',
+        storageBucket: 'lifewalletpuelo.firebasestorage.app',
+        iosBundleId: 'app.puelo',
       ),
     );
   } else {
