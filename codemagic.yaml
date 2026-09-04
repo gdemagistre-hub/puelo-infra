@@ -1,0 +1,39 @@
+workflows:
+  ios-testflight:
+    name: iOS TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: Codemagic PROX
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: app.puelo
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Prebuild iOS module
+        script: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          bash tools/codemagic_prebuild_ios.sh
+      - name: Flutter pub get
+        script: |
+          flutter pub get
+      - name: Build IPA
+        script: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          flutter build ipa --release \
+            --export-options-plist=/Users/builder/export_options.plist \
+            --dart-define=FIREBASE_API_KEY_IOS="${FIREBASE_API_KEY_IOS}" \
+            --dart-define=FIREBASE_APP_ID_IOS="${FIREBASE_APP_ID_IOS}"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: false
+        submit_to_app_store: false
