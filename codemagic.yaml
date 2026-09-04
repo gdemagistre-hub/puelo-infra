@@ -52,7 +52,7 @@ workflows:
           #!/usr/bin/env bash
           if [ -z "${FIREBASE_API_KEY_IOS:-}" ] || [ -z "${FIREBASE_APP_ID_IOS:-}" ]; then
             echo "El grupo ios_firebase no llegó al job."
-            env | awk -F= '/FIREBASE|GOOGLESERVICE|CERTIFICATE_PRIVATE/ {print $1}' || true
+            env | awk -F= '/FIREBASE|GOOGLESERVICE|CERTIFICATE_PRIVATE|GOOGLE_WEB/ {print $1}' || true
             exit 1
           fi
           echo "Firebase iOS env OK"
@@ -64,7 +64,8 @@ workflows:
           flutter build ipa --release \
             --export-options-plist=/Users/builder/export_options.plist \
             --dart-define=FIREBASE_API_KEY_IOS="$FIREBASE_API_KEY_IOS" \
-            --dart-define=FIREBASE_APP_ID_IOS="$FIREBASE_APP_ID_IOS"
+            --dart-define=FIREBASE_APP_ID_IOS="$FIREBASE_APP_ID_IOS" \
+            --dart-define=GOOGLE_WEB_CLIENT_ID="${GOOGLE_WEB_CLIENT_ID:-}"
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
