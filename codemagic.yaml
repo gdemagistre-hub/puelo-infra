@@ -24,9 +24,18 @@ workflows:
         script: |
           #!/usr/bin/env bash
           set -euo pipefail
+          KEY=/tmp/ios_dist_key.pem
+          if [ -n "${CERTIFICATE_PRIVATE_KEY:-}" ]; then
+            printf '%s\n' "$CERTIFICATE_PRIVATE_KEY" > "$KEY"
+          else
+            openssl genrsa -out "$KEY" 2048
+            echo "Generated a new CERTIFICATE_PRIVATE_KEY. Save it in Codemagic env after this build."
+          fi
+          chmod 600 "$KEY"
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
-            --create
+            --create \
+            --certificate-key=@file:"$KEY"
       - name: Add certificates to keychain
         script: |
           keychain add-certificates
