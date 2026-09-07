@@ -7,7 +7,7 @@ import 'elige_pais.dart';
 import 'legales/acepto_legales.dart';
 import 'loginScreen.dart';
 import 'user_session.dart';
-import 'theme/app_copy.dart';
+import 'widgets/prox_lockup.dart';
 import 'pantalla_gracias_validacion.dart';
 import 'validar_domicilio.dart';
 
@@ -52,8 +52,6 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
     );
 
     _controller.forward();
-    // Audio de ingreso: se dispara en el primer gesto del login (no acá:
-    // el browser bloquea autoplay sin interacción del usuario).
     _bootstrap();
   }
 
@@ -139,38 +137,7 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
               opacity: _opacityAnimation.value,
               child: Transform.scale(
                 scale: _scaleAnimation.value,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Image.asset(
-                      'assets/images/logo_prox_splash.png.png',
-                      width: 200,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => Image.asset(
-                        'assets/images/lifewallet.png',
-                        width: 200,
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => const Icon(
-                          Icons.handyman_rounded,
-                          size: 80,
-                          color: Color(0xFF734BE4),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      AppCopy.tagline,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF64748B),
-                        letterSpacing: 0.1,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                ),
+                child: const ProxLockup(maxWidth: 260),
               ),
             );
           },
