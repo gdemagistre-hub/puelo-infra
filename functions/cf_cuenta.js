@@ -5,7 +5,7 @@
  * solicitarEliminacionCuenta: anonymiza ya, borra Auth, encola purge 02:30.
  * purgeCuentasEliminadas: helper del batch diario (no es CF publicada).
  *
- * Mail a dev@ es aviso. No es el trámite de baja (Apple 5.1.1(v)).
+ * Mail a dev@ es aviso. El mensaje siempre queda en dev_inbox.
  */
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const nodemailer = require("nodemailer");
@@ -74,6 +74,10 @@ function getTransport() {
     host: "smtp.ionos.com",
     port: 587,
     secure: false,
+    requireTLS: true,
+    connectionTimeout: 12000,
+    greetingTimeout: 12000,
+    socketTimeout: 15000,
     auth: { user: FROM_EMAIL, pass },
   });
 }
@@ -276,7 +280,6 @@ async function purgeOne(uid) {
   return { uid, done, storage, subs };
 }
 
-/** Helper del batch 02:30. No publicar como CF. */
 async function purgeCuentasEliminadas({ limit } = {}) {
   const cap = Math.min(Number(limit) || PURGE_LIMIT, 20);
   const snap = await db
@@ -301,43 +304,73 @@ exports.purgeCuentasEliminadas = purgeCuentasEliminadas;
 exports.enviarMensajeDesarrollador = onCall(
   {
     cors: true,
+    invoker: "public",
     region: "us-east1",
     memory: "256MiB",
     timeoutSeconds: 30,
     secrets: ["IONOS_SMTP_PASS"],
   },
   async (request) => {
-    const uid = requireAuthUid(request);
-    const mensaje = sanitizeMensaje(request.data && request.data.mensaje);
-    const email = String(
-      (request.auth && request.auth.token && request.auth.token.email) || ""
-    ).slice(0, 120);
-    await consumirCuotaMensaje(uid);
     try {
-      await sendDevMail({
-        subject: `[Puelo] Mensaje al desarrollador (${uid.slice(0, 8)})`,
-        html: `<!DOCTYPE html><html><body style="font-family:system-ui,sans-serif;color:#0f172a">
+      const uid = requireAuthUid(request);
+      const mensaje = sanitizeMensaje(request.data && request.data.mensaje);
+      const email = String(
+        (request.auth && request.auth.token && request.auth.token.email) || ""
+      ).slice(0, 120);
+      await consumirCuotaMensaje(uid);
+
+      const inboxRef = db.collection("dev_inbox").doc();
+      await inboxRef.set({
+        uid,
+        email: email || null,
+        mensaje,
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
+        mailed: false,
+        source: "enviarMensajeDesarrollador",
+      });
+
+      let mailed = false;
+      try {
+        await sendDevMail({
+          subject: `[Puelo] Mensaje al desarrollador (${uid.slice(0, 8)})`,
+          html: `<!DOCTYPE html><html><body style="font-family:system-ui,sans-serif;color:#0f172a">
   <div style="max-width:560px;margin:24px auto">
     <h2 style="color:#28B5CD">Mensaje al desarrollador</h2>
     <p style="font-size:13px;color:#64748b">uid: ${escapeHtml(uid)}<br/>email Auth: ${escapeHtml(email || "(sin email)")}</p>
     <pre style="white-space:pre-wrap;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;font-size:14px">${escapeHtml(mensaje)}</pre>
   </div></body></html>`,
-      });
+        });
+        mailed = true;
+        await inboxRef.set(
+          {
+            mailed: true,
+            mailed_at: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+      } catch (e) {
+        console.error("enviarMensajeDesarrollador mail", e && e.message, e && e.code);
+        await inboxRef.set(
+          { mail_error: String((e && e.message) || e).slice(0, 220) },
+          { merge: true }
+        );
+      }
+      return { ok: true, mailed };
     } catch (e) {
       if (e instanceof HttpsError) throw e;
-      console.error("enviarMensajeDesarrollador mail", e);
+      console.error("enviarMensajeDesarrollador", e);
       throw new HttpsError(
         "unavailable",
         "No se pudo enviar el mensaje. Probá más tarde."
       );
     }
-    return { ok: true };
   }
 );
 
 exports.solicitarEliminacionCuenta = onCall(
   {
     cors: true,
+    invoker: "public",
     region: "us-east1",
     memory: "256MiB",
     timeoutSeconds: 60,
