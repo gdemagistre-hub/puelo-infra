@@ -296,7 +296,7 @@ class _MensajeDesarrolladorWidgetState
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text(
-              'Escribí tu consulta o reportá un contenido. Máximo 140 palabras.',
+              'Escribí tu consulta o reportá un contenido. Máximo 800 caracteres.',
               style: TextStyle(color: AppColors.textMuted, fontSize: 13),
             ),
             const SizedBox(height: 12),
