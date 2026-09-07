@@ -18,3 +18,22 @@ import 'theme/app_colors.dart';
 import 'legales/documento_legal_screen.dart';
 import 'legales/textos_legales.dart';
 import 'cuenta/mas_opciones_cuenta.dart';
+
+class MenuPerfilOpcionesWidget extends StatefulWidget {
+  final VoidCallback? onClose;
+  final bool modoPrestador;
+  final VoidCallback? onRolPuedeHaberCambiado;
+  final VoidCallback? onRequestHomeTour;
+
+  const MenuPerfilOpcionesWidget({
+    super.key,
+    this.onClose,
+    this.modoPrestador = false,
+    this.onRolPuedeHaberCambiado,
+    this.onRequestHomeTour,
+  });
+
+  @override
+  State<MenuPerfilOpcionesWidget> createState() =>
+      _MenuPerfilOpcionesWidgetState();
+}
