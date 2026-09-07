@@ -35,16 +35,13 @@ assignSafe("./cf_pii_sanitize");
 assignSafe("./cf_oficios_libres_sched");
 assignSafe("./cf_cuenta");
 
-// Export explícito: assignSafe a veces no toma onCall v2.
-const cfCuenta = require("./cf_cuenta");
-exports.enviarMensajeDesarrollador = cfCuenta.enviarMensajeDesarrollador;
-exports.solicitarEliminacionCuenta = cfCuenta.solicitarEliminacionCuenta;
-
 exports.enviarMensajeTexto = require("./mensajes_texto").enviarMensajeTexto;
 const calificacionAviso = require("./calificacion_aviso");
 exports.avisarCalificacionPrestador = calificacionAviso.avisarCalificacionPrestador;
 exports.responderCalificacion = calificacionAviso.responderCalificacion;
-exports.sendAuthEmail = require("./auth_emails").sendAuthEmail;
+const authEmails = require("./auth_emails");
+exports.sendAuthEmail = authEmails.sendAuthEmail;
+exports.enviarMensajeDesarrollador = authEmails.enviarMensajeDesarrollador;
 exports.obtenerContactoPrestador = require("./contacto_prestador").obtenerContactoPrestador;
 const tarjetaShare = require("./tarjeta_share");
 exports.crearTarjetaShare = tarjetaShare.crearTarjetaShare;
