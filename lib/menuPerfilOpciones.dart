@@ -17,7 +17,6 @@ import 'onboarding/home_tour_service.dart';
 import 'theme/app_colors.dart';
 import 'legales/documento_legal_screen.dart';
 import 'legales/textos_legales.dart';
-import 'cuenta/mas_opciones_cuenta.dart';
 
 class MenuPerfilOpcionesWidget extends StatefulWidget {
   final VoidCallback? onClose;
@@ -323,24 +322,6 @@ class _MenuPerfilOpcionesWidgetState extends State<MenuPerfilOpcionesWidget> {
                   ]),
                 ],
                 const SizedBox(height: 32),
-                _sectionCard([
-                  _row(
-                    icon: Icons.person_off_outlined,
-                    label: 'Eliminar cuenta',
-                    danger: true,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => MasOpcionesCuentaWidget(
-                            modoPrestador: modoPrestador,
-                            abrirEliminar: true,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ]),
-                const SizedBox(height: 12),
                 _sectionCard([
                   _row(
                     icon: Icons.logout_rounded,
