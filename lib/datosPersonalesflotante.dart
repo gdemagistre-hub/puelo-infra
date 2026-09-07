@@ -15,6 +15,7 @@ import 'user_session.dart';
 import 'usuario_list_sync.dart';
 import 'identidad_pii.dart';
 import 'theme/app_colors.dart';
+import 'cuenta/mas_opciones_cuenta.dart';
 
 class DatosPersonalesFlotanteWidget extends StatefulWidget {
   final bool? modoPrestador;
@@ -64,7 +65,6 @@ class _DatosPersonalesFlotanteWidgetState
 
   bool _docValidado = false;
   String? _docHashDatos;
-
 
   @override
   void initState() {
@@ -412,6 +412,31 @@ class _DatosPersonalesFlotanteWidgetState
                       _buildField('Usuario de Instagram', _instagramController,
                           hint: '@usuario'),
                     ],
+                  ),
+                  const SizedBox(height: 14),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => MasOpcionesCuentaWidget(
+                            modoPrestador: _esPrestador,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.more_horiz_rounded, size: 20),
+                    label: const Text(
+                      'Más opciones',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _textColor,
+                      side: const BorderSide(color: AppColors.border),
+                      minimumSize: const Size.fromHeight(48),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 20),
                   SizedBox(
