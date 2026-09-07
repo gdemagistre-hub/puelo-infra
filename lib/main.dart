@@ -16,6 +16,7 @@ import 'loginScreen.dart';
 import 'Homepage.dart';
 import 'elige_camino.dart';
 import 'elige_pais.dart';
+import 'legales/acepto_legales.dart';
 import 'elige_oficio.dart';
 import 'registroTrabajador.dart';
 import 'buscadorPrestadores.dart';
@@ -122,6 +123,7 @@ class MyApp extends StatelessWidget {
         ),
         EligeCaminoWidget.routePath: (context) => const EligeCaminoWidget(),
         EligePaisWidget.routePath: (context) => const EligePaisWidget(),
+        AceptoLegalesWidget.routePath: (context) => const AceptoLegalesWidget(),
         EligeOficioWidget.routePath: (context) => const EligeOficioWidget(),
         RegistroTrabajadorWidget.routePath: (context) =>
             const RegistroTrabajadorWidget(),
