@@ -12,6 +12,8 @@ import 'theme/app_colors.dart';
 import 'theme/app_copy.dart';
 import 'analytics/prox_analytics.dart';
 import 'theme/prox_sounds.dart';
+import 'widgets/google_g_mark.dart';
+import 'widgets/prox_lockup.dart';
 
 class LoginScreenWidget extends StatefulWidget {
   const LoginScreenWidget({super.key});
@@ -442,144 +444,72 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Center(
-                      child: Image.asset(
-                        'assets/images/logo_prox_icon.png.png',
-                        height: 88,
-                        width: 88,
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => Container(
-                          height: 80,
-                          width: 80,
-                          decoration: BoxDecoration(
-                            color: primaryColor,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Icon(
-                            Icons.handyman_rounded,
-                            color: Colors.white,
-                            size: 42,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      AppCopy.tagline,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: subTextColor,
-                        height: 1.35,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
+                    const Center(child: ProxLockup(maxWidth: 280)),
+                    const SizedBox(height: 28),
                     Text(
                       AppCopy.welcomeTitle,
                       textAlign: TextAlign.center,
                       style: const TextStyle(
-                        fontSize: 26,
+                        fontSize: 22,
                         fontWeight: FontWeight.w800,
                         color: textColor,
-                        letterSpacing: -0.5,
+                        letterSpacing: -0.4,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Text(
                       AppCopy.welcomeSubtitle,
                       textAlign: TextAlign.center,
                       style: const TextStyle(
-                        fontSize: 15,
+                        fontSize: 14,
                         color: subTextColor,
                         height: 1.4,
                       ),
                     ),
-                    const SizedBox(height: 36),
-                    _buildLoginButton(
+                    const SizedBox(height: 28),
+                    _authButton(
                       onPressed: busy ? null : _entrarConGoogle,
-                      icon: _buildIconCircle(
-                        backgroundColor: const Color(0xFFF1F5F9),
-                        child: const Text(
-                          'G',
-                          style: TextStyle(
-                            color: Color(0xFFDB4437),
-                            fontWeight: FontWeight.w900,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
+                      icon: const GoogleGMark(size: 22),
                       label: _loadingGoogle
                           ? 'Conectando con Google…'
                           : 'Continuar con Google',
-                      backgroundColor: Colors.white,
-                      textColor: textColor,
-                      hasBorder: true,
                       loading: _loadingGoogle,
                     ),
-                    const SizedBox(height: 14),
-                    _buildLoginButton(
+                    const SizedBox(height: 12),
+                    _authButton(
+                      onPressed: busy ? null : _entrarConApple,
+                      icon: const Icon(Icons.apple, size: 24, color: Color(0xFF1F1F1F)),
+                      label: _loadingApple
+                          ? 'Conectando con Apple…'
+                          : 'Continuar con Apple',
+                      loading: _loadingApple,
+                    ),
+                    const SizedBox(height: 12),
+                    _authButton(
                       onPressed: busy
                           ? null
                           : () => setState(() => _showEmailForm = !_showEmailForm),
-                      icon: _buildIconCircle(
-                        backgroundColor: primaryColor.withOpacity(0.12),
-                        child: Icon(
-                          Icons.email_outlined,
-                          color: primaryColor,
-                          size: 16,
-                        ),
+                      icon: const Icon(
+                        Icons.mail_outline_rounded,
+                        size: 22,
+                        color: Color(0xFF1F1F1F),
                       ),
                       label: _showEmailForm
                           ? 'Ocultar email'
                           : 'Continuar con email',
-                      backgroundColor: Colors.white,
-                      textColor: textColor,
-                      hasBorder: true,
-                      borderColor: primaryColor.withOpacity(0.35),
                     ),
                     if (_showEmailForm) ...[
                       const SizedBox(height: 16),
                       _buildEmailForm(busy: busy),
                     ],
-                    const SizedBox(height: 14),
-                    _buildLoginButton(
-                      onPressed: busy ? null : _entrarConApple,
-                      icon: _buildIconCircle(
-                        backgroundColor: Colors.white.withOpacity(0.15),
-                        child: const Icon(
-                          Icons.apple,
-                          color: Colors.white,
-                          size: 18,
-                        ),
-                      ),
-                      label: _loadingApple
-                          ? 'Conectando con Apple…'
-                          : 'Continuar con Apple',
-                      backgroundColor: Colors.black,
-                      textColor: Colors.white,
-                      loading: _loadingApple,
-                    ),
                     if (LoginScreenWidget.showFacebookLogin) ...[
-                      const SizedBox(height: 14),
-                      _buildLoginButton(
+                      const SizedBox(height: 12),
+                      _authButton(
                         onPressed: busy ? null : _entrarConFacebook,
-                        icon: _buildIconCircle(
-                          backgroundColor: Colors.white.withOpacity(0.2),
-                          child: const Text(
-                            'f',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ),
+                        icon: const Icon(Icons.facebook, size: 22, color: Color(0xFF1877F2)),
                         label: _loadingFacebook
                             ? 'Conectando con Facebook…'
                             : 'Continuar con Facebook',
-                        backgroundColor: const Color(0xFF1877F2),
-                        textColor: Colors.white,
                         loading: _loadingFacebook,
                       ),
                     ],
@@ -625,78 +555,59 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
     );
   }
 
-  Widget _buildIconCircle({
-    required Color backgroundColor,
-    required Widget child,
-  }) {
-    return Container(
-      width: 28,
-      height: 28,
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: child,
-    );
-  }
-
-  Widget _buildLoginButton({
+  /// Botón de auth homologado: misma geometría para Google / Apple / email.
+  /// Blanco, borde #747775 (guideline Google), alto 52, radio 12.
+  Widget _authButton({
     required Widget icon,
     required String label,
-    required Color backgroundColor,
-    required Color textColor,
     VoidCallback? onPressed,
-    bool hasBorder = false,
-    Color? borderColor,
     bool loading = false,
   }) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: backgroundColor,
-        foregroundColor: textColor,
-        disabledBackgroundColor: backgroundColor.withOpacity(0.7),
-        elevation: backgroundColor == Colors.white ? 1 : 0,
-        padding: const EdgeInsets.symmetric(vertical: 15),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: hasBorder
-              ? BorderSide(
-                  color: borderColor ?? AppColors.border,
-                  width: 1.5,
-                )
-              : BorderSide.none,
+    const border = Color(0xFF747775);
+    const ink = Color(0xFF1F1F1F);
+    return SizedBox(
+      height: 52,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          backgroundColor: Colors.white,
+          foregroundColor: ink,
+          disabledForegroundColor: ink.withOpacity(0.45),
+          disabledBackgroundColor: Colors.white,
+          elevation: 0,
+          side: const BorderSide(color: border, width: 1),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
         ),
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Padding(
-              padding: const EdgeInsets.only(left: 16.0),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 24,
+              height: 24,
               child: loading
-                  ? SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: textColor,
-                      ),
+                  ? const CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: ink,
                     )
-                  : icon,
+                  : Center(child: icon),
             ),
-          ),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.2,
+            Expanded(
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.15,
+                  color: ink,
+                ),
+              ),
             ),
-          ),
-        ],
+            const SizedBox(width: 24),
+          ],
+        ),
       ),
     );
   }
