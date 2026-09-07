@@ -1,6 +1,7 @@
 /**
  * Cloud Functions assembler — Puelo
  * 2026-08-31 S1: validación en cf_validacion (sin calle en calificaciones).
+ * 2026-09-06: cf_cuenta (baja in-app + mensaje desarrollador).
  */
 const { setGlobalOptions } = require("firebase-functions/v2");
 setGlobalOptions({
@@ -32,6 +33,7 @@ assignSafe("./cf_recibo");
 assignSafe("./cf_fiados_sched");
 assignSafe("./cf_pii_sanitize");
 assignSafe("./cf_oficios_libres_sched");
+assignSafe("./cf_cuenta");
 
 exports.enviarMensajeTexto = require("./mensajes_texto").enviarMensajeTexto;
 const calificacionAviso = require("./calificacion_aviso");
