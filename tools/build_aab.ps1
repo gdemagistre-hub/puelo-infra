@@ -74,6 +74,16 @@ Write-Host "appId=$($pueloClient.client_info.mobilesdk_app_id)"
 Write-Host "androidKey=...$($androidKey.Substring($androidKey.Length-6))"
 Write-Host "webClientId=$webClientId"
 
+$py = Get-Command python -ErrorAction SilentlyContinue
+if (-not $py) { $py = Get-Command python3 -ErrorAction SilentlyContinue }
+if ($py) {
+  Write-Host "Generando icono casita+pin..."
+  & $py.Source -m pip install pillow -q
+  & $py.Source tools\generate_app_icons.py
+} else {
+  Write-Host "WARN: no hay Python; el AAB puede salir con el icono anterior."
+}
+
 Write-Host "Compilando AAB app.puelo (puede tardar varios minutos)..."
 & $flutter pub get
 if ($LASTEXITCODE -ne 0) { Fail "flutter pub get fallo" }
@@ -88,4 +98,4 @@ if ($LASTEXITCODE -ne 0) { Fail "flutter build appbundle fallo" }
 $aab = "build\app\outputs\bundle\release\app-release.aab"
 if (-not (Test-Path -LiteralPath $aab)) { Fail "No se genero el AAB" }
 Get-Item -LiteralPath $aab | Format-List FullName, Length, LastWriteTime
-Write-Host "OK. Ese archivo se sube a Play Console (versionCode 9)."
+Write-Host "OK. Ese archivo se sube a Play Console."
