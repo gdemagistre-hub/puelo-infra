@@ -56,8 +56,22 @@ exports.scoringBatchDaily = onSchedule(
       console.error("purgeValidacionPii", e);
       purge = { status: "error", error: String(e.message || e) };
     }
+    let purgeCuentas = { status: "skipped" };
+    try {
+      const cuentaCf = require("./cf_cuenta");
+      purgeCuentas = await cuentaCf.purgeCuentasEliminadas({ limit: 8 });
+      console.log("purgeCuentasEliminadas", purgeCuentas);
+    } catch (e) {
+      console.error("purgeCuentasEliminadas", e);
+      purgeCuentas = { status: "error", error: String(e.message || e) };
+    }
     const result = await runScoringBatch({ trigger: "scheduler" });
     console.log("scoringBatchDaily", result);
-    return { scoring: result, topServicios: top, purgeValidacionPii: purge };
+    return {
+      scoring: result,
+      topServicios: top,
+      purgeValidacionPii: purge,
+      purgeCuentasEliminadas: purgeCuentas,
+    };
   }
 );
