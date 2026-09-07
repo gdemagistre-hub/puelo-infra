@@ -16,8 +16,6 @@ import 'loginScreen.dart';
 import 'onboarding/home_tour_service.dart';
 import 'acerca_de.dart';
 import 'theme/app_colors.dart';
-import 'legales/documento_legal_screen.dart';
-import 'legales/textos_legales.dart';
 
 class MenuPerfilOpcionesWidget extends StatefulWidget {
   final VoidCallback? onClose;
@@ -39,8 +37,6 @@ class MenuPerfilOpcionesWidget extends StatefulWidget {
 }
 
 class _MenuPerfilOpcionesWidgetState extends State<MenuPerfilOpcionesWidget> {
-  bool _legalesAbierto = false;
-
   bool get modoPrestador => widget.modoPrestador;
 
   Color get primaryColor =>
@@ -62,17 +58,6 @@ class _MenuPerfilOpcionesWidgetState extends State<MenuPerfilOpcionesWidget> {
           );
         },
         transitionDuration: const Duration(milliseconds: 300),
-      ),
-    );
-  }
-
-  void _abrirLegal(BuildContext context, TipoDocumentoLegal tipo) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => DocumentoLegalScreen(
-          tipo: tipo,
-          modoPrestador: modoPrestador,
-        ),
       ),
     );
   }
@@ -303,9 +288,6 @@ class _MenuPerfilOpcionesWidgetState extends State<MenuPerfilOpcionesWidget> {
                     },
                   ),
                 ]),
-                const SizedBox(height: 16),
-                _sectionLabel('Legal'),
-                _legalesBlock(),
                 if (isAdmin) ...[
                   const SizedBox(height: 16),
                   _sectionLabel('Admin'),
@@ -486,127 +468,6 @@ class _MenuPerfilOpcionesWidgetState extends State<MenuPerfilOpcionesWidget> {
               ),
             ),
             Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _legalesBlock() {
-    final muted = Colors.grey.shade600;
-    return Material(
-      color: const Color(0xFFF8FAFC),
-      borderRadius: BorderRadius.circular(14),
-      clipBehavior: Clip.antiAlias,
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.grey.shade200),
-        ),
-        child: Column(
-          children: [
-            InkWell(
-              onTap: () => setState(() => _legalesAbierto = !_legalesAbierto),
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade200.withOpacity(0.8),
-                        borderRadius: BorderRadius.circular(9),
-                      ),
-                      child: Icon(
-                        Icons.gavel_outlined,
-                        color: muted,
-                        size: 18,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Documentos legales',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: muted,
-                        ),
-                      ),
-                    ),
-                    Icon(
-                      _legalesAbierto
-                          ? Icons.expand_less_rounded
-                          : Icons.expand_more_rounded,
-                      color: Colors.grey.shade400,
-                      size: 20,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            AnimatedCrossFade(
-              firstChild: const SizedBox(width: double.infinity, height: 0),
-              secondChild: Column(
-                children: [
-                  Divider(height: 1, color: Colors.grey.shade200),
-                  _legalRow(
-                    'Términos y condiciones',
-                    TipoDocumentoLegal.terminos,
-                  ),
-                  Divider(
-                      height: 1, indent: 48, color: Colors.grey.shade200),
-                  _legalRow(
-                    'Privacidad',
-                    TipoDocumentoLegal.privacidad,
-                  ),
-                  Divider(
-                      height: 1, indent: 48, color: Colors.grey.shade200),
-                  _legalRow(
-                    'Buenas prácticas',
-                    TipoDocumentoLegal.buenasPracticas,
-                  ),
-                  Divider(
-                      height: 1, indent: 48, color: Colors.grey.shade200),
-                  _legalRow(
-                    'Protección infantil',
-                    TipoDocumentoLegal.csae,
-                  ),
-                ],
-              ),
-              crossFadeState: _legalesAbierto
-                  ? CrossFadeState.showSecond
-                  : CrossFadeState.showFirst,
-              duration: const Duration(milliseconds: 200),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _legalRow(String label, TipoDocumentoLegal tipo) {
-    return InkWell(
-      onTap: () => _abrirLegal(context, tipo),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-        child: Row(
-          children: [
-            const SizedBox(width: 44),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-            ),
-            Icon(Icons.chevron_right_rounded,
-                color: Colors.grey.shade400, size: 18),
           ],
         ),
       ),
