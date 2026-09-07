@@ -1,7 +1,7 @@
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 
-/// Callables us-east1: mensaje a dev@ y baja de cuenta (Etapa 1).
+/// Callables us-east1: mensaje a dev@ y baja de cuenta.
 class CuentaService {
   CuentaService._();
   static final CuentaService instance = CuentaService._();
@@ -64,11 +64,12 @@ class CuentaService {
             ? e.message!
             : 'Revisá el texto e intentá de nuevo.';
       case 'unavailable':
+      case 'internal':
+      case 'unknown':
+      case 'not-found':
         return 'No se pudo enviar el mensaje. Probá más tarde.';
       default:
-        return e.message?.isNotEmpty == true
-            ? e.message!
-            : 'No se pudo completar la acción.';
+        return 'No se pudo completar la acción.';
     }
   }
 }
