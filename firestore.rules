@@ -1,4 +1,5 @@
 rules_version = '2';
+// 2026-09-06 Etapa 2: baja de cuenta — list excluye cuenta_eliminada; jobs solo admin.
 // 2026-09-02 cap writes: demanda/analytics ID anclado al uid + día ART.
 // Rollback: checkout resguardo/2026-09-02-pre-cap-writes-demanda-analytics -- firestore.rules lib/demanda/demanda_oficios_service.dart lib/analytics/prox_analytics.dart
 // Resguardo: resguardo/2026-09-02-pre-cap-writes-demanda-analytics @ 1a450b47
@@ -53,7 +54,11 @@ service cloud.firestore {
         'readiness_next_step',
         'readiness_academia',
         'readiness_oferta_elegible',
-        'readiness_actualizado_en'
+        'readiness_actualizado_en',
+        'cuenta_eliminada',
+        'eliminada_at',
+        'purge_status',
+        'purge_at'
       ];
     }
 
@@ -156,7 +161,9 @@ service cloud.firestore {
     match /usuarios/{userId} {
       allow get: if isSignedIn() || isAdmin();
       allow list: if isAdmin()
-        || (isSignedIn() && resource.data.es_trabajador == true);
+        || (isSignedIn()
+          && resource.data.es_trabajador == true
+          && resource.data.get('cuenta_eliminada', false) != true);
 
       allow create: if createHasNoPrivileged()
         && (isOwner(userId) || isAdmin());
@@ -234,7 +241,7 @@ service cloud.firestore {
       allow read: if isSignedIn() || isAdmin();
       allow create: if isSignedIn()
         && request.resource.data.cliente_id == request.auth.uid
-        && request.resource.data.prestador_id is string
+        && request.resource.data.prestador_uid is string
         && request.resource.data.prestador_id.size() > 0
         && request.resource.data.cliente_id != request.resource.data.prestador_id
         && request.resource.data.estrellas is int
@@ -276,6 +283,11 @@ service cloud.firestore {
     match /scoring_features/{uid} {
       allow read: if isAdmin();
       allow write: if isAdmin();
+    }
+
+    match /cuenta_eliminaciones/{uid} {
+      allow read: if isAdmin();
+      allow write: if false;
     }
 
     match /{document=**} {
