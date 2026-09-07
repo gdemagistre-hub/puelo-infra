@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'Homepage.dart';
 import 'elige_camino.dart';
 import 'geo/country_profile.dart';
+import 'legales/acepto_legales.dart';
 import 'user_session.dart';
 
 /// Primera vez: país de operación. Trio AR/CL/UY habilitado. Default visual AR.
@@ -47,6 +48,16 @@ class _EligePaisWidgetState extends State<EligePaisWidget> {
     _iso = CountryProfile.isLaunch(actual)
         ? actual
         : CountryProfile.defaultIso;
+
+    if (!widget.modoCambio && AceptoLegalesWidget.necesitaAceptar()) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const AceptoLegalesWidget()),
+        );
+      });
+    }
   }
 
   Future<void> _confirmar() async {
