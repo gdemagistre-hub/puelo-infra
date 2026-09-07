@@ -23,7 +23,10 @@ class CuentaService {
       );
     }
     try {
-      final callable = _fn.httpsCallable('enviarMensajeDesarrollador');
+      final callable = _fn.httpsCallable(
+        'enviarMensajeDesarrollador',
+        options: HttpsCallableOptions(timeout: const Duration(seconds: 25)),
+      );
       await callable.call(<String, dynamic>{'mensaje': t});
     } on FirebaseFunctionsException catch (e) {
       debugPrint('CuentaService.enviarMensaje: ${e.code} ${e.message}');
@@ -67,9 +70,10 @@ class CuentaService {
       case 'internal':
       case 'unknown':
       case 'not-found':
+      case 'deadline-exceeded':
         return 'No se pudo enviar el mensaje. Probá más tarde.';
       default:
-        return 'No se pudo completar la acción.';
+        return 'No se pudo enviar el mensaje. Probá más tarde.';
     }
   }
 }

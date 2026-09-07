@@ -4,6 +4,9 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const nodemailer = require("nodemailer");
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
 
 const FROM_EMAIL = "no-reply@puelo.app";
 const FROM = `Puelo <${FROM_EMAIL}>`;
@@ -49,6 +52,10 @@ function getTransport() {
     host: "smtp.ionos.com",
     port: 587,
     secure: false,
+    requireTLS: true,
+    connectionTimeout: 8000,
+    greetingTimeout: 8000,
+    socketTimeout: 10000,
     auth: { user: FROM_EMAIL, pass },
   });
 }
@@ -140,16 +147,28 @@ exports.enviarMensajeDesarrollador = onCall(
       });
       let mailed = false;
       try {
-        await sendMail({
-          to: "dev@puelo.app",
-          subject: "[Puelo] Mensaje al desarrollador (" + uid.slice(0, 8) + ")",
-          html: "<p>uid: " + escapeHtmlDev(uid) + "<br/>email: " + escapeHtmlDev(email || "(sin email)") + "</p><pre>" + escapeHtmlDev(mensaje) + "</pre>",
+        const mailWait = new Promise((_, rej) => {
+          setTimeout(() => {
+            const err = new Error("smtp_timeout");
+            err.code = "smtp_timeout";
+            rej(err);
+          }, 10000);
         });
+        await Promise.race([
+          sendMail({
+            to: "dev@puelo.app",
+            subject: "[Puelo] Mensaje al desarrollador (" + uid.slice(0, 8) + ")",
+            html: "<p>uid: " + escapeHtmlDev(uid) + "<br/>email: " + escapeHtmlDev(email || "(sin email)") + "</p><pre>" + escapeHtmlDev(mensaje) + "</pre>",
+          }),
+          mailWait,
+        ]);
         mailed = true;
         await inboxRef.set({ mailed: true, mailed_at: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
       } catch (e) {
         console.error("enviarMensajeDesarrollador mail", e && e.message);
-        await inboxRef.set({ mail_error: String((e && e.message) || e).slice(0, 220) }, { merge: true });
+        try {
+          await inboxRef.set({ mail_error: String((e && e.message) || e).slice(0, 220) }, { merge: true });
+        } catch (_) {}
       }
       return { ok: true, mailed };
     } catch (e) {
