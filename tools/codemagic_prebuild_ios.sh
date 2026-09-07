@@ -78,38 +78,11 @@ if [ -f ios/Podfile ]; then
   fi
 fi
 
-# Ícono PROX (P) — reemplaza el Flutter default. Sin alpha (Apple 1024).
-ICON_SRC=""
-for cand in \
-  assets/brand/app_icon_ios_1024.png \
-  assets/images/logo_prox_icon.png.png \
-  assets/images/logo_prox_icon.png; do
-  if [ -f "$cand" ]; then
-    ICON_SRC="$cand"
-    break
-  fi
-done
-ICON_DIR=ios/Runner/Assets.xcassets/AppIcon.appiconset
-if [ -n "$ICON_SRC" ] && [ -d "$ICON_DIR" ] && command -v sips >/dev/null 2>&1; then
-  SQ=/tmp/prox_icon_sq.png
-  JPG=/tmp/prox_icon.jpg
-  MASTER=/tmp/prox_icon_1024.png
-  sips --resampleHeightWidthMax 1024 "$ICON_SRC" --out /tmp/prox_icon_in.png >/dev/null
-  # recorte cuadrado centrado
-  sips --cropToHeightWidth 1024 1024 /tmp/prox_icon_in.png --out "$SQ" >/dev/null || cp /tmp/prox_icon_in.png "$SQ"
-  # aplastar alpha → JPEG → PNG (requisito App Store)
-  sips -s format jpeg -s formatOptions 90 "$SQ" --out "$JPG" >/dev/null
-  sips -s format png "$JPG" --out "$MASTER" >/dev/null
-  sips -z 1024 1024 "$MASTER" --out "$MASTER" >/dev/null
-  shopt -s nullglob
-  for f in "$ICON_DIR"/*.png; do
-    w=$(sips -g pixelWidth "$f" 2>/dev/null | awk '/pixelWidth/{print $2}')
-    h=$(sips -g pixelHeight "$f" 2>/dev/null | awk '/pixelHeight/{print $2}')
-    if [ -n "${w:-}" ] && [ -n "${h:-}" ]; then
-      sips -z "$h" "$w" "$MASTER" --out "$f" >/dev/null
-    fi
-  done
-  echo "AppIcon PROX aplicado desde $ICON_SRC"
+# Icono PROX: casita + pin a cuadrado completo. No usar el poster vertical.
+if python3 -m pip install --quiet pillow \
+  && python3 tools/generate_app_icons.py; then
+  echo "AppIcon PROX casita+pin aplicado"
 else
-  echo "AppIcon: no se aplicó (src='$ICON_SRC' dir='$ICON_DIR')"
+  echo "WARN: generate_app_icons.py fallo"
+  exit 1
 fi
