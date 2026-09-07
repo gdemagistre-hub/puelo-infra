@@ -14,6 +14,7 @@ import 'user_session.dart';
 import 'auth_service.dart';
 import 'loginScreen.dart';
 import 'onboarding/home_tour_service.dart';
+import 'acerca_de.dart';
 import 'theme/app_colors.dart';
 import 'legales/documento_legal_screen.dart';
 import 'legales/textos_legales.dart';
@@ -279,17 +280,29 @@ class _MenuPerfilOpcionesWidgetState extends State<MenuPerfilOpcionesWidget> {
                     ),
                   ]),
                 ],
-                if (widget.onRequestHomeTour != null) ...[
-                  const SizedBox(height: 16),
-                  _sectionLabel('Ayuda'),
-                  _sectionCard([
+                const SizedBox(height: 16),
+                _sectionLabel('Ayuda'),
+                _sectionCard([
+                  if (widget.onRequestHomeTour != null)
                     _row(
                       icon: Icons.help_outline_rounded,
                       label: 'Guía rápida',
                       onTap: () => _abrirGuiaRapida(context),
                     ),
-                  ]),
-                ],
+                  _row(
+                    icon: Icons.info_outline_rounded,
+                    label: 'Acerca de',
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => AcercaDeWidget(
+                            modoPrestador: modoPrestador,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ]),
                 const SizedBox(height: 16),
                 _sectionLabel('Legal'),
                 _legalesBlock(),
