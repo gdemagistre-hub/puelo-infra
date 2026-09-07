@@ -81,7 +81,6 @@ service cloud.firestore {
       return request.resource.data.keys().size() <= 24;
     }
 
-    // ID = {uid}_{yyyymmddART}_{00-39}. Máximo 40 docs/día por cuenta.
     match /analytics_events/{id} {
       allow create, update: if isSignedIn()
         && id.size() < 96
@@ -118,7 +117,6 @@ service cloud.firestore {
       }
     }
 
-    // ID = {uid}_{yyyymmddART}_{oficio_id}. Un tap por oficio por día por cuenta.
     match /demanda_eventos/{id} {
       allow create, update: if isSignedIn()
         && id.size() < 128
@@ -241,7 +239,7 @@ service cloud.firestore {
       allow read: if isSignedIn() || isAdmin();
       allow create: if isSignedIn()
         && request.resource.data.cliente_id == request.auth.uid
-        && request.resource.data.prestador_uid is string
+        && request.resource.data.prestador_id is string
         && request.resource.data.prestador_id.size() > 0
         && request.resource.data.cliente_id != request.resource.data.prestador_id
         && request.resource.data.estrellas is int
