@@ -241,7 +241,7 @@ service cloud.firestore {
       allow create: if isSignedIn()
         && request.resource.data.cliente_id == request.auth.uid
         && request.resource.data.prestador_id is string
-        && request.resource.data.prestador_uid.size() > 0
+        && request.resource.data.prestador_id.size() > 0
         && request.resource.data.cliente_id != request.resource.data.prestador_id
         && request.resource.data.estrellas is int
         && request.resource.data.estrellas >= 1
