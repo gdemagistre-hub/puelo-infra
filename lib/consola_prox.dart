@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import 'admin/usuarios_resumen.dart';
 import 'scoring_service.dart';
 import 'user_session.dart';
 
@@ -37,6 +38,8 @@ class _ConsolaProxWidgetState extends State<ConsolaProxWidget> {
   bool _batchRunning = false;
   String? _batchMsg;
 
+  UsuariosResumen _usuarios = const UsuariosResumen();
+
   @override
   void initState() {
     super.initState();
@@ -66,22 +69,13 @@ class _ConsolaProxWidgetState extends State<ConsolaProxWidget> {
           .orderBy('client_ts', descending: true)
           .limit(400)
           .get();
-
       _events = snap.docs;
       _recompute();
-
-      if (mounted) setState(() => _loading = false);
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-          _error =
-              'No se pudieron leer eventos. Verifica reglas Firestore e indice '
-              'en client_ts.';
-        });
-      }
       debugPrint('ConsolaProx load error: $e');
     }
+    _usuarios = await UsuariosResumen.cargar();
+    if (mounted) setState(() => _loading = false);
   }
 
   void _recompute() {
@@ -238,6 +232,8 @@ class _ConsolaProxWidgetState extends State<ConsolaProxWidget> {
                         children: [
                           _bannerSeguridad(),
                           const SizedBox(height: 12),
+                          _usuariosCard(),
+                          const SizedBox(height: 12),
                           _scoringBatchCard(),
                           const SizedBox(height: 12),
                           _kpiRow(),
@@ -255,7 +251,7 @@ class _ConsolaProxWidgetState extends State<ConsolaProxWidget> {
                           _rankingMap(_viewsByScreen),
                           const SizedBox(height: 20),
                           _sectionTitle('Acciones'),
-                          _rankingMap(_actions),
+                          _rankingMap(_accionesVisibles()),
                           const SizedBox(height: 20),
                           _sectionTitle('Errores por pantalla'),
                           _errorsByScreen.isEmpty
@@ -273,6 +269,118 @@ class _ConsolaProxWidgetState extends State<ConsolaProxWidget> {
                         ],
                       ),
                     ),
+    );
+  }
+
+  static const _loginOcultos = {
+    'login_dev_dropdown',
+    'Login_dev_dropdown',
+    'login_dev',
+    'Login_dev',
+  };
+
+  static const _loginLabels = {
+    'login_email': 'PROX (email)',
+    'Login_email': 'PROX (email)',
+    'login_apple': 'Apple',
+    'Login_apple': 'Apple',
+    'login_google': 'Google',
+    'Login_google': 'Google',
+  };
+
+  Map<String, int> _accionesVisibles() {
+    final out = <String, int>{};
+    _actions.forEach((k, v) {
+      if (_loginOcultos.contains(k) || k.toLowerCase().contains('dropdown')) {
+        return;
+      }
+      out[_loginLabels[k] ?? k] = (out[_loginLabels[k] ?? k] ?? 0) + v;
+    });
+    return out;
+  }
+
+  Widget _usuariosCard() {
+    final u = _usuarios;
+    if (u.error != null) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFFECACA)),
+        ),
+        child: Text(
+          'Usuarios: no se pudo leer (${u.error})',
+          style: const TextStyle(fontSize: 12, color: Color(0xFF991B1B)),
+        ),
+      );
+    }
+    Widget line(String k, String v) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(k, style: TextStyle(fontSize: 13, color: Colors.grey.shade700)),
+            ),
+            Text(
+              v,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1E293B),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFCBD5E1)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Usuarios',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+              color: Color(0xFF1E293B),
+            ),
+          ),
+          const SizedBox(height: 8),
+          line('Total', '${u.total}'),
+          line('Alta ayer (ART)', '${u.ayer}'),
+          const SizedBox(height: 8),
+          Text('Por tipo de login', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.grey.shade600)),
+          line('PROX (email)', '${u.loginProx}'),
+          line('Google', '${u.loginGoogle}'),
+          line('Apple', '${u.loginApple}'),
+          if (u.loginOtro > 0) line('Otro / sin dato', '${u.loginOtro}'),
+          const SizedBox(height: 8),
+          Text('Por rol', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.grey.shade600)),
+          line('Solo clientes', '${u.soloCliente}'),
+          line('Solo prestadores', '${u.soloPrestador}'),
+          line('Ambos roles', '${u.ambos}'),
+          if (u.omitidos > 0) ...[
+            const SizedBox(height: 6),
+            Text('Cuentas dadas de baja omitidas: ${u.omitidos}', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+          ],
+          if (u.capped)
+            Text('Muestra tope ${UsuariosResumen.limite}.', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+        ],
+      ),
     );
   }
 
