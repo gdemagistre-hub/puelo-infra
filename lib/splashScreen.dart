@@ -55,6 +55,15 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
     _bootstrap();
   }
 
+  void _irALogin() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const LoginScreenWidget(),
+      ),
+    );
+  }
+
   Future<void> _bootstrap() async {
     await Future<void>.delayed(const Duration(milliseconds: 1600));
 
@@ -90,6 +99,8 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
           );
         } else if (AceptoLegalesWidget.necesitaAceptar()) {
           Navigator.pushReplacementNamed(context, AceptoLegalesWidget.routePath);
+        } else if (EligePaisWidget.necesitaElegir()) {
+          Navigator.pushReplacementNamed(context, EligePaisWidget.routePath);
         } else if (EligeCaminoWidget.necesitaElegir()) {
           Navigator.pushReplacementNamed(context, EligeCaminoWidget.routePath);
         } else {
@@ -103,23 +114,11 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
           );
         }
       } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const HomePageWidget(initialModoPrestador: false),
-          ),
-        );
+        _irALogin();
       }
     } catch (e) {
       debugPrint('Splash navigate error: $e');
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const HomePageWidget(initialModoPrestador: false),
-          ),
-        );
-      }
+      if (mounted) _irALogin();
     }
   }
 
