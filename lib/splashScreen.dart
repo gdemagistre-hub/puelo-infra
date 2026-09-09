@@ -90,8 +90,6 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
           );
         } else if (AceptoLegalesWidget.necesitaAceptar()) {
           Navigator.pushReplacementNamed(context, AceptoLegalesWidget.routePath);
-        } else if (EligePaisWidget.necesitaElegir()) {
-          Navigator.pushReplacementNamed(context, EligePaisWidget.routePath);
         } else if (EligeCaminoWidget.necesitaElegir()) {
           Navigator.pushReplacementNamed(context, EligeCaminoWidget.routePath);
         } else {
@@ -105,24 +103,24 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
           );
         }
       } else {
-        Navigator.pushReplacementNamed(context, LoginScreenWidget.routePath);
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const HomePageWidget(initialModoPrestador: false),
+          ),
+        );
       }
     } catch (e) {
       debugPrint('Splash navigate error: $e');
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const LoginScreenWidget()),
+          MaterialPageRoute(
+            builder: (_) => const HomePageWidget(initialModoPrestador: false),
+          ),
         );
       }
     }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    super.dispose();
   }
 
   @override
@@ -144,5 +142,12 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    super.dispose();
   }
 }
