@@ -6,7 +6,7 @@ import 'user_session.dart';
 import 'theme/app_colors.dart';
 
 /// Cliente elige prestador y pasa a calificar (estrellas + comentario).
-/// Las fotos de trabajos solo las carga el prestador (portfolio).
+/// Solo prestadores con vínculo previo: contacto (WA/llamada) o Mensajes.
 class CargaTrabajoClienteWidget extends StatefulWidget {
   const CargaTrabajoClienteWidget({super.key});
 
@@ -21,13 +21,13 @@ class _CargaTrabajoClienteWidgetState extends State<CargaTrabajoClienteWidget> {
   bool _isSaving = false;
   String _query = '';
   final _searchCtrl = TextEditingController();
+  late final Future<List<DocumentSnapshot<Map<String, dynamic>>>> _vinculadosFuture;
 
-  late final Future<QuerySnapshot<Map<String, dynamic>>> _trabajadoresFuture =
-      FirebaseFirestore.instance
-          .collection('usuarios')
-          .where('es_trabajador', isEqualTo: true)
-          .limit(120)
-          .get();
+  @override
+  void initState() {
+    super.initState();
+    _vinculadosFuture = _cargarPrestadoresVinculados();
+  }
 
   @override
   void dispose() {
@@ -35,11 +35,62 @@ class _CargaTrabajoClienteWidgetState extends State<CargaTrabajoClienteWidget> {
     super.dispose();
   }
 
+  Future<List<DocumentSnapshot<Map<String, dynamic>>>>
+      _cargarPrestadoresVinculados() async {
+    final uid = UserSession().uid;
+    if (uid == null || uid.isEmpty) return const [];
+
+    final ids = <String>{};
+    final db = FirebaseFirestore.instance;
+
+    try {
+      final contactos = await db
+          .collection('contactos')
+          .where('cliente_uid', isEqualTo: uid)
+          .limit(80)
+          .get();
+      for (final doc in contactos.docs) {
+        final p = (doc.data()['prestador_uid'] ?? '').toString().trim();
+        if (p.isNotEmpty && p != uid) ids.add(p);
+      }
+    } catch (_) {}
+
+    try {
+      final convs = await db
+          .collection('conversaciones')
+          .where('participantes', arrayContains: uid)
+          .limit(80)
+          .get();
+      for (final doc in convs.docs) {
+        final parts = doc.data()['participantes'];
+        if (parts is! List) continue;
+        for (final raw in parts) {
+          final p = raw.toString().trim();
+          if (p.isNotEmpty && p != uid) ids.add(p);
+        }
+      }
+    } catch (_) {}
+
+    if (ids.isEmpty) return const [];
+
+    final out = <DocumentSnapshot<Map<String, dynamic>>>[];
+    for (final id in ids) {
+      try {
+        final doc = await db.collection('usuarios').doc(id).get();
+        if (!doc.exists) continue;
+        out.add(doc);
+      } catch (_) {}
+    }
+    out.sort((a, b) => _displayName(a.data() ?? {})
+        .toLowerCase()
+        .compareTo(_displayName(b.data() ?? {}).toLowerCase()));
+    return out;
+  }
+
   String _displayName(Map<String, dynamic> data) {
     final comercial = (data['nombre_comercial'] ?? '').toString().trim();
     if (comercial.isNotEmpty) return comercial;
-    final n =
-        '${data['nombre'] ?? ''} ${data['apellido'] ?? ''}'.trim();
+    final n = '${data['nombre'] ?? ''} ${data['apellido'] ?? ''}'.trim();
     if (n.isNotEmpty) return n;
     final listNombre = (data['list_nombre'] ?? '').toString().trim();
     if (listNombre.isNotEmpty) return listNombre;
@@ -52,20 +103,19 @@ class _CargaTrabajoClienteWidgetState extends State<CargaTrabajoClienteWidget> {
       (data['nombre'] ?? '').toString(),
       (data['apellido'] ?? '').toString(),
       (data['list_nombre'] ?? '').toString(),
-      if (data['profesiones'] is List)
-        (data['profesiones'] as List).join(' '),
+      if (data['profesiones'] is List) (data['profesiones'] as List).join(' '),
     ];
     return parts.join(' ').toLowerCase();
   }
 
-  List<QueryDocumentSnapshot<Map<String, dynamic>>> _filtrar(
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  List<DocumentSnapshot<Map<String, dynamic>>> _filtrar(
+    List<DocumentSnapshot<Map<String, dynamic>>> docs,
   ) {
     final q = _query.trim().toLowerCase();
     if (q.isEmpty) return docs;
     final tokens = q.split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
     return docs.where((doc) {
-      final h = _haystack(doc.data());
+      final h = _haystack(doc.data() ?? {});
       return tokens.every((t) => h.contains(t));
     }).toList();
   }
@@ -74,7 +124,7 @@ class _CargaTrabajoClienteWidgetState extends State<CargaTrabajoClienteWidget> {
     if (_selectedTrabajador == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Seleccion\u00e1 el prestador del servicio.'),
+          content: Text('Seleccioná el prestador del servicio.'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -85,7 +135,7 @@ class _CargaTrabajoClienteWidgetState extends State<CargaTrabajoClienteWidget> {
     if (sessionUid == null || sessionUid.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Sesi\u00f3n no encontrada. Volv\u00e9 a iniciar.'),
+          content: Text('Sesión no encontrada. Volvé a iniciar.'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -170,7 +220,7 @@ class _CargaTrabajoClienteWidgetState extends State<CargaTrabajoClienteWidget> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text(
-              '\u00bfA qui\u00e9n calific\u00e1s?',
+              '¿A quién calificás?',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
@@ -179,8 +229,8 @@ class _CargaTrabajoClienteWidgetState extends State<CargaTrabajoClienteWidget> {
             ),
             const SizedBox(height: 6),
             const Text(
-              'Escrib\u00ed el nombre o nombre comercial del prestador. '
-              'Despu\u00e9s vas a poner estrellas y un comentario.',
+              'Solo aparecen prestadores que contactaste (WhatsApp o llamada) '
+              'o con los que ya tenés un hilo en Mensajes.',
               style: TextStyle(
                 fontSize: 14,
                 height: 1.4,
@@ -193,7 +243,7 @@ class _CargaTrabajoClienteWidgetState extends State<CargaTrabajoClienteWidget> {
               textInputAction: TextInputAction.search,
               onChanged: (v) => setState(() => _query = v),
               decoration: InputDecoration(
-                hintText: 'Buscar por nombre\u2026',
+                hintText: 'Buscar por nombre…',
                 prefixIcon: const Icon(Icons.search_rounded),
                 suffixIcon: _query.isEmpty
                     ? null
@@ -264,8 +314,9 @@ class _CargaTrabajoClienteWidgetState extends State<CargaTrabajoClienteWidget> {
             ],
             const SizedBox(height: 12),
             Expanded(
-              child: FutureBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                future: _trabajadoresFuture,
+              child: FutureBuilder<
+                  List<DocumentSnapshot<Map<String, dynamic>>>>(
+                future: _vinculadosFuture,
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
                     return Text(
@@ -276,15 +327,32 @@ class _CargaTrabajoClienteWidgetState extends State<CargaTrabajoClienteWidget> {
                   if (!snapshot.hasData) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  final filtrados = _filtrar(snapshot.data!.docs);
+                  final todos = snapshot.data!;
+                  final filtrados = _filtrar(todos);
+                  if (todos.isEmpty) {
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Text(
+                          'Todavía no hay nadie para calificar.\n\n'
+                          'Primero contactalo desde su tarjeta (WhatsApp o llamada) '
+                          'o registrá un pago en Mensajes. Después aparece acá.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 15,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    );
+                  }
                   if (filtrados.isEmpty) {
                     return Center(
                       child: Padding(
                         padding: const EdgeInsets.all(24),
                         child: Text(
-                          _query.trim().isEmpty
-                              ? 'No hay prestadores para mostrar.'
-                              : 'No encontramos a nadie con \u201c$_query\u201d.',
+                          'No encontramos a nadie con “$_query” entre tus contactos.',
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             color: AppColors.textMuted,
@@ -299,7 +367,7 @@ class _CargaTrabajoClienteWidgetState extends State<CargaTrabajoClienteWidget> {
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (context, i) {
                       final doc = filtrados[i];
-                      final data = doc.data();
+                      final data = doc.data() ?? {};
                       final name = _displayName(data);
                       final selected = _selectedTrabajador?.id == doc.id;
                       final profesiones = data['profesiones'] as List? ?? [];
