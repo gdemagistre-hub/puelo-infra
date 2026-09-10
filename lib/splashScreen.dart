@@ -64,6 +64,15 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
     );
   }
 
+  void _irAHomeInvitado() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const HomePageWidget(initialModoPrestador: false),
+      ),
+    );
+  }
+
   Future<void> _bootstrap() async {
     await Future<void>.delayed(const Duration(milliseconds: 1600));
 
@@ -99,8 +108,6 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
           );
         } else if (AceptoLegalesWidget.necesitaAceptar()) {
           Navigator.pushReplacementNamed(context, AceptoLegalesWidget.routePath);
-        } else if (EligePaisWidget.necesitaElegir()) {
-          Navigator.pushReplacementNamed(context, EligePaisWidget.routePath);
         } else if (EligeCaminoWidget.necesitaElegir()) {
           Navigator.pushReplacementNamed(context, EligeCaminoWidget.routePath);
         } else {
@@ -114,11 +121,12 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget>
           );
         }
       } else {
-        _irALogin();
+        // App Store 5.1.1: directorio de oficios sin cuenta.
+        _irAHomeInvitado();
       }
     } catch (e) {
       debugPrint('Splash navigate error: $e');
-      if (mounted) _irALogin();
+      if (mounted) _irAHomeInvitado();
     }
   }
 
