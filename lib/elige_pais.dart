@@ -17,14 +17,9 @@ class EligePaisWidget extends StatefulWidget {
 
   const EligePaisWidget({super.key, this.modoCambio = false});
 
-  static bool necesitaElegir() {
-    final data = UserSession().datosCompletos;
-    if (data == null) return false;
-    final raw = (data['country_code'] ?? '').toString().trim();
-    if (raw.isNotEmpty) return false;
-    if (data['pais_confirmado'] == true) return false;
-    return true;
-  }
+  /// App Store 5.1.1: el país no es dato obligatorio para usar la app.
+  /// Se elige desde Perfil → País o Domicilio cuando haga falta el catálogo.
+  static bool necesitaElegir() => false;
 
   @override
   State<EligePaisWidget> createState() => _EligePaisWidgetState();
@@ -294,6 +289,24 @@ class _EligePaisWidgetState extends State<EligePaisWidget> {
                   ),
                 ),
               ),
+              if (!widget.modoCambio) ...[
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: _saving
+                      ? null
+                      : () {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const HomePageWidget(
+                                initialModoPrestador: false,
+                              ),
+                            ),
+                          );
+                        },
+                  child: const Text('Ahora no'),
+                ),
+              ],
             ],
           ),
         ),
