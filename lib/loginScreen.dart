@@ -314,13 +314,6 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
       );
       return;
     }
-    if (EligePaisWidget.necesitaElegir()) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const EligePaisWidget()),
-      );
-      return;
-    }
     if (EligeCaminoWidget.necesitaElegir()) {
       Navigator.pushReplacement(
         context,
@@ -545,6 +538,28 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 16),
+                    TextButton(
+                      onPressed: busy
+                          ? null
+                          : () {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const HomePageWidget(
+                                    initialModoPrestador: false,
+                                  ),
+                                ),
+                              );
+                            },
+                      child: const Text(
+                        'Explorar servicios',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -555,8 +570,6 @@ class _LoginScreenWidgetState extends State<LoginScreenWidget> {
     );
   }
 
-  /// Botón de auth homologado: misma geometría para Google / Apple / email.
-  /// Blanco, borde #747775 (guideline Google), alto 52, radio 12.
   Widget _authButton({
     required Widget icon,
     required String label,
