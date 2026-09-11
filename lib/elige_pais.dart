@@ -4,11 +4,10 @@ import 'package:flutter/material.dart';
 import 'Homepage.dart';
 import 'elige_camino.dart';
 import 'geo/country_profile.dart';
-import 'legales/acepto_legales.dart';
 import 'user_session.dart';
 
-/// Primera vez: país de operación. Trio AR/CL/UY habilitado. Default visual AR.
-/// [modoCambio] = ya tiene país y lo cambia desde perfil/domicilio.
+/// País de operación. Trio AR/CL/UY. Solo se abre desde Perfil / Domicilio.
+/// App Store 5.1.1: el primer arranque no pide país.
 class EligePaisWidget extends StatefulWidget {
   static const String routeName = 'EligePais';
   static const String routePath = '/elige-pais';
@@ -18,7 +17,6 @@ class EligePaisWidget extends StatefulWidget {
   const EligePaisWidget({super.key, this.modoCambio = false});
 
   /// App Store 5.1.1: el país no es dato obligatorio para usar la app.
-  /// Se elige desde Perfil → País o Domicilio cuando haga falta el catálogo.
   static bool necesitaElegir() => false;
 
   @override
@@ -44,12 +42,14 @@ class _EligePaisWidgetState extends State<EligePaisWidget> {
         ? actual
         : CountryProfile.defaultIso;
 
-    if (!widget.modoCambio && AceptoLegalesWidget.necesitaAceptar()) {
+    if (!widget.modoCambio) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const AceptoLegalesWidget()),
+          MaterialPageRoute(
+            builder: (_) => const HomePageWidget(initialModoPrestador: false),
+          ),
         );
       });
     }
