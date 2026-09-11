@@ -11,6 +11,7 @@ import 'legales/textos_legales.dart';
 
 /// Alta de cuenta con email + contraseña (Firebase Auth).
 /// Tras registrarse debe verificar el mail antes de entrar a la app.
+/// App Store 5.1.1: el país no se pide en el alta; default silencioso AR.
 class RegistroCuentaWidget extends StatefulWidget {
   const RegistroCuentaWidget({super.key});
 
@@ -35,7 +36,7 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
   bool _pendienteVerificacion = false;
   bool _aceptoLegales = false;
   String? _emailRegistrado;
-  String _paisIso = CountryProfile.defaultIso;
+  final String _paisIso = CountryProfile.defaultIso;
 
   @override
   void dispose() {
@@ -49,15 +50,6 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
 
   Future<void> _registrar() async {
     if (!_formKey.currentState!.validate()) return;
-    if (!CountryProfile.isLaunch(_paisIso)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Hoy podés registrarte en Argentina, Chile o Uruguay.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
     if (!_aceptoLegales) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -291,45 +283,6 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
                           (v == null || v.trim().isEmpty) ? 'Obligatorio' : null,
                     ),
                     const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: _paisIso,
-                      decoration: _dec(
-                        'País *',
-                        prefix: const Icon(Icons.public_outlined),
-                      ),
-                      items: CountryProfile.listedForSelector
-                          .where((p) => p.launchReady)
-                          .map(
-                            (p) => DropdownMenuItem(
-                              value: p.iso,
-                              child: Text(p.name),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: _isLoading
-                          ? null
-                          : (v) {
-                              if (v != null && CountryProfile.isLaunch(v)) {
-                                setState(() => _paisIso = v);
-                              }
-                            },
-                      validator: (v) {
-                        if (v == null || v.isEmpty) return 'Obligatorio';
-                        if (!CountryProfile.isLaunch(v)) {
-                          return 'Hoy: Argentina, Chile o Uruguay';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Próximamente se sumarán más países.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
                     TextFormField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
@@ -517,11 +470,11 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
           const SizedBox(height: 12),
           Text(
             'Te mandamos un enlace a $casilla.\n\n'
-            'Abrilo para activar la cuenta. Si no lo ves, mirá en spam.',
+            'Abrilo y después tocá Ya verifiqué.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 15,
-              height: 1.45,
+              height: 1.4,
               color: Colors.grey.shade700,
             ),
           ),
@@ -533,40 +486,20 @@ class _RegistroCuentaWidgetState extends State<RegistroCuentaWidget> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryColor,
                 foregroundColor: Colors.white,
+                elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
-                elevation: 0,
               ),
-              child: _isLoading
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Text(
-                      'Ya verifiqué · Entrar',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
-                      ),
-                    ),
+              child: const Text(
+                'Ya verifiqué',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+              ),
             ),
           ),
-          const SizedBox(height: 12),
-          OutlinedButton(
+          const SizedBox(height: 8),
+          TextButton(
             onPressed: _isLoading ? null : _reenviarMail,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: primaryColor,
-              side: BorderSide(color: primaryColor.withOpacity(0.4)),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
             child: const Text('Reenviar mail de verificación'),
           ),
           const SizedBox(height: 8),
