@@ -73,8 +73,8 @@ class HomeTourCopy {
         );
       }
       return const HomeTourCopy(
-        'Más confianza',
-        'Atajo a prestadores mejor evaluados cerca tuyo.',
+        'Cerca tuyo',
+        'Prestadores de tu zona, ordenados por calificación.',
       );
     }
     if (key == HomeTourKeys.navMisNumeros) {
