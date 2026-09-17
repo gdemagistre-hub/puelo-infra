@@ -10,7 +10,7 @@ class AcercaDeWidget extends StatelessWidget {
 
   const AcercaDeWidget({super.key, this.modoPrestador = false});
 
-  static const String versionLabel = 'Versión 1.0.4 (19)';
+  static const String versionLabel = 'Versión 1.0.4 (20)';
   static const String copyright = 'Copyright 2026 — Puelo.app';
 
   Color get _primary =>
