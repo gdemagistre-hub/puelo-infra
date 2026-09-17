@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 
 /// Catálogo de servicios: categoría → especialidad + sinónimos.
 /// Fuente única para UI de prestador, buscador y labels.
+/// Home cliente top-8 vive en DemandaOficiosService (no se toca acá).
 class CatalogoOficios {
   CatalogoOficios._();
 
-  static const String version = '2.0';
+  static const String version = '2.1';
 
   // ---------------------------------------------------------------------------
   // Categorías (chips de búsqueda / agrupación)
@@ -23,6 +24,11 @@ class CatalogoOficios {
     OficioCategoria('seguridad_tech', 'Seguridad y tech', Icons.videocam_outlined),
     OficioCategoria('mudanzas', 'Mudanzas y fletes', Icons.local_shipping_outlined),
     OficioCategoria('mascotas', 'Mascotas', Icons.pets_outlined),
+    OficioCategoria('auto_domicilio', 'Auto a domicilio', Icons.local_car_wash_outlined),
+    OficioCategoria('cuidado_personal', 'Cuidado personal', Icons.content_cut_outlined),
+    OficioCategoria('bienestar', 'Bienestar', Icons.fitness_center_outlined),
+    OficioCategoria('cuidado_en_casa', 'Cuidado en casa', Icons.favorite_outline),
+    OficioCategoria('vida_barrio', 'Clases y eventos', Icons.celebration_outlined),
     OficioCategoria('hogar_varios', 'Hogar y varios', Icons.home_repair_service_outlined),
   ];
 
@@ -114,6 +120,8 @@ class CatalogoOficios {
         ['post obra', 'fin de obra']),
     OficioEspecialidad('fumigacion', 'Fumigación', 'limpieza',
         ['fumigar', 'plagas', 'desinfectar']),
+    OficioEspecialidad('planchado', 'Planchado y lavandería', 'limpieza',
+        ['planchar', 'lavanderia', 'ropa']),
 
     // —— Clima ——
     OficioEspecialidad('aire_acondicionado', 'Aire acondicionado', 'clima',
@@ -145,9 +153,57 @@ class CatalogoOficios {
     OficioEspecialidad('paseador_perros', 'Paseador de perros', 'mascotas',
         ['pasear', 'perro', 'mascota']),
     OficioEspecialidad('peluqueria_canina', 'Peluquería canina', 'mascotas',
-        ['peluqueria', 'grooming']),
+        ['canina', 'grooming', 'perro', 'mascota', 'peluqueria canina', 'corte perro']),
     OficioEspecialidad('adiestramiento', 'Adiestramiento', 'mascotas',
         ['entrenar', 'obediencia']),
+
+    // —— Auto a domicilio ——
+    OficioEspecialidad('lavado_auto', 'Lavado de auto a domicilio', 'auto_domicilio',
+        ['lavadero', 'car wash', 'lavado auto', 'auto en casa', 'lavado']),
+    OficioEspecialidad('detailing_auto', 'Detailing', 'auto_domicilio',
+        ['detailing', 'estetico auto', 'hidratacion cueros']),
+    OficioEspecialidad('gomeria_domicilio', 'Gomería a domicilio', 'auto_domicilio',
+        ['gomeria', 'pinchadura', 'inflado', 'auxilio liviano']),
+
+    // —— Cuidado personal ——
+    OficioEspecialidad('peluqueria', 'Peluquería a domicilio', 'cuidado_personal',
+        ['corte', 'color', 'brushing', 'peluquera', 'peinado']),
+    OficioEspecialidad('barberia', 'Barbería', 'cuidado_personal',
+        ['barbero', 'corte hombre', 'barba']),
+    OficioEspecialidad('manicura', 'Manicura / uñas', 'cuidado_personal',
+        ['unas', 'uñas', 'semipermanente', 'kapping', 'manicuria']),
+    OficioEspecialidad('pedicura', 'Pedicura', 'cuidado_personal',
+        ['pies', 'pedicuria']),
+    OficioEspecialidad('maquillaje', 'Maquillaje', 'cuidado_personal',
+        ['makeup', 'maquilladora', 'novias']),
+    OficioEspecialidad('depilacion', 'Depilación', 'cuidado_personal',
+        ['cera', 'depiladora']),
+
+    // —— Bienestar ——
+    OficioEspecialidad('personal_trainer', 'Personal trainer', 'bienestar',
+        ['entrenador', 'gym en casa', 'pt', 'entrenamiento']),
+    OficioEspecialidad('yoga_pilates', 'Yoga / pilates', 'bienestar',
+        ['yoga', 'pilates', 'stretching']),
+    OficioEspecialidad('masajes', 'Masajes', 'bienestar',
+        ['masaje', 'deportivo', 'relajacion']),
+
+    // —— Cuidado en casa ——
+    OficioEspecialidad('acompanante_mayores', 'Acompañante de adultos mayores', 'cuidado_en_casa',
+        ['acompanante', 'cuidado adultos', 'adultos mayores']),
+    OficioEspecialidad('ninera', 'Niñera', 'cuidado_en_casa',
+        ['babysitter', 'ninera', 'cuidado ninos', 'niños']),
+    OficioEspecialidad('cocinera_domicilio', 'Cocinera a domicilio', 'cuidado_en_casa',
+        ['cocinera', 'chef en casa', 'viandas']),
+
+    // —— Clases y eventos ——
+    OficioEspecialidad('clases_particulares', 'Clases particulares', 'vida_barrio',
+        ['profesor', 'apoyo escolar', 'tutor']),
+    OficioEspecialidad('ingles', 'Inglés', 'vida_barrio',
+        ['ingles', 'english', 'clases ingles']),
+    OficioEspecialidad('catering', 'Catering', 'vida_barrio',
+        ['catering', 'evento', 'comida evento']),
+    OficioEspecialidad('fotografo_eventos', 'Fotografía de eventos', 'vida_barrio',
+        ['fotografo', 'fotografia', 'fotos evento']),
 
     // —— Hogar varios ——
     OficioEspecialidad('cerrajeria', 'Cerrajería', 'hogar_varios',
