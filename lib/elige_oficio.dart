@@ -33,6 +33,10 @@ class _EligeOficioWidgetState extends State<EligeOficioWidget> {
     {'id': 'herreria', 'label': 'Herrería', 'icon': Icons.hardware_rounded, 'color': Color(0xFF78716C)},
     {'id': 'mudanzas', 'label': 'Mudanzas', 'icon': Icons.local_shipping_rounded, 'color': Color(0xFFEA580C)},
     {'id': 'cerrajeria', 'label': 'Cerrajería', 'icon': Icons.lock_rounded, 'color': Color(0xFF475569)},
+    {'id': 'peluqueria', 'label': 'Peluquería', 'icon': Icons.content_cut_rounded, 'color': Color(0xFFDB2777)},
+    {'id': 'lavado_auto', 'label': 'Lavado auto', 'icon': Icons.local_car_wash_rounded, 'color': Color(0xFF0369A1)},
+    {'id': 'personal_trainer', 'label': 'Trainer', 'icon': Icons.fitness_center_rounded, 'color': Color(0xFF15803D)},
+    {'id': 'ninera', 'label': 'Niñera', 'icon': Icons.child_care_rounded, 'color': Color(0xFF7C3AED)},
   ];
 
   final TextEditingController _searchCtrl = TextEditingController();
@@ -341,7 +345,7 @@ class _EligeOficioWidgetState extends State<EligeOficioWidget> {
                 textInputAction: TextInputAction.search,
                 onChanged: _onSearchChanged,
                 decoration: InputDecoration(
-                  hintText: 'Ej: plomería, cerámicos, mudanzas…',
+                  hintText: 'Ej: peluquería, lavado de auto, trainer…',
                   prefixIcon: const Icon(Icons.search_rounded, color: _teal),
                   suffixIcon: _searchCtrl.text.isEmpty
                       ? null
