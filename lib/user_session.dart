@@ -323,7 +323,7 @@ class UserSession {
           String nombre = '';
           String apellido = '';
           if (display.isNotEmpty) {
-            final parts = display.split(RegExp(r'\s+'));
+            final parts = display.split(RegExp(r'\\s+'));
             nombre = parts.first;
             if (parts.length > 1) apellido = parts.sublist(1).join(' ');
           }
@@ -432,7 +432,17 @@ class UserSession {
     }
   }
 
-  String get nombreCompleto => '$nombre $apellido'.trim();
+  static String _nombreLimpio(String? raw) {
+    final s = (raw ?? '').trim();
+    if (s.isEmpty || s.toLowerCase() == 'null') return '';
+    return s;
+  }
+
+  String get nombreCompleto {
+    final n = _nombreLimpio(nombre);
+    final a = _nombreLimpio(apellido);
+    return '$n $a'.trim();
+  }
 
   Future<void> _loadPendingValidacion() async {
     try {
