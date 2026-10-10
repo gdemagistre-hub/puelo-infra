@@ -6,6 +6,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 import 'user_session.dart';
 import 'geo/country_profile.dart';
+import 'invitacion_ref.dart';
 
 /// Auth real (Google + Apple + Facebook web + email/password).
 class AuthService {
@@ -16,6 +17,12 @@ class AuthService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   static const String _fnRegion = 'us-east1';
+
+  Future<void> _ponerInvitado(Map<String, dynamic> payload, String uid) async {
+    final inv = await InvitacionRef.pendienteDistintoDe(uid);
+    if (inv == null) return;
+    payload['invitado_por'] = inv;
+  }
 
   /// Web OAuth client ID. En Android Play hace falta para el idToken
   /// (google_sign_in 6.2). Lo inyecta tools/build_aab.ps1.
@@ -276,7 +283,9 @@ class AuthService {
         payload['currency'] = pais.currency;
         payload['pais_confirmado'] = true;
       }
+      await _ponerInvitado(payload, user.uid);
       await ref.set(payload, SetOptions(merge: true));
+      await InvitacionRef.consumir();
 
       return _auth.currentUser ?? user;
     } on FirebaseAuthException catch (e) {
@@ -509,7 +518,9 @@ class AuthService {
         'creado_en': FieldValue.serverTimestamp(),
         'updated_at': FieldValue.serverTimestamp(),
       };
+      await _ponerInvitado(data, user.uid);
       await ref.set(data);
+      await InvitacionRef.consumir();
       final created = await ref.get();
       return Map<String, dynamic>.from(created.data() ?? data);
     }

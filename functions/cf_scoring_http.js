@@ -1,6 +1,7 @@
 const { onRequest } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { runScoringBatch, runTopServiciosAyer } = require("./scoringCore");
+const { runPlazaAyer } = require("./cf_plaza");
 const {
   applyCors,
   requireBatchSecret,
@@ -40,6 +41,19 @@ exports.scoringBatchDaily = onSchedule(
     timeZone: "America/Argentina/Buenos_Aires",
   },
   async () => {
+    let plaza = { status: "skipped" };
+    try {
+      plaza = await runPlazaAyer();
+      console.log("plazaAyer", {
+        status: plaza.status,
+        ymd: plaza.ymd,
+        altas: plaza.altas,
+        salto_n: plaza.salto_n,
+      });
+    } catch (e) {
+      console.error("plazaAyer", e);
+      plaza = { status: "error", error: String(e.message || e).slice(0, 180) };
+    }
     let top = { status: "skipped" };
     try {
       top = await runTopServiciosAyer();
@@ -69,6 +83,7 @@ exports.scoringBatchDaily = onSchedule(
     console.log("scoringBatchDaily", result);
     return {
       scoring: result,
+      plaza,
       topServicios: top,
       purgeValidacionPii: purge,
       purgeCuentasEliminadas: purgeCuentas,

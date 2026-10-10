@@ -20,6 +20,26 @@ service cloud.firestore {
         && request.auth.token.get('admin', false) == true;
     }
 
+    function uidAjeno(v) {
+      return v is string
+        && v.size() >= 20
+        && v.size() <= 36
+        && v.matches('^[A-Za-z0-9]+$')
+        && v != request.auth.uid;
+    }
+
+    function invitadoPorCreateOk() {
+      return !request.resource.data.keys().hasAny(['invitado_por'])
+        || uidAjeno(request.resource.data.invitado_por);
+    }
+
+    function invitadoPorUpdateOk() {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['invitado_por'])
+        || (!resource.data.keys().hasAny(['invitado_por'])
+          && uidAjeno(request.resource.data.invitado_por));
+    }
+
     function isOwner(userId) {
       return isSignedIn() && !isDevImpersonation() && request.auth.uid == userId;
     }
@@ -108,6 +128,8 @@ service cloud.firestore {
     }
 
     match /stats/{doc} {
+      // stats/plaza_diaria y stats/plaza_diaria/dias/{ymd}: solo admin.
+      // El batch diario escribe con la cuenta de servicio (no pasa por estas rules).
       allow read: if isAdmin() || doc == 'top_servicios';
       allow write: if isAdmin();
       match /{document=**} {
@@ -165,10 +187,13 @@ service cloud.firestore {
           && resource.data.get('cuenta_eliminada', false) != true);
 
       allow create: if createHasNoPrivileged()
+        && invitadoPorCreateOk()
         && (isOwner(userId) || isAdmin());
 
       allow update: if isAdmin()
-        || (isOwner(userId) && updateTouchesNoPrivileged());
+        || (isOwner(userId)
+          && updateTouchesNoPrivileged()
+          && invitadoPorUpdateOk());
 
       allow delete: if isAdmin();
 

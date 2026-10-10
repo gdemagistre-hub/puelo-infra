@@ -7,6 +7,7 @@ import 'catalogo_geo_cache.dart';
 import 'analytics/prox_analytics.dart';
 import 'identidad_pii.dart';
 import 'geo/country_profile.dart';
+import 'invitacion_ref.dart';
 
 /// Sesión en memoria + persistencia.
 ///
@@ -344,11 +345,14 @@ class UserSession {
             'es_trabajador': false,
             'estado': 'activo',
           };
+          final inv = await InvitacionRef.pendienteDistintoDe(user.uid);
           await FirebaseFirestore.instance.collection('usuarios').doc(user.uid).set({
             ...data,
+            if (inv != null) 'invitado_por': inv,
             'creado_en': FieldValue.serverTimestamp(),
             'updated_at': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
+          if (inv != null) await InvitacionRef.consumir();
         }
 
         uid = user.uid;

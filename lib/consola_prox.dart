@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import 'admin/plaza_tablero.dart';
 import 'admin/usuarios_resumen.dart';
 import 'scoring_service.dart';
 import 'user_session.dart';
@@ -39,6 +40,7 @@ class _ConsolaProxWidgetState extends State<ConsolaProxWidget> {
   String? _batchMsg;
 
   UsuariosResumen _usuarios = const UsuariosResumen();
+  int _plazaGen = 0;
 
   @override
   void initState() {
@@ -75,7 +77,12 @@ class _ConsolaProxWidgetState extends State<ConsolaProxWidget> {
       debugPrint('ConsolaProx load error: $e');
     }
     _usuarios = await UsuariosResumen.cargar();
-    if (mounted) setState(() => _loading = false);
+    if (mounted) {
+      setState(() {
+        _loading = false;
+        _plazaGen++;
+      });
+    }
   }
 
   void _recompute() {
@@ -230,6 +237,8 @@ class _ConsolaProxWidgetState extends State<ConsolaProxWidget> {
                       child: ListView(
                         padding: const EdgeInsets.all(16),
                         children: [
+                          PlazaTablero(generation: _plazaGen),
+                          const SizedBox(height: 12),
                           _bannerSeguridad(),
                           const SizedBox(height: 12),
                           _usuariosCard(),

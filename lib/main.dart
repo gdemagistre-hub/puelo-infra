@@ -10,6 +10,7 @@ import 'theme/app_theme.dart';
 import 'theme/app_copy.dart';
 import 'analytics/prox_analytics.dart';
 import 'user_session.dart';
+import 'invitacion_ref.dart';
 
 import 'splashScreen.dart';
 import 'loginScreen.dart';
@@ -96,6 +97,10 @@ void main() async {
 
   // S3: App Check monitor. Fail-open si falta site key / provider.
   await AppCheckBootstrap.activate();
+
+  try {
+    await InvitacionRef.capturarDeUri(Uri.base);
+  } catch (_) {}
 
   if (AppEnv.verboseLogging) {
     debugPrint('Puelo env=${AppEnv.label} showDevTools=${AppEnv.showDevTools}');
