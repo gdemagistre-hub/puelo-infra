@@ -1,6 +1,16 @@
 /**
  * Scoring batch core (Admin SDK).
- * Model v1.2-phase1.5-cf — batch diario sin depender de la app.
+ *
+ * Qué hace: una vez por noche recalcula badge y score de identidad de cada
+ * usuario y los deja en el documento público (badge_prestador y scoring
+ * sin preview de crédito). El buscador y la tarjeta leen eso.
+ *
+ * score_credito_preview y readiness no van al documento público: Firestore
+ * no puede ocultar campos de un doc que el directorio lee. Esos números
+ * quedan en scoring_features/{uid} (solo admin). Si el padre todavía los
+ * tiene, este batch los copia ahí y los borra.
+ *
+ * Model v1.2-phase1.5-cf. No depende de la app.
  */
 const admin = require("firebase-admin");
 if (!admin.apps.length) admin.initializeApp();
@@ -8,6 +18,23 @@ const db = admin.firestore();
 const { mergePii, sanitizarOps, flagsContactoPublico, sanitizeValidacionesArray } = require("./pii");
 
 const MODEL_VERSION = "v1.2-phase1-cf";
+
+// Campos que no pueden quedar en usuarios/{uid}: el directorio lo lee entero.
+const LEAK_KEYS = [
+  "readiness_microcredito",
+  "readiness_bucket",
+  "readiness_detalle",
+  "readiness_next_step",
+  "readiness_academia",
+  "readiness_oferta_elegible",
+  "readiness_actualizado_en",
+  "trust_tier",
+  "score_credito",
+  "score_credito_preview",
+  "score_total",
+  "riesgo_fraude",
+  "fraud_flags",
+];
 const LOCK_TTL_MS = 15 * 60 * 1000;
 
 function noVacio(v) {
@@ -118,6 +145,7 @@ async function runScoringBatch({ trigger = "scheduler", force = false } = {}) {
           f_score_identidad: scoreId,
           y_badge: badge,
         };
+        const preview = Math.round(0.35 * scoreId);
         const parentUpdate = {
             badge_prestador: badge,
             score_actualizado_en: admin.firestore.FieldValue.serverTimestamp(),
@@ -128,11 +156,17 @@ async function runScoringBatch({ trigger = "scheduler", force = false } = {}) {
               score_identidad: scoreId,
               score_servicio: 0,
               score_cliente: 0,
-              score_credito_preview: Math.round(0.35 * scoreId),
               actualizado_en: admin.firestore.FieldValue.serverTimestamp(),
               last_run_id: runId,
             },
         };
+        const carried = {};
+        for (const k of LEAK_KEYS) {
+          if (k !== "score_credito_preview" && data[k] !== undefined) {
+            carried[k] = data[k];
+          }
+          parentUpdate[k] = admin.firestore.FieldValue.delete();
+        }
         const piiOps = sanitizarOps(data);
         if (piiOps) {
           batch.set(
@@ -153,16 +187,19 @@ async function runScoringBatch({ trigger = "scheduler", force = false } = {}) {
           parentUpdate,
           { merge: true }
         );
-        batch.set(
-          db.collection("scoring_features").doc(doc.id),
-          {
+        const featureDoc = {
             uid: doc.id,
             model_version: MODEL_VERSION,
             updated_at: admin.firestore.FieldValue.serverTimestamp(),
             last_run_id: runId,
             features,
             labels: { y_badge: badge, y_score_identidad: scoreId },
-          },
+            interno: { score_credito_preview: preview },
+        };
+        Object.assign(featureDoc, carried);
+        batch.set(
+          db.collection("scoring_features").doc(doc.id),
+          featureDoc,
           { merge: true }
         );
         n++;

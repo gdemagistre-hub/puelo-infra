@@ -2,8 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Madurez para microcrédito (V1).
 ///
-/// Independiente del score/badge públicos del marketplace.
-/// Academia es **indicativa** (gate educativo): no suma al 0–100.
+/// Independiente del badge y de las estrellas que ve el cliente.
+/// El número vive en scoring_features/{uid} (solo admin). No se escribe
+/// en usuarios/{uid}: ese documento lo lee el directorio entero.
+/// Academia es indicativa (gate educativo): no suma al 0–100.
 class ReadinessService {
   ReadinessService._();
   static final _db = FirebaseFirestore.instance;
@@ -274,7 +276,7 @@ class ReadinessService {
     return 0;
   }
 
-  /// Batch: escribe solo campos readiness_* (no toca badge/list/scoring público).
+  /// Batch admin: guarda readiness en scoring_features y lo saca del perfil público.
   static Future<ReadinessBatchResult> recalcularTodos({
     int pageSize = 150,
     int maxUsers = 800,
@@ -311,25 +313,14 @@ class ReadinessService {
             nCapsulasAcademia: nCap,
           );
           batch.set(
-            doc.reference,
-            {
-              'readiness_microcredito': r.score,
-              'readiness_bucket': r.bucket,
-              'readiness_detalle': r.detalle,
-              'readiness_next_step': r.nextStep,
-              'readiness_academia': {
-                'n_capsulas': r.academiaN,
-                'ok': r.academiaOk,
-                'min_requeridas': academiaMinRequeridas,
-              },
-              'readiness_oferta_elegible': r.ofertaElegible,
-              'readiness_actualizado_en': FieldValue.serverTimestamp(),
-            },
+            _db.collection('scoring_features').doc(doc.id),
+            _payload(doc.id, data, r),
             SetOptions(merge: true),
           );
+          batch.set(doc.reference, _borradoPublico(), SetOptions(merge: true));
           enBatch++;
           escritos++;
-          if (enBatch >= 400) {
+          if (enBatch >= 200) {
             await batch.commit();
             batch = _db.batch();
             enBatch = 0;
@@ -351,7 +342,7 @@ class ReadinessService {
     );
   }
 
-  /// Recalcula un solo uid (detalle admin / debug).
+  /// Recalcula un solo uid (detalle admin). No deja el número en el perfil público.
   static Future<ReadinessResult> recalcularUid(String uid) async {
     final doc = await _db.collection('usuarios').doc(uid).get();
     final data = doc.data() ?? {};
@@ -363,7 +354,45 @@ class ReadinessService {
       tieneFondoEmergencia: sig.fondo,
       nCapsulasAcademia: _academiaFromData(data),
     );
-    await doc.reference.set({
+    final batch = _db.batch();
+    batch.set(
+      _db.collection('scoring_features').doc(uid),
+      _payload(uid, data, r),
+      SetOptions(merge: true),
+    );
+    batch.set(doc.reference, _borradoPublico(), SetOptions(merge: true));
+    await batch.commit();
+    return r;
+  }
+
+  static const _leakKeys = [
+    'readiness_microcredito',
+    'readiness_bucket',
+    'readiness_detalle',
+    'readiness_next_step',
+    'readiness_academia',
+    'readiness_oferta_elegible',
+    'readiness_actualizado_en',
+    'trust_tier',
+    'score_credito',
+    'score_credito_preview',
+    'score_total',
+  ];
+
+  static Map<String, dynamic> _borradoPublico() {
+    return {for (final k in _leakKeys) k: FieldValue.delete()};
+  }
+
+  static Map<String, dynamic> _payload(
+    String uid,
+    Map<String, dynamic> data,
+    ReadinessResult r,
+  ) {
+    return {
+      'uid': uid,
+      'nombre': (data['nombre'] ?? '').toString(),
+      'apellido': (data['apellido'] ?? '').toString(),
+      'list_badge': data['list_badge'] ?? data['badge_prestador'],
       'readiness_microcredito': r.score,
       'readiness_bucket': r.bucket,
       'readiness_detalle': r.detalle,
@@ -375,8 +404,7 @@ class ReadinessService {
       },
       'readiness_oferta_elegible': r.ofertaElegible,
       'readiness_actualizado_en': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-    return r;
+    };
   }
 }
 

@@ -5,7 +5,8 @@ import '../readiness/readiness_service.dart';
 import '../scoring_service.dart';
 import '../user_session.dart';
 
-/// Tablero admin: madurez para microcrédito (solo lectura + recalcular).
+/// Tablero admin: madurez para microcrédito.
+/// Lee scoring_features (solo admin). El perfil público no tiene este número.
 class ReadinessAdminScreen extends StatefulWidget {
   const ReadinessAdminScreen({super.key});
 
@@ -52,13 +53,13 @@ class _ReadinessAdminScreenState extends State<ReadinessAdminScreen> {
       QuerySnapshot<Map<String, dynamic>> snap;
       try {
         snap = await FirebaseFirestore.instance
-            .collection('usuarios')
+            .collection('scoring_features')
             .orderBy('readiness_microcredito', descending: true)
             .limit(120)
             .get();
       } catch (_) {
         snap = await FirebaseFirestore.instance
-            .collection('usuarios')
+            .collection('scoring_features')
             .limit(120)
             .get();
       }
