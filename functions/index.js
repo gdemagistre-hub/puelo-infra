@@ -1,13 +1,29 @@
 /**
- * Cloud Functions assembler — Puelo
- * 2026-08-31 S1: validación en cf_validacion (sin calle en calificaciones).
- * 2026-09-06: cf_cuenta (baja in-app + mensaje desarrollador).
+ * Entrypoint de Cloud Functions (package.json "main").
+ *
+ * Qué hace: fija los defaults de todas las funciones y reexporta los handlers
+ * de los módulos. No contiene lógica de negocio.
+ *
+ * Defaults para callables livianos: us-east1, 256 MiB, 60 s, máximo 5
+ * instancias. Sin mínimo de instancias (no queda nada encendido al pedo).
+ *
+ * El batch de scoring NO usa este default: cf_scoring_http.js declara
+ * 1 GiB, 540 s y 1 instancia. Fiados y oficios libres también se sobreescriben
+ * en su propio archivo.
+ *
+ * index_impl.js no se carga. No es fuente. Si este archivo queda truncado
+ * (SEE_FILE / PLACEHOLDER) el deploy pierde funciones en silencio:
+ * functions/check_exports.js lo frena antes de publicar.
+ *
+ * assignSafe traga un módulo que no carga para no tumbar el proceso al
+ * arrancar. El guard de CI exige igual que los exports críticos existan.
  */
 const { setGlobalOptions } = require("firebase-functions/v2");
 setGlobalOptions({
   region: "us-east1",
-  memory: "1GiB",
-  timeoutSeconds: 540,
+  memory: "256MiB",
+  timeoutSeconds: 60,
+  maxInstances: 5,
 });
 
 function isCfHandler(v) {

@@ -1,3 +1,13 @@
+/**
+ * Batch nocturno de scoring, plaza y top de oficios.
+ *
+ * scoringBatchDaily corre a las 02:30 ART (plaza, top de oficios, purga de
+ * validaciones y de cuentas, después el scoring). scoringBatchHttp es el
+ * mismo trabajo disparado a mano: solo POST y header X-Batch-Secret.
+ *
+ * No heredan el default liviano de index.js. Recorren usuarios, así que
+ * quedan en 1 GiB, 540 s y una sola instancia para no solaparse.
+ */
 const { onRequest } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { runScoringBatch, runTopServiciosAyer } = require("./scoringCore");
@@ -7,10 +17,17 @@ const {
   requireBatchSecret,
 } = require("./cf_shared");
 
+const BATCH_RUN = {
+  memory: "1GiB",
+  timeoutSeconds: 540,
+  maxInstances: 1,
+};
+
 exports.scoringBatchHttp = onRequest(
   {
     invoker: "public",
     secrets: ["BATCH_SECRET"],
+    ...BATCH_RUN,
   },
   async (req, res) => {
     applyCors(req, res);
@@ -39,6 +56,7 @@ exports.scoringBatchDaily = onSchedule(
   {
     schedule: "30 2 * * *",
     timeZone: "America/Argentina/Buenos_Aires",
+    ...BATCH_RUN,
   },
   async () => {
     let plaza = { status: "skipped" };

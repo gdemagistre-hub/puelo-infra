@@ -32,6 +32,13 @@ jobs:
         working-directory: functions
         run: npm ci --ignore-scripts
 
+      - name: Guard exports before deploy
+        working-directory: functions
+        env:
+          GCLOUD_PROJECT: lifewalletpuelo
+          GOOGLE_CLOUD_PROJECT: lifewalletpuelo
+        run: node check_exports.js
+
       - name: Deploy functions
         uses: w9jds/firebase-action@5b73b1274a2229c7598af09e6e95addfb75f897b # master / tools v15.28.1
         with:
