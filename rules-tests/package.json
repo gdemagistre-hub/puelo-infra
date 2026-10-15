@@ -1,0 +1,13 @@
+{
+  "name": "puelo-rules-tests",
+  "private": true,
+  "description": "Tests del emulador para firestore.rules. No se despliega. El script se corre desde esta carpeta y sube a la raíz, donde está firebase.json.",
+  "scripts": {
+    "test": "cd .. && firebase emulators:exec --only firestore --project demo-puelo \"node --test rules-tests/firestore.rules.test.js\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^11.6.0",
+    "firebase-tools": "^14.11.0"
+  }
+}
