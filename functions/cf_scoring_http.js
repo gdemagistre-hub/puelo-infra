@@ -2,8 +2,13 @@
  * Batch nocturno de scoring, plaza y top de oficios.
  *
  * scoringBatchDaily corre a las 02:30 ART (plaza, top de oficios, purga de
- * validaciones y de cuentas, después el scoring). scoringBatchHttp es el
- * mismo trabajo disparado a mano: solo POST y header X-Batch-Secret.
+ * validaciones y de cuentas, después el scoring). Cloud Scheduler lo invoca
+ * directo, con su propia identidad. No pasa por scoringBatchHttp.
+ *
+ * scoringBatchHttp es el mismo trabajo disparado a mano. invoker private:
+ * internet no despierta la función. Cloud Run responde 403 antes de
+ * ejecutarla. El header X-Batch-Secret sigue siendo la segunda cerradura
+ * para quien sí tiene identidad en el proyecto.
  *
  * No heredan el default liviano de index.js. Recorren usuarios, así que
  * quedan en 1 GiB, 540 s y una sola instancia para no solaparse.
@@ -25,7 +30,7 @@ const BATCH_RUN = {
 
 exports.scoringBatchHttp = onRequest(
   {
-    invoker: "public",
+    invoker: "private",
     secrets: ["BATCH_SECRET"],
     ...BATCH_RUN,
   },

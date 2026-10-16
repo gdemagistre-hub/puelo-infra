@@ -41,6 +41,8 @@ firebase deploy --only functions --project lifewalletpuelo
 
 Requiere plan Blaze. Tras deploy: `scoringBatchDaily` + HTTP `scoringBatchHttp`.
 
+`scoringBatchHttp` no acepta llamadas anónimas. Un POST sin identidad de Google recibe 403 y la función no arranca. El cron de las 02:30 no usa esa URL: Scheduler llama a `scoringBatchDaily`.
+
 ## App (solo debug/staging)
 
 Home → “Correr batch scoring (dev)” — no aparece en prod release.
