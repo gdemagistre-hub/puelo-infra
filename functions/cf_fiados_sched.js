@@ -1,3 +1,16 @@
+/**
+ * Avisos de vencimiento de fiados.
+ *
+ * fiadosVtoDaily corre a las 08:00 ART y fiadosVtoEvening a las 18:00 ART.
+ * Scheduler los invoca directo. No pasan por fiadosVtoHttp.
+ *
+ * fiadosVtoHttp es el mismo trabajo disparado a mano. invoker private:
+ * internet no despierta la función. Cloud Run responde 403 antes de
+ * ejecutarla. El header X-Batch-Secret sigue siendo la segunda cerradura
+ * para quien sí tiene identidad en el proyecto.
+ *
+ * 512 MiB y 300 s. No usan el default liviano de index.js.
+ */
 const { onRequest } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { applyCors, requireBatchSecret } = require("./cf_shared");
@@ -33,7 +46,7 @@ exports.fiadosVtoEvening = onSchedule(
 
 exports.fiadosVtoHttp = onRequest(
   {
-    invoker: "public",
+    invoker: "private",
     secrets: ["BATCH_SECRET"],
     memory: "512MiB",
     timeoutSeconds: 300,
