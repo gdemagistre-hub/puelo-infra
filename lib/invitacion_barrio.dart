@@ -25,11 +25,27 @@ class InvitacionBarrio {
       'Si necesitás un oficio cerca de casa, mirá PROX. '
       'Es gratis. ${urlPara(UserSession().uid)}';
 
+  /// Invitación corta para un conocido, por WhatsApp.
+  /// *asteriscos* se ven en negrita. El link abre puelo.app.
+  static String get textoConocido {
+    final limpio = InvitacionRef.sanitizar(UserSession().uid);
+    final link = limpio == null ? urlPublica : '$urlPublica/?i=$limpio';
+    return 'Hola. Te paso *PROX*.\n\n'
+        'Oficios de confianza, cerca tuyo. Es gratis.\n\n'
+        'Si ofrecés un oficio, armá tu perfil y te encuentran.\n'
+        'Si necesitás uno, mirá quién trabaja en tu zona.\n\n'
+        '👉 Entrá acá\n'
+        '$link';
+  }
+
   static Future<void> invitarPrestador(BuildContext context) =>
       _abrir(context, textoPrestador);
 
   static Future<void> invitarVecino(BuildContext context) =>
       _abrir(context, textoVecino);
+
+  static Future<void> invitarConocido(BuildContext context) =>
+      _abrir(context, textoConocido);
 
   static Future<void> _abrir(BuildContext context, String texto) async {
     final wa = Uri.parse(

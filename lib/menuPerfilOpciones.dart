@@ -15,6 +15,7 @@ import 'auth_service.dart';
 import 'loginScreen.dart';
 import 'onboarding/home_tour_service.dart';
 import 'acerca_de.dart';
+import 'invitacion_barrio.dart';
 import 'theme/app_colors.dart';
 
 class MenuPerfilOpcionesWidget extends StatefulWidget {
@@ -275,6 +276,12 @@ class _MenuPerfilOpcionesWidgetState extends State<MenuPerfilOpcionesWidget> {
                       onTap: () => _abrirGuiaRapida(context),
                     ),
                   _row(
+                    icon: Icons.chat_outlined,
+                    label: 'Recomendar a un conocido',
+                    accent: AppColors.whatsapp,
+                    onTap: () => InvitacionBarrio.invitarConocido(context),
+                  ),
+                  _row(
                     icon: Icons.info_outline_rounded,
                     label: 'Acerca de',
                     onTap: () {
@@ -435,10 +442,11 @@ class _MenuPerfilOpcionesWidgetState extends State<MenuPerfilOpcionesWidget> {
     required VoidCallback onTap,
     bool destacado = false,
     bool danger = false,
+    Color? accent,
   }) {
     final color = danger
         ? Colors.red.shade700
-        : (destacado ? AppColors.prestador : primaryColor);
+        : (accent ?? (destacado ? AppColors.prestador : primaryColor));
     return InkWell(
       onTap: onTap,
       child: Padding(
