@@ -1,0 +1,51 @@
+name: Artifact Registry cleanup
+
+# Qué hace: en el repo gcf-artifacts (us-east1) borra imágenes de Cloud
+# Functions con más de 7 días, salvo las 3 más nuevas de cada función.
+# La que está sirviendo queda. El rollback sigue siendo git y un deploy,
+# no una imagen vieja. No toca la app ni las funciones.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/artifacts-cleanup.yml"
+      - ".github/artifact-cleanup-policy.json"
+
+permissions: {}
+
+jobs:
+  policy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Solo main
+        run: test "${GITHUB_REF}" = "refs/heads/main"
+
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Auth
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_LIFEWALLETPUELO }}
+        run: |
+          umask 077
+          printf '%s' "$GCP_SA_KEY" > "$RUNNER_TEMP/sa.json"
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/sa.json"
+          gcloud config set project lifewalletpuelo
+
+      - name: Set cleanup policy
+        run: |
+          gcloud artifacts repositories set-cleanup-policies gcf-artifacts \
+            --location=us-east1 \
+            --project=lifewalletpuelo \
+            --policy=.github/artifact-cleanup-policy.json \
+            --no-dry-run
+
+      - name: Show policy
+        run: |
+          gcloud artifacts repositories describe gcf-artifacts \
+            --location=us-east1 \
+            --project=lifewalletpuelo \
+            --format="yaml(cleanupPolicies,cleanupPolicyDryRun)"
